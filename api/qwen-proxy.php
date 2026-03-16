@@ -7,14 +7,26 @@
  *
  * POST /api/qwen-proxy.php
  * Body: { "message": "..." }
+ *
+ * API key configuration — set QWEN_API_KEY in one of two ways:
+ *   1. Add  define('QWEN_API_KEY', 'sk-...');  to includes/config.php  (preferred)
+ *   2. Set an environment variable:  QWEN_API_KEY=sk-...
  */
 
-// ── Configuration ──────────────────────────────────────────────────
-const QWEN_API_KEY      = 'YOUR_QWEN_API_KEY_HERE';   // ← replace with your Dashscope API key
-const QWEN_API_URL      = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions';
-const QWEN_MODEL        = 'qwen-plus';
-const MAX_INPUT_CHARS   = 4000;
-const RATE_LIMIT_SEC    = 2;   // minimum seconds between requests per IP
+// ── Load shared config (DB + API keys) ──────────────────────────────
+$configFile = __DIR__ . '/../includes/config.php';
+if (file_exists($configFile)) {
+    require_once $configFile;
+}
+
+// Resolve API key: config.php constant → env var → placeholder
+$qwenApiKey = defined('QWEN_API_KEY') ? QWEN_API_KEY
+            : (getenv('QWEN_API_KEY') ?: 'YOUR_QWEN_API_KEY_HERE');
+
+const QWEN_API_URL    = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions';
+const QWEN_MODEL      = 'qwen-plus';
+const MAX_INPUT_CHARS = 4000;
+const RATE_LIMIT_SEC  = 2;   // minimum seconds between requests per IP
 
 // ── CORS / headers ─────────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -39,16 +51,27 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// ── Rate limiting (simple in-memory via file lock) ─────────────────
+// ── Rate limiting (file-lock protected to avoid race conditions) ────
 $ip       = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 $rateFile = sys_get_temp_dir() . '/qwen_rate_' . md5($ip);
 $now      = microtime(true);
-if (file_exists($rateFile) && ($now - (float) file_get_contents($rateFile)) < RATE_LIMIT_SEC) {
-    http_response_code(429);
-    echo json_encode(['error' => 'Too many requests. Please wait a moment.']);
-    exit;
+
+$fh = fopen($rateFile, 'c+');
+if ($fh && flock($fh, LOCK_EX)) {
+    $lastTime = (float) stream_get_contents($fh);
+    if ($lastTime > 0 && ($now - $lastTime) < RATE_LIMIT_SEC) {
+        flock($fh, LOCK_UN);
+        fclose($fh);
+        http_response_code(429);
+        echo json_encode(['error' => 'Too many requests. Please wait a moment.']);
+        exit;
+    }
+    ftruncate($fh, 0);
+    rewind($fh);
+    fwrite($fh, $now);
+    flock($fh, LOCK_UN);
 }
-file_put_contents($rateFile, $now, LOCK_EX);
+if ($fh) fclose($fh);
 
 // ── Parse request ──────────────────────────────────────────────────
 $raw  = file_get_contents('php://input');
@@ -103,7 +126,7 @@ curl_setopt_array($ch, [
     CURLOPT_POST           => true,
     CURLOPT_POSTFIELDS     => $payload,
     CURLOPT_HTTPHEADER     => [
-        'Authorization: Bearer ' . QWEN_API_KEY,
+        'Authorization: Bearer ' . $qwenApiKey,
         'Content-Type: application/json',
     ],
     CURLOPT_TIMEOUT        => 30,

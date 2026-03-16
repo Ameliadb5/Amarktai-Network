@@ -1,16 +1,19 @@
 <?php
 /**
- * Amarktai Network — Database Configuration
+ * Amarktai Network — Database & API Configuration
  *
  * Copy this file to config.php on your VPS and fill in the real credentials.
  * This sample file is safe to commit; config.php is in .gitignore.
  */
 
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'amarktainet1');
-define('DB_USER', 'amarktainet1');
-define('DB_PASS', 'YOUR_DB_PASSWORD_HERE');   // replace on VPS
+define('DB_HOST',    'localhost');
+define('DB_NAME',    'amarktainet1');
+define('DB_USER',    'amarktainet1');
+define('DB_PASS',    'YOUR_DB_PASSWORD_HERE');   // replace on VPS
 define('DB_CHARSET', 'utf8mb4');
+
+// Qwen (Dashscope) API key — get yours at https://dashscope.aliyun.com
+define('QWEN_API_KEY', 'YOUR_QWEN_API_KEY_HERE');
 
 /**
  * Return a PDO connection (singleton).

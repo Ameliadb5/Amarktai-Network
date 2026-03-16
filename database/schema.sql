@@ -4,7 +4,8 @@
 -- ================================================================
 
 SET NAMES utf8mb4;
-SET time_zone = '+02:00';  -- SAST
+-- Use named timezone instead of hardcoded offset
+SET time_zone = 'Africa/Johannesburg';
 
 -- ── Waitlist ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `waitlist` (

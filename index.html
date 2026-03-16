@@ -895,10 +895,13 @@
   <!-- ================================================================
        SCRIPTS
   ================================================================ -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.min.js"></script>
+  <!-- CDN scripts — add integrity="sha384-..." via deploy.sh sri-check target before going live -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.min.js" crossorigin="anonymous"></script>
+  <!-- DOMPurify — sanitise AI-returned HTML before DOM injection -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js" crossorigin="anonymous"></script>
 
   <script>
   // ================================================================
@@ -1318,15 +1321,30 @@
     // Particle explosion
     window.explodeNeural();
 
+    // Sanitise AI-returned HTML — require DOMPurify; abort injection if unavailable
+    function safeHtml(raw) {
+      if (typeof DOMPurify !== 'undefined') {
+        return DOMPurify.sanitize(raw, {USE_PROFILES: {html: true}});
+      }
+      // DOMPurify failed to load — refuse to inject unverified HTML
+      console.warn('DOMPurify not available; skipping HTML injection.');
+      return '';
+    }
+
     if(typeof gsap!=='undefined'){
       gsap.to(target,{opacity:0,scale:.96,duration:.35,onComplete:()=>{
-        target.innerHTML=html;
+        const clean = safeHtml(html);
+        if (clean) target.innerHTML = clean;
         gsap.fromTo(target,{opacity:0,scale:1.04},{opacity:1,scale:1,duration:.5});
         if(typeof AOS!=='undefined') AOS.refresh();
       }});
     } else {
       target.style.opacity='0';
-      setTimeout(()=>{ target.innerHTML=html; target.style.opacity='1'; },350);
+      setTimeout(()=>{
+        const clean = safeHtml(html);
+        if (clean) target.innerHTML = clean;
+        target.style.opacity='1';
+      },350);
     }
   }
 
@@ -1352,15 +1370,8 @@
         appendMsg('ai','❌ <strong style="color:#ef4444;">Access denied.</strong> Incorrect password.');
       }
     }catch{
-      // Offline fallback for demo
-      if(pw==='Ashmor12@'){
-        adminAuth=true;
-        appendMsg('ai','✅ <strong style="color:#22c55e;">Access granted.</strong> Loading command centre…');
-        setTimeout(openAdmin,800);
-        closeChat();
-      } else {
-        appendMsg('ai','❌ <strong style="color:#ef4444;">Access denied.</strong> Incorrect password.');
-      }
+      // Server unreachable — do NOT fall back to client-side password checks
+      appendMsg('ai','⚠️ Could not reach the auth server. Ensure the site is running on a PHP host.');
     }
   }
 

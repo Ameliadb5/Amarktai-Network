@@ -8,7 +8,7 @@
 #   ./deploy.sh
 #
 # Before running:
-#   1. Replace YOUR_QWEN_API_KEY_HERE in api/qwen-proxy.php
+#   1. Edit includes/config.php with your real DB password and Qwen API key
 #   2. Ensure this script is run from the project root
 # ================================================================
 
@@ -17,8 +17,12 @@ set -euo pipefail
 WEB_ROOT="/var/www/html"
 DB_NAME="amarktainet1"
 DB_USER="amarktainet1"
-DB_PASS="3mGbMgua4aER"
-DB_ROOT_PASS=""          # leave blank to use sudo mysql without password
+
+# Prompt for DB password rather than hardcoding it
+if [ -z "${DB_PASS:-}" ]; then
+  read -rsp "Enter MySQL password for user '$DB_USER': " DB_PASS
+  echo ""
+fi
 
 echo ""
 echo "╔══════════════════════════════════════════════╗"
@@ -58,16 +62,21 @@ echo "    Permissions set ✓"
 
 # ── 3. Import database schema ────────────────────────────────────────
 echo "[3/6] Importing database schema …"
-if [ -n "$DB_ROOT_PASS" ]; then
-  sudo mysql -u root -p"$DB_ROOT_PASS" "$DB_NAME" < database/schema.sql
-else
-  sudo mysql "$DB_NAME" < database/schema.sql
-fi
+sudo mysql -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < database/schema.sql
 echo "    Schema imported ✓"
 
 # ── 4. Configure Nginx ───────────────────────────────────────────────
 echo "[4/6] Writing Nginx config …"
-sudo tee /etc/nginx/sites-available/amarktai > /dev/null <<'NGINX'
+
+# Auto-detect installed PHP-FPM version
+PHP_FPM_SOCK=$(ls /var/run/php/php*-fpm.sock 2>/dev/null | sort -V | tail -1)
+if [ -z "$PHP_FPM_SOCK" ]; then
+  PHP_FPM_SOCK="/var/run/php/php8.3-fpm.sock"
+  echo "    Warning: could not auto-detect PHP-FPM socket; defaulting to $PHP_FPM_SOCK"
+fi
+echo "    Using PHP-FPM socket: $PHP_FPM_SOCK"
+
+sudo tee /etc/nginx/sites-available/amarktai > /dev/null <<NGINX
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -84,10 +93,10 @@ server {
     add_header Referrer-Policy strict-origin-when-cross-origin always;
 
     # PHP via php-fpm
-    location ~ \.php$ {
+    location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:${PHP_FPM_SOCK};
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         include fastcgi_params;
     }
 
@@ -109,7 +118,7 @@ server {
     }
 
     location / {
-        try_files $uri $uri/ /index.html;
+        try_files \$uri \$uri/ /index.html;
     }
 }
 NGINX
@@ -127,17 +136,35 @@ echo "    Nginx reloaded ✓"
 
 # ── 6. PHP-FPM status ────────────────────────────────────────────────
 echo "[6/6] Checking PHP-FPM …"
-sudo systemctl is-active php8.3-fpm || sudo systemctl start php8.3-fpm
+PHP_FPM_SVC=$(systemctl list-units --type=service --state=active | grep -o 'php[0-9.]*-fpm' | head -1 || echo "php8.3-fpm")
+sudo systemctl is-active "$PHP_FPM_SVC" || sudo systemctl start "$PHP_FPM_SVC"
 echo "    PHP-FPM running ✓"
+
+# ── Optional: generate & apply SRI hashes for CDN scripts ─────────────
+# Uncomment the block below to add Subresource Integrity attributes to
+# all CDN <script> tags. Requires curl + openssl on the VPS.
+#
+# echo "Generating SRI hashes for CDN scripts …"
+# for html_file in "$WEB_ROOT"/*.html; do
+#   while IFS= read -r line; do
+#     if [[ "$line" =~ src=\"(https://[^\"]+\.js)\" ]]; then
+#       url="${BASH_REMATCH[1]}"
+#       hash=$(curl -fsSL "$url" | openssl dgst -sha384 -binary | openssl base64 -A)
+#       sri="sha384-$hash"
+#       sudo sed -i "s|src=\"$url\"|src=\"$url\" integrity=\"$sri\" crossorigin=\"anonymous\"|g" "$html_file"
+#     fi
+#   done < "$html_file"
+# done
+# echo "    SRI hashes applied ✓"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════╗"
 echo "║  ✅  Deployment complete!                                ║"
 echo "║                                                          ║"
 echo "║  👉  Next steps:                                         ║"
-echo "║  1. Set your Qwen API key:                               ║"
-echo "║     sudo nano /var/www/html/api/qwen-proxy.php           ║"
-echo "║     Replace YOUR_QWEN_API_KEY_HERE with your key         ║"
+echo "║  1. Set your credentials in config.php:                  ║"
+echo "║     sudo nano /var/www/html/includes/config.php          ║"
+echo "║     Set DB_PASS and QWEN_API_KEY                         ║"
 echo "║                                                          ║"
 echo "║  2. Download hero video (optional):                      ║"
 echo "║     Place as /var/www/html/assets/hero.mp4               ║"
@@ -146,6 +173,7 @@ echo "║  3. (Recommended) Set up SSL with Certbot:               ║"
 echo "║     sudo certbot --nginx                                 ║"
 echo "║                                                          ║"
 echo "║  4. Secret admin access:                                 ║"
-echo "║     Click the AI orb → type 'show admin' → Ashmor12@    ║"
+echo "║     Click the AI orb → type 'show admin'                 ║"
+echo "║     Then enter your admin password                       ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
