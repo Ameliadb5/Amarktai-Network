@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Amarktai Network Apps — 10 AI-powered applications built for Africa and the world.">
+  <meta name="theme-color" content="#0a0a1a">
+  <title>Apps — Amarktai Network</title>
+
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    :root{ --cyan:#00f5ff; --purple:#8b5cf6; --pink:#ec4899; --dark:#0a0a1a; }
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    html{ scroll-behavior:smooth; }
+    body{ font-family:'Inter',sans-serif; background:var(--dark); color:#fff; overflow-x:hidden; }
+    ::-webkit-scrollbar{ width:4px; }
+    ::-webkit-scrollbar-thumb{ background:var(--cyan); border-radius:2px; }
+    body::before{
+      content:''; position:fixed; inset:0;
+      background-image:linear-gradient(rgba(0,245,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,245,255,.025) 1px,transparent 1px);
+      background-size:60px 60px; pointer-events:none; z-index:0;
+    }
+    #content{ position:relative; z-index:1; }
+    .gradient-text{ background:linear-gradient(135deg,var(--cyan),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .btn-primary{ display:inline-flex; align-items:center; background:linear-gradient(135deg,var(--cyan),var(--purple)); color:#0a0a1a; font-weight:700; padding:.7rem 1.5rem; border-radius:50px; border:none; cursor:pointer; transition:all .3s; text-decoration:none; font-size:.875rem; box-shadow:0 0 20px rgba(0,245,255,.3); }
+    .btn-primary:hover{ transform:translateY(-2px); box-shadow:0 0 40px rgba(0,245,255,.5); }
+    .btn-outline{ display:inline-flex; align-items:center; background:transparent; border:1px solid currentColor; font-weight:600; padding:.65rem 1.4rem; border-radius:50px; cursor:pointer; transition:all .3s; text-decoration:none; font-size:.875rem; }
+    .btn-outline:hover{ background:rgba(255,255,255,.06); transform:translateY(-2px); }
+
+    /* Nav */
+    #navbar{ position:fixed; top:0; left:0; right:0; z-index:200; background:rgba(10,10,26,.85); backdrop-filter:blur(24px); border-bottom:1px solid rgba(0,245,255,.1); }
+    .nav-inner{ max-width:1280px; margin:0 auto; padding:.9rem 1.5rem; display:flex; align-items:center; justify-content:space-between; }
+    .nav-logo{ display:flex; align-items:center; gap:.75rem; text-decoration:none; }
+    .nav-logo-icon{ width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg,var(--cyan),var(--purple)); display:flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:900; color:#0a0a1a; box-shadow:0 0 20px rgba(0,245,255,.4); }
+    .nav-links{ display:flex; align-items:center; gap:2rem; }
+    .nav-links a{ color:rgba(255,255,255,.75); text-decoration:none; font-size:.875rem; font-weight:500; transition:color .2s; }
+    .nav-links a:hover,.nav-links a.active{ color:var(--cyan); }
+    #mobile-toggle{ display:none; background:none; border:1px solid rgba(0,245,255,.3); border-radius:8px; padding:.45rem .6rem; color:var(--cyan); cursor:pointer; }
+    #mobile-nav{ display:none; flex-direction:column; gap:1rem; padding:1rem 1.5rem 1.5rem; border-top:1px solid rgba(0,245,255,.1); }
+    #mobile-nav.open{ display:flex; }
+    #mobile-nav a{ color:rgba(255,255,255,.75); text-decoration:none; font-size:.95rem; font-weight:500; }
+    @media(max-width:768px){ #mobile-toggle{ display:block; } .nav-links,#nav-cta{ display:none; } }
+
+    .container{ max-width:1280px; margin:0 auto; padding:0 1.5rem; }
+    section{ padding:5.5rem 1.5rem; }
+    .section-label{ display:inline-flex; align-items:center; gap:.5rem; border-radius:50px; padding:.35rem 1rem; font-size:.8rem; font-weight:600; margin-bottom:1rem; }
+    .section-title{ font-size:clamp(1.9rem,4vw,3rem); font-weight:800; line-height:1.15; }
+
+    /* App cards */
+    .app-card{
+      background:rgba(13,13,43,.7); backdrop-filter:blur(20px);
+      border:1px solid rgba(0,245,255,.1); border-radius:24px; padding:2rem;
+      transition:all .4s; position:relative; overflow:hidden; display:flex; flex-direction:column;
+    }
+    .app-card::before{
+      content:''; position:absolute; inset:0;
+      background:linear-gradient(135deg,rgba(0,245,255,.04),rgba(139,92,246,.04));
+      opacity:0; transition:opacity .3s;
+    }
+    .app-card:hover{ transform:translateY(-8px); border-color:rgba(0,245,255,.4); box-shadow:0 24px 60px rgba(0,245,255,.15); }
+    .app-card:hover::before{ opacity:1; }
+    .app-icon{ width:56px; height:56px; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0; }
+    .status-badge{ padding:.2rem .75rem; border-radius:50px; font-size:.7rem; font-weight:700; }
+
+    /* Filter tabs */
+    .filter-tab{
+      padding:.5rem 1.25rem; border-radius:50px; font-size:.82rem; font-weight:600;
+      background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
+      color:rgba(255,255,255,.65); cursor:pointer; transition:all .2s;
+    }
+    .filter-tab:hover{ border-color:rgba(0,245,255,.3); color:var(--cyan); }
+    .filter-tab.active{ background:rgba(0,245,255,.12); border-color:var(--cyan); color:var(--cyan); }
+
+    footer{ background:rgba(5,5,15,.9); border-top:1px solid rgba(0,245,255,.1); padding:2rem 1.5rem; }
+    .footer-link{ color:rgba(255,255,255,.5); text-decoration:none; font-size:.875rem; transition:color .2s; }
+    .footer-link:hover{ color:var(--cyan); }
+  </style>
+</head>
+<body>
+<div id="content">
+
+  <!-- NAV -->
+  <nav id="navbar">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-icon">A</div>
+        <span style="font-weight:800;font-size:1.2rem;background:linear-gradient(135deg,#fff,rgba(255,255,255,.7));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Amarktai</span>
+      </a>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/apps.html" class="active">Apps</a>
+        <a href="/contact.html">Contact</a>
+      </div>
+      <div style="display:flex;align-items:center;gap:1rem;">
+        <a href="/contact.html" class="btn-primary" id="nav-cta" style="font-size:.82rem;padding:.6rem 1.25rem;">Get Access</a>
+        <button id="mobile-toggle" onclick="document.getElementById('mobile-nav').classList.toggle('open')"><i class="fas fa-bars"></i></button>
+      </div>
+    </div>
+    <div id="mobile-nav">
+      <a href="/">Home</a><a href="/about.html">About</a><a href="/apps.html">Apps</a><a href="/contact.html">Contact</a>
+      <a href="/contact.html" class="btn-primary" style="justify-content:center;">Get Access</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section style="padding-top:7rem;padding-bottom:3rem;">
+    <div class="container">
+      <div style="text-align:center;max-width:780px;margin:0 auto;">
+        <div data-aos="fade-down" class="section-label" style="background:rgba(0,245,255,.08);border:1px solid rgba(0,245,255,.25);color:var(--cyan);">🌐 The Full Ecosystem</div>
+        <h1 data-aos="fade-up" data-aos-delay="80" class="section-title" style="font-size:clamp(2.5rem,6vw,4.5rem);font-weight:900;margin-bottom:1.25rem;">
+          10 Apps. One <span class="gradient-text">Neural Network.</span>
+        </h1>
+        <p data-aos="fade-up" data-aos-delay="160" style="color:rgba(255,255,255,.65);font-size:1.1rem;line-height:1.75;margin-bottom:2.5rem;">
+          Every Amarktai application is a world-class product on its own. Together they share intelligence, user context, and data — creating an AI ecosystem unlike anything built in Africa before.
+        </p>
+        <!-- Filter tabs -->
+        <div data-aos="fade-up" data-aos-delay="240" style="display:flex;flex-wrap:wrap;gap:.65rem;justify-content:center;" id="filter-tabs">
+          <button class="filter-tab active" data-filter="all">All Apps</button>
+          <button class="filter-tab" data-filter="live">Live</button>
+          <button class="filter-tab" data-filter="invite-only">Invite Only</button>
+          <button class="filter-tab" data-filter="coming-soon">Coming Soon</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- APPS GRID -->
+  <section style="padding-top:0;padding-bottom:5rem;">
+    <div class="container">
+      <div id="apps-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.75rem;"></div>
+    </div>
+  </section>
+
+  <!-- CROSS-APP INTELLIGENCE SECTION -->
+  <section style="background:rgba(5,5,20,.5);">
+    <div class="container" style="max-width:900px;text-align:center;">
+      <div data-aos="fade-up" class="section-label" style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.25);color:#8b5cf6;">🔗 Unified Intelligence</div>
+      <h2 data-aos="fade-up" data-aos-delay="100" class="section-title" style="margin-bottom:1.25rem;">
+        All Apps Share <span class="gradient-text">One Brain</span>
+      </h2>
+      <p data-aos="fade-up" data-aos-delay="180" style="color:rgba(255,255,255,.65);font-size:1.05rem;line-height:1.75;margin-bottom:3rem;">
+        Unlike isolated SaaS tools, every Amarktai app feeds a unified neural layer. Your EquiProfile career data improves your Amarktai Jobs matches. Your Forex trading patterns inform your Crypto signals. Cross-app intelligence creates compounding value the more apps you use.
+      </p>
+      <div data-aos="zoom-in" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.25rem;">
+        <div style="background:rgba(13,13,43,.65);border:1px solid rgba(0,245,255,.12);border-radius:16px;padding:1.5rem;">
+          <div style="font-size:1.75rem;margin-bottom:.75rem;">⚡</div>
+          <h4 style="font-weight:700;font-size:.95rem;margin-bottom:.5rem;">Shared Data Layer</h4>
+          <p style="color:rgba(255,255,255,.55);font-size:.825rem;line-height:1.65;">One identity, one profile, one context — across all 10 apps.</p>
+        </div>
+        <div style="background:rgba(13,13,43,.65);border:1px solid rgba(139,92,246,.12);border-radius:16px;padding:1.5rem;">
+          <div style="font-size:1.75rem;margin-bottom:.75rem;">🧠</div>
+          <h4 style="font-weight:700;font-size:.95rem;margin-bottom:.5rem;">Neural Transfer</h4>
+          <p style="color:rgba(255,255,255,.55);font-size:.825rem;line-height:1.65;">Signals from one app train models in others — continuous improvement.</p>
+        </div>
+        <div style="background:rgba(13,13,43,.65);border:1px solid rgba(236,72,153,.12);border-radius:16px;padding:1.5rem;">
+          <div style="font-size:1.75rem;margin-bottom:.75rem;">🔒</div>
+          <h4 style="font-weight:700;font-size:.95rem;margin-bottom:.5rem;">Privacy-Preserving</h4>
+          <p style="color:rgba(255,255,255,.55);font-size:.825rem;line-height:1.65;">Zero-knowledge architecture — intelligence without exposure.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section>
+    <div class="container" style="max-width:660px;text-align:center;">
+      <div data-aos="zoom-in">
+        <h2 class="section-title" style="margin-bottom:1rem;">Can't Find What You Need?</h2>
+        <p style="color:rgba(255,255,255,.6);font-size:1.05rem;margin-bottom:2.25rem;">Join the waitlist on our home page or contact us directly. More apps ship every quarter.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;">
+          <a href="/" class="btn-primary"><i class="fas fa-home" style="margin-right:.5rem;"></i>Back to Home</a>
+          <a href="/contact.html" class="btn-outline" style="color:var(--cyan);border-color:var(--cyan);"><i class="fas fa-envelope" style="margin-right:.5rem;"></i>Contact Us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:1rem;">
+      <p style="color:rgba(255,255,255,.4);font-size:.8rem;">© 2025 Amarktai Network. Built in South Africa 🇿🇦</p>
+      <div style="display:flex;gap:1.5rem;">
+        <a href="/" class="footer-link">Home</a>
+        <a href="/about.html" class="footer-link">About</a>
+        <a href="/contact.html" class="footer-link">Contact</a>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.min.js" crossorigin="anonymous"></script>
+<script>
+AOS.init({duration:750,once:true,offset:80});
+
+const APPS=[
+  {name:"Amarktai Crypto",icon:"₿",color:"#f59e0b",status:"invite-only",url:"https://amarktai.online",users:4231,
+   desc:"Invite-only AI-powered crypto intelligence platform. Real-time signals, predictive analytics, automated portfolio optimisation, and on-chain anomaly detection across BTC, ETH, and ZAR pairs.",
+   features:["AI Signal Engine","On-Chain Analytics","Portfolio Optimizer","Risk Dashboard"]},
+  {name:"EquiProfile",icon:"👤",color:"#00f5ff",status:"live",url:"https://equiprofile.online",users:3847,
+   desc:"Live equity profile management system. Build, verify and monetise your professional identity. AI analyses your skills, projects, and endorsements to surface opportunities you'd never find manually.",
+   features:["AI Career Insights","Skill Verification","Network Graph","Opportunity Engine"]},
+  {name:"Kinship",icon:"🤝",color:"#ec4899",status:"coming-soon",url:"#",users:0,
+   desc:"AI-powered relationship and community network. Discover, nurture and grow meaningful connections across Africa. Kinship maps the strength of relationships, suggests introductions, and builds community.",
+   features:["Relationship Graph","Smart Introductions","Community Rooms","Event AI"]},
+  {name:"Amarktai Secure",icon:"🔒",color:"#8b5cf6",status:"coming-soon",url:"#",users:892,
+   desc:"Military-grade AI security suite for individuals and businesses. Continuous threat monitoring, zero-knowledge encryption, AI-powered vulnerability scanning, and real-time breach alerts.",
+   features:["Zero-Knowledge Vault","Threat Intelligence","AI Firewall","Breach Monitor"]},
+  {name:"Amarktai Marketing",icon:"📣",color:"#22c55e",status:"coming-soon",url:"#",users:1204,
+   desc:"AI-driven marketing automation for African businesses. Generate hyper-targeted campaigns, analyse audience sentiment, and deploy across social, email, and ad channels with zero manual effort.",
+   features:["Campaign Generator","Audience AI","Multi-Channel Deploy","Analytics Engine"]},
+  {name:"Amarktai Property Manager",icon:"🏠",color:"#f97316",status:"coming-soon",url:"#",users:687,
+   desc:"Smart property management AI. Automate listings, AI-screen tenants, predict maintenance windows, and maximise rental yields with market-aware pricing recommendations.",
+   features:["AI Tenant Screening","Predictive Maintenance","Dynamic Pricing","Portfolio Analytics"]},
+  {name:"Amarktai Agents",icon:"🤖",color:"#00f5ff",status:"coming-soon",url:"#",users:441,
+   desc:"Deploy and manage autonomous AI agents for your business. Custom-trained on your data, continuously self-improving, and always-on — your digital employees never sleep.",
+   features:["Custom Training","Auto-Improvement","Multi-Task Agents","Audit Trail"]},
+  {name:"Amarktai Forex",icon:"💱",color:"#eab308",status:"coming-soon",url:"#",users:1123,
+   desc:"AI forex trading intelligence with a South African edge. Real-time ZAR signal generation, automated risk management, and intelligent execution across major and exotic currency pairs.",
+   features:["ZAR Signal Engine","Risk Manager","Auto-Execute","Economic Calendar AI"]},
+  {name:"Amarktai Prayer",icon:"🙏",color:"#c084fc",status:"coming-soon",url:"#",users:756,
+   desc:"AI-powered spiritual community platform. Submit and join prayer requests, explore scripture with AI-guided insights, and connect across faith communities throughout Africa.",
+   features:["Prayer Network","Scripture AI","Faith Community","Devotional Engine"]},
+  {name:"Amarktai Jobs",icon:"💼",color:"#06b6d4",status:"coming-soon",url:"#",users:2966,
+   desc:"AI job matching built for Africa's market. Intelligent CV analysis, skills gap assessment, direct employer matching, and AI-powered interview preparation — zero recruitment fees.",
+   features:["AI CV Analyser","Skills Assessment","Employer Matching","Interview Coach"]}
+];
+
+function statusBg(s){ return s==='live'?'rgba(34,197,94,.15)':s==='invite-only'?'rgba(251,191,36,.15)':'rgba(139,92,246,.15)'; }
+function statusColor(s){ return s==='live'?'#22c55e':s==='invite-only'?'#fbbf24':'#8b5cf6'; }
+function statusLabel(s){ return s==='live'?'🟢 Live':s==='invite-only'?'🔑 Invite Only':'🔜 Coming Soon'; }
+
+function renderGrid(filter='all'){
+  const grid=document.getElementById('apps-grid');
+  const filtered=filter==='all'?APPS:APPS.filter(a=>a.status===filter);
+  grid.innerHTML=filtered.map((a,i)=>`
+    <div class="app-card" data-aos="fade-up" data-aos-delay="${(i%3)*70}">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;">
+        <div class="app-icon" style="background:${a.color}1a;border:1px solid ${a.color}44;">${a.icon}</div>
+        <div>
+          <h3 style="font-size:1.05rem;font-weight:800;line-height:1.2;margin-bottom:.3rem;">${a.name}</h3>
+          <span class="status-badge" style="background:${statusBg(a.status)};color:${statusColor(a.status)};">${statusLabel(a.status)}</span>
+        </div>
+      </div>
+      <p style="color:rgba(255,255,255,.6);font-size:.85rem;line-height:1.7;margin-bottom:1.25rem;flex:1;">${a.desc}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1.25rem;">
+        ${a.features.map(f=>`<span style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:50px;padding:.2rem .65rem;font-size:.72rem;color:rgba(255,255,255,.65);">${f}</span>`).join('')}
+      </div>
+      ${a.users>0?`<div style="font-size:.78rem;color:rgba(255,255,255,.45);margin-bottom:1rem;"><span style="color:${a.color};font-weight:700;">${a.users.toLocaleString()}</span> users</div>`:''}
+      ${a.url!=='#'?
+        `<a href="${a.url}" target="_blank" class="btn-primary" style="font-size:.82rem;padding:.65rem 1.25rem;background:linear-gradient(135deg,${a.color},${a.color}bb);box-shadow:0 0 20px ${a.color}44;">
+           Visit App <i class="fas fa-external-link-alt" style="margin-left:.4rem;font-size:.7rem;"></i>
+         </a>`:
+        `<button class="btn-outline" style="color:${a.color};border-color:${a.color}55;" onclick="joinWaitlist('${a.name}')">
+           <i class="fas fa-bell" style="margin-right:.4rem;"></i>Notify Me
+         </button>`
+      }
+    </div>
+  `).join('');
+  AOS.refresh();
+}
+
+// Filter tabs
+document.querySelectorAll('.filter-tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.filter-tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderGrid(btn.dataset.filter);
+  });
+});
+
+function joinWaitlist(appName){
+  const email=prompt(`Enter your email to get notified when ${appName} launches:`);
+  if(email&&email.includes('@')){
+    fetch('/api/waitlist.php',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,app:appName})
+    }).catch(()=>{});
+    alert('✅ You\'re on the list! We\'ll notify you at launch.');
+  }
+}
+
+renderGrid();
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+</script>
+</body>
+</html>

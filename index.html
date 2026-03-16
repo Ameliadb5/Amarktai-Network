@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Amarktai Network — Africa's most advanced AI ecosystem. Real-time intelligence across crypto, property, forex, and more.">
+  <meta name="theme-color" content="#0a0a1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Amarktai Network — Africa's AI Ecosystem</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Google Fonts: Inter only -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- AOS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --cyan: #00f5ff;
+      --purple: #8b5cf6;
+      --pink: #ec4899;
+      --dark: #0a0a1a;
+      --surface: #0d0d2b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--dark);
+      color: #fff;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--dark); }
+    ::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 2px; }
+
+    /* ── Background layers ── */
+    #bg-video {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: 0; opacity: .12; pointer-events: none;
+    }
+    #neural-canvas {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1; pointer-events: none;
+    }
+    #tsparticles {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 2; pointer-events: none;
+    }
+    /* scanline overlay */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.025) 2px, rgba(0,0,0,.025) 4px);
+      pointer-events: none; z-index: 3;
+    }
+    #content { position: relative; z-index: 10; }
+
+    /* ── Utilities ── */
+    .gradient-text {
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .glass {
+      background: rgba(13,13,43,.65);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0,245,255,.15); border-radius: 16px;
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center;
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      color: #0a0a1a; font-weight: 700; font-size: .9rem;
+      padding: .75rem 1.75rem; border-radius: 50px; border: none;
+      cursor: pointer; transition: all .3s;
+      box-shadow: 0 0 20px rgba(0,245,255,.35);
+      text-decoration: none;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 40px rgba(0,245,255,.55); }
+    .btn-outline {
+      display: inline-flex; align-items: center;
+      background: transparent;
+      border: 1px solid var(--cyan); color: var(--cyan);
+      font-weight: 700; font-size: .9rem;
+      padding: .75rem 1.75rem; border-radius: 50px;
+      cursor: pointer; transition: all .3s; text-decoration: none;
+    }
+    .btn-outline:hover { background: rgba(0,245,255,.1); transform: translateY(-2px); }
+
+    /* ── Nav ── */
+    #navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      background: rgba(10,10,26,.85);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(0,245,255,.1);
+      transition: all .3s;
+    }
+    .nav-inner {
+      max-width: 1280px; margin: 0 auto; padding: .9rem 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: .75rem; text-decoration: none;
+    }
+    .nav-logo-icon {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; font-weight: 900; color: #0a0a1a;
+      box-shadow: 0 0 20px rgba(0,245,255,.4);
+    }
+    .nav-links { display: flex; align-items: center; gap: 2rem; }
+    .nav-links a {
+      color: rgba(255,255,255,.75); text-decoration: none;
+      font-size: .875rem; font-weight: 500; transition: color .2s;
+    }
+    .nav-links a:hover, .nav-links a.active { color: var(--cyan); }
+    #mobile-toggle {
+      display: none; background: none;
+      border: 1px solid rgba(0,245,255,.3); border-radius: 8px;
+      padding: .45rem .6rem; color: var(--cyan); font-size: 1rem; cursor: pointer;
+    }
+    #mobile-nav {
+      display: none; flex-direction: column; gap: 1rem;
+      padding: 1rem 1.5rem 1.5rem;
+      border-top: 1px solid rgba(0,245,255,.1);
+    }
+    #mobile-nav.open { display: flex; }
+    #mobile-nav a {
+      color: rgba(255,255,255,.75); text-decoration: none;
+      font-size: .95rem; font-weight: 500; transition: color .2s;
+    }
+    #mobile-nav a:hover { color: var(--cyan); }
+    @media (max-width: 768px) {
+      #mobile-toggle { display: block; }
+      .nav-links, #nav-cta { display: none; }
+    }
+
+    /* ── Hero ── */
+    #hero-section {
+      min-height: 100vh;
+      display: flex; align-items: center;
+      padding: 7rem 1.5rem 5rem;
+    }
+    .hero-title {
+      font-size: clamp(2.6rem, 7vw, 6rem);
+      font-weight: 900; line-height: 1.04;
+    }
+
+    /* ── Feature cards ── */
+    .feature-card {
+      background: rgba(13,13,43,.6);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(0,245,255,.1);
+      border-radius: 20px; padding: 2rem;
+      transition: all .4s;
+    }
+    .feature-card:hover {
+      border-color: rgba(0,245,255,.35);
+      transform: translateY(-5px);
+      box-shadow: 0 20px 50px rgba(0,245,255,.12);
+    }
+    .feature-icon {
+      width: 60px; height: 60px; border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; margin-bottom: 1.25rem;
+    }
+
+    /* ── App cards ── */
+    .app-card {
+      background: rgba(13,13,43,.7);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(0,245,255,.1);
+      border-radius: 20px; padding: 1.5rem;
+      transition: all .4s; position: relative; overflow: hidden;
+    }
+    .app-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(0,245,255,.04), rgba(139,92,246,.04));
+      opacity: 0; transition: opacity .3s;
+    }
+    .app-card:hover {
+      transform: translateY(-8px);
+      border-color: rgba(0,245,255,.4);
+      box-shadow: 0 24px 60px rgba(0,245,255,.18);
+    }
+    .app-card:hover::before { opacity: 1; }
+
+    /* ── Stat numbers ── */
+    .stat-number {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ── AI Orb ── */
+    #ai-orb {
+      position: fixed; bottom: 2rem; right: 2rem;
+      z-index: 500; width: 70px; height: 70px; border-radius: 50%;
+      cursor: pointer;
+      background: radial-gradient(circle at 35% 35%, rgba(0,245,255,.85), rgba(139,92,246,.65));
+      border: 1px solid rgba(0,245,255,.5);
+      display: flex; align-items: center; justify-content: center;
+      animation: orbPulse 2.4s ease-in-out infinite;
+      transition: box-shadow .3s;
+    }
+    @keyframes orbPulse {
+      0%,100% { box-shadow: 0 0 20px rgba(0,245,255,.6), 0 0 50px rgba(139,92,246,.4); }
+      50%      { box-shadow: 0 0 45px rgba(0,245,255,.9), 0 0 90px rgba(139,92,246,.65); }
+    }
+    .orb-inner {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: rgba(10,10,26,.75); backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+    }
+    .orb-label {
+      position: absolute; right: 80px; top: 50%; transform: translateY(-50%);
+      background: rgba(13,13,43,.92); backdrop-filter: blur(20px);
+      border: 1px solid rgba(0,245,255,.3);
+      padding: .45rem 1rem; border-radius: 50px; white-space: nowrap;
+      font-size: .8rem; font-weight: 600; color: var(--cyan);
+      pointer-events: none; opacity: 0; transition: opacity .3s;
+    }
+    #ai-orb:hover .orb-label { opacity: 1; }
+
+    /* ── Chat Modal ── */
+    #chat-modal {
+      position: fixed; inset: 0; z-index: 2000;
+      display: none; align-items: flex-end; justify-content: flex-end;
+      padding: 2rem;
+    }
+    #chat-modal.open { display: flex; }
+    .chat-box {
+      width: min(480px, 96vw); height: min(640px, 82vh);
+      background: rgba(9,9,24,.97);
+      backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+      border: 1px solid rgba(0,245,255,.3);
+      border-radius: 24px; display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 0 60px rgba(0,245,255,.2), 0 0 120px rgba(139,92,246,.1);
+      animation: slideUp .4s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(50px) scale(.9); opacity: 0; }
+      to   { transform: translateY(0)    scale(1);  opacity: 1; }
+    }
+    .chat-header {
+      padding: 1.1rem 1.4rem;
+      background: linear-gradient(135deg, rgba(0,245,255,.06), rgba(139,92,246,.06));
+      border-bottom: 1px solid rgba(0,245,255,.1);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    }
+    .chat-msgs {
+      flex: 1; overflow-y: auto; padding: 1.25rem;
+      display: flex; flex-direction: column; gap: .875rem;
+    }
+    .chat-msgs::-webkit-scrollbar { width: 3px; }
+    .chat-msgs::-webkit-scrollbar-thumb { background: rgba(0,245,255,.3); }
+    .msg { max-width: 86%; animation: msgIn .3s ease; }
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, rgba(0,245,255,.2), rgba(139,92,246,.2));
+      border: 1px solid rgba(0,245,255,.3);
+      padding: .75rem 1rem; border-radius: 18px 18px 4px 18px;
+      font-size: .875rem;
+    }
+    .msg.ai {
+      align-self: flex-start;
+      background: rgba(13,13,43,.85);
+      border: 1px solid rgba(139,92,246,.3);
+      padding: .75rem 1rem; border-radius: 4px 18px 18px 18px;
+      font-size: .875rem; line-height: 1.65;
+    }
+    .typing { align-self: flex-start; display: flex; gap: 5px; padding: .75rem 1rem;
+      background: rgba(13,13,43,.85); border: 1px solid rgba(139,92,246,.3); border-radius: 4px 18px 18px 18px; }
+    .typing span {
+      width: 7px; height: 7px; background: var(--cyan); border-radius: 50%;
+      animation: bounce 1.2s ease-in-out infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: .2s; }
+    .typing span:nth-child(3) { animation-delay: .4s; }
+    @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-8px); } }
+    .chat-footer {
+      padding: .875rem 1.25rem;
+      border-top: 1px solid rgba(0,245,255,.1);
+      background: rgba(13,13,43,.5); flex-shrink: 0;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .65rem; }
+    .chip {
+      background: rgba(0,245,255,.07); border: 1px solid rgba(0,245,255,.2);
+      border-radius: 50px; padding: .3rem .75rem;
+      font-size: .75rem; color: rgba(0,245,255,.85); cursor: pointer; transition: all .2s;
+    }
+    .chip:hover { background: rgba(0,245,255,.16); border-color: var(--cyan); }
+    .input-row { display: flex; gap: .6rem; align-items: flex-end; }
+    #chat-input {
+      flex: 1; background: rgba(255,255,255,.05);
+      border: 1px solid rgba(0,245,255,.2); border-radius: 14px;
+      padding: .7rem 1rem; color: #fff; font-family: 'Inter', sans-serif;
+      font-size: .875rem; resize: none; max-height: 120px; outline: none;
+      transition: border-color .3s;
+    }
+    #chat-input:focus { border-color: var(--cyan); }
+    .send-btn {
+      width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      border: none; cursor: pointer; color: #0a0a1a; font-size: .95rem;
+      display: flex; align-items: center; justify-content: center; transition: all .3s;
+    }
+    .send-btn:hover { transform: scale(1.06); box-shadow: 0 0 20px rgba(0,245,255,.4); }
+
+    /* ── Admin Overlay ── */
+    #admin-overlay {
+      position: fixed; inset: 0; z-index: 3000;
+      background: rgba(5,5,18,.97); backdrop-filter: blur(30px);
+      overflow-y: auto; display: none;
+    }
+    #admin-overlay.open { display: block; }
+    .admin-card {
+      background: rgba(13,13,43,.7); backdrop-filter: blur(20px);
+      border: 1px solid rgba(0,245,255,.14); border-radius: 20px; padding: 1.4rem;
+      transition: border-color .3s;
+    }
+    .admin-card:hover { border-color: rgba(0,245,255,.3); }
+    .user-dot {
+      position: absolute; width: 12px; height: 12px;
+      border-radius: 50%; transform: translate(-50%,-50%);
+      animation: dotPulse 2s ease-in-out infinite; cursor: pointer;
+    }
+    @keyframes dotPulse {
+      0%,100% { transform: translate(-50%,-50%) scale(1); box-shadow: 0 0 0 0 rgba(0,245,255,.45); }
+      50%      { transform: translate(-50%,-50%) scale(1.3); box-shadow: 0 0 0 8px rgba(0,245,255,0); }
+    }
+    .editable {
+      cursor: text; border-bottom: 1px dashed rgba(0,245,255,.35);
+      padding: 1px 4px; transition: border-color .2s;
+    }
+    .editable:focus { outline: none; border-color: var(--cyan); }
+    .rev-bar { height: 6px; border-radius: 6px; background: linear-gradient(90deg, var(--cyan), var(--purple)); transition: width .8s ease; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 5.5rem; right: 1.5rem; z-index: 4000;
+      background: rgba(13,13,43,.97); border: 1px solid rgba(0,245,255,.4);
+      border-radius: 14px; padding: .875rem 1.25rem; font-size: .875rem;
+      box-shadow: 0 0 30px rgba(0,245,255,.2);
+      transform: translateX(200%); transition: transform .4s cubic-bezier(.34,1.56,.64,1);
+    }
+    #toast.show { transform: translateX(0); }
+
+    /* ── Progress bar ── */
+    #progress-bar {
+      position: fixed; top: 0; left: 0; height: 3px; z-index: 9999;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      transition: width .1s;
+    }
+
+    /* ── Waitlist input ── */
+    .wl-input {
+      flex: 1; background: rgba(255,255,255,.06);
+      border: 1px solid rgba(0,245,255,.2); border-radius: 50px 0 0 50px;
+      padding: .85rem 1.25rem; color: #fff; font-family: 'Inter', sans-serif;
+      font-size: .9rem; outline: none; transition: border-color .3s;
+      min-width: 0;
+    }
+    .wl-input:focus { border-color: var(--cyan); }
+
+    /* ── Add-App modal ── */
+    #add-app-modal {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,.7); backdrop-filter: blur(10px);
+      display: none; align-items: center; justify-content: center;
+    }
+    #add-app-modal.open { display: flex; }
+    .modal-form-input {
+      width: 100%; background: rgba(255,255,255,.05);
+      border: 1px solid rgba(0,245,255,.2); border-radius: 10px;
+      padding: .75rem 1rem; color: #fff; font-family: 'Inter', sans-serif;
+      font-size: .875rem; outline: none; transition: border-color .3s;
+    }
+    .modal-form-input:focus { border-color: var(--cyan); }
+
+    /* ── Misc ── */
+    @keyframes scrollDown { 0%,100% { opacity: .4; transform: translateY(0); } 50% { opacity: 1; transform: translateY(8px); } }
+    @keyframes borderGlow { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+    section { padding: 5.5rem 1.5rem; }
+    .container { max-width: 1280px; margin: 0 auto; }
+    .section-label {
+      display: inline-flex; align-items: center; gap: .5rem;
+      border-radius: 50px; padding: .35rem 1rem;
+      font-size: .8rem; font-weight: 600; margin-bottom: 1rem;
+    }
+    .section-title { font-size: clamp(1.9rem, 4vw, 3rem); font-weight: 800; line-height: 1.15; }
+    .section-sub { color: rgba(255,255,255,.6); font-size: 1.05rem; line-height: 1.7; }
+
+    footer { background: rgba(5,5,15,.9); border-top: 1px solid rgba(0,245,255,.1); }
+    .footer-link {
+      color: rgba(255,255,255,.5); text-decoration: none;
+      font-size: .875rem; transition: color .2s; display: block; margin-bottom: .65rem;
+    }
+    .footer-link:hover { color: var(--cyan); }
+    .social-btn {
+      width: 36px; height: 36px; background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(255,255,255,.55); text-decoration: none; transition: all .2s; font-size: .85rem;
+    }
+    .social-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  </style>
+</head>
+<body>
+  <!-- Reading progress -->
+  <div id="progress-bar" style="width:0%"></div>
+
+  <!-- Background Video -->
+  <video id="bg-video" autoplay muted loop playsinline preload="none">
+    <source src="assets/hero.mp4" type="video/mp4">
+  </video>
+
+  <!-- Three.js Neural Canvas -->
+  <canvas id="neural-canvas"></canvas>
+
+  <!-- tsParticles -->
+  <div id="tsparticles"></div>
+
+  <!-- ================================================================
+       MAIN CONTENT
+  ================================================================ -->
+  <div id="content">
+
+    <!-- NAV -->
+    <nav id="navbar">
+      <div class="nav-inner">
+        <a href="/" class="nav-logo">
+          <div class="nav-logo-icon">A</div>
+          <span style="font-weight:800;font-size:1.2rem;background:linear-gradient(135deg,#fff,rgba(255,255,255,.7));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Amarktai</span>
+        </a>
+        <div class="nav-links" id="desktop-nav">
+          <a href="/" class="active">Home</a>
+          <a href="/about.html">About</a>
+          <a href="/apps.html">Apps</a>
+          <a href="/contact.html">Contact</a>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;">
+          <a href="/apps.html" class="btn-primary" id="nav-cta" style="font-size:.82rem;padding:.6rem 1.25rem;">Explore Apps</a>
+          <button id="mobile-toggle" onclick="toggleMobileNav()" aria-label="Menu">
+            <i class="fas fa-bars"></i>
+          </button>
+        </div>
+      </div>
+      <div id="mobile-nav">
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/apps.html">Apps</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/apps.html" class="btn-primary" style="font-size:.875rem;justify-content:center;">Explore Apps</a>
+      </div>
+    </nav>
+
+    <!-- ── HERO ── -->
+    <section id="hero-section">
+      <div class="container" style="width:100%;">
+        <div data-aos="fade-down" data-aos-duration="700" class="section-label" style="background:rgba(0,245,255,.08);border:1px solid rgba(0,245,255,.25);color:var(--cyan);">
+          <span style="width:6px;height:6px;background:var(--cyan);border-radius:50%;display:inline-block;animation:orbPulse 1.5s ease infinite;"></span>
+          Live AI Systems Active &nbsp;·&nbsp; South Africa &amp; Global
+        </div>
+
+        <h1 class="hero-title" data-aos="fade-up" data-aos-duration="850" data-aos-delay="80">
+          <span style="display:block;color:rgba(255,255,255,.95);">Africa's Most</span>
+          <span class="gradient-text" style="display:block;">Advanced AI</span>
+          <span style="display:block;color:rgba(255,255,255,.95);">Ecosystem</span>
+        </h1>
+
+        <p data-aos="fade-up" data-aos-delay="180" style="font-size:clamp(1rem,2vw,1.2rem);color:rgba(255,255,255,.65);max-width:600px;margin:1.5rem 0 2.5rem;line-height:1.75;">
+          10 groundbreaking AI applications — crypto intelligence to property management, prayer networks to forex algorithms. Amarktai Network is the operating system for tomorrow.
+        </p>
+
+        <div data-aos="fade-up" data-aos-delay="260" style="display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:3rem;">
+          <a href="/apps.html" class="btn-primary"><i class="fas fa-rocket" style="margin-right:.5rem;"></i>Explore All Apps</a>
+          <a href="/about.html" class="btn-outline"><i class="fas fa-play" style="margin-right:.5rem;"></i>Learn More</a>
+        </div>
+
+        <!-- Live stats bar -->
+        <div data-aos="fade-up" data-aos-delay="340" style="display:flex;flex-wrap:wrap;gap:2rem;">
+          <div style="display:flex;align-items:center;gap:.6rem;">
+            <span style="width:8px;height:8px;background:var(--cyan);border-radius:50%;display:inline-block;animation:orbPulse 1s ease infinite;"></span>
+            <span style="font-size:.82rem;color:rgba(255,255,255,.6);"><span id="live-users" style="color:#fff;font-weight:700;">12,847</span> Active Users</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.6rem;">
+            <span style="width:8px;height:8px;background:var(--purple);border-radius:50%;display:inline-block;animation:orbPulse 1.5s ease infinite;"></span>
+            <span style="font-size:.82rem;color:rgba(255,255,255,.6);"><span id="live-agents" style="color:#fff;font-weight:700;">247</span> AI Agents Running</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.6rem;">
+            <span style="width:8px;height:8px;background:var(--pink);border-radius:50%;display:inline-block;animation:orbPulse 2s ease infinite;"></span>
+            <span style="font-size:.82rem;color:rgba(255,255,255,.6);"><span style="color:#fff;font-weight:700;">10</span> Live Applications</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scroll indicator -->
+      <div style="position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.5rem;color:rgba(255,255,255,.3);font-size:.7rem;font-weight:600;letter-spacing:.1em;">
+        <span>SCROLL</span>
+        <i class="fas fa-chevron-down" style="animation:scrollDown 2s ease infinite;"></i>
+      </div>
+    </section>
+
+    <!-- ── FEATURES ── -->
+    <section id="features-section" style="background:rgba(5,5,20,.4);">
+      <div class="container">
+        <div style="text-align:center;margin-bottom:3.5rem;">
+          <div data-aos="fade-up" class="section-label" style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.25);color:#8b5cf6;">⚡ Why Amarktai</div>
+          <h2 data-aos="fade-up" data-aos-delay="100" class="section-title">Built Different. <span class="gradient-text">Runs Different.</span></h2>
+          <p data-aos="fade-up" data-aos-delay="180" class="section-sub" style="max-width:580px;margin:.875rem auto 0;">Every app in the Amarktai ecosystem is powered by proprietary AI models trained on African market data.</p>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:1.5rem;">
+          <div class="feature-card" data-aos="fade-up" data-aos-delay="50">
+            <div class="feature-icon" style="background:rgba(0,245,255,.1);">🧠</div>
+            <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.65rem;">Neural Intelligence</h3>
+            <p style="color:rgba(255,255,255,.6);font-size:.875rem;line-height:1.7;">Proprietary neural networks trained on African market data. Not ChatGPT wrappers — real intelligence built from scratch.</p>
+          </div>
+          <div class="feature-card" data-aos="fade-up" data-aos-delay="130">
+            <div class="feature-icon" style="background:rgba(139,92,246,.1);">🔗</div>
+            <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.65rem;">Cross-App Intelligence</h3>
+            <p style="color:rgba(255,255,255,.6);font-size:.875rem;line-height:1.7;">All 10 apps share a unified data layer. Your crypto signals inform property decisions. Your job profile powers your forex strategy.</p>
+          </div>
+          <div class="feature-card" data-aos="fade-up" data-aos-delay="210">
+            <div class="feature-icon" style="background:rgba(236,72,153,.1);">🌍</div>
+            <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.65rem;">Africa-First Design</h3>
+            <p style="color:rgba(255,255,255,.6);font-size:.875rem;line-height:1.7;">Built for South Africa's markets, infrastructure, and culture. Then scaled globally — not the other way around.</p>
+          </div>
+          <div class="feature-card" data-aos="fade-up" data-aos-delay="50">
+            <div class="feature-icon" style="background:rgba(0,245,255,.1);">⚡</div>
+            <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.65rem;">Real-Time Everything</h3>
+            <p style="color:rgba(255,255,255,.6);font-size:.875rem;line-height:1.7;">Sub-second AI responses. Live market feeds. Instant notifications. We don't do "processing time" — everything is now.</p>
+          </div>
+          <div class="feature-card" data-aos="fade-up" data-aos-delay="130">
+            <div class="feature-icon" style="background:rgba(139,92,246,.1);">🔒</div>
+            <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.65rem;">Military-Grade Security</h3>
+            <p style="color:rgba(255,255,255,.6);font-size:.875rem;line-height:1.7;">End-to-end encryption, zero-knowledge architecture, AI-powered threat detection. Your data stays yours — always.</p>
+          </div>
+          <div class="feature-card" data-aos="fade-up" data-aos-delay="210">
+            <div class="feature-icon" style="background:rgba(236,72,153,.1);">🚀</div>
+            <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.65rem;">Invite-Only Precision</h3>
+            <p style="color:rgba(255,255,255,.6);font-size:.875rem;line-height:1.7;">Some apps stay invite-only — maintaining elite quality and community standards before every public rollout.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── APPS PREVIEW ── -->
+    <section id="apps-section">
+      <div class="container">
+        <div style="text-align:center;margin-bottom:3.5rem;">
+          <div data-aos="fade-up" class="section-label" style="background:rgba(0,245,255,.08);border:1px solid rgba(0,245,255,.25);color:var(--cyan);">🌐 The Ecosystem</div>
+          <h2 data-aos="fade-up" data-aos-delay="100" class="section-title">10 Apps. One <span class="gradient-text">Neural Network.</span></h2>
+          <p data-aos="fade-up" data-aos-delay="180" class="section-sub" style="max-width:580px;margin:.875rem auto 0;">Each application stands alone as a world-class product. Together they form the most powerful AI platform in Africa.</p>
+        </div>
+        <div id="apps-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.5rem;"></div>
+        <div data-aos="fade-up" style="text-align:center;margin-top:3rem;">
+          <a href="/apps.html" class="btn-primary">View All Apps &nbsp;<i class="fas fa-arrow-right"></i></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── STATS ── -->
+    <section id="stats-section" style="background:rgba(5,5,20,.5);">
+      <div class="container">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:2rem;text-align:center;">
+          <div data-aos="zoom-in">
+            <div class="stat-number" id="stat-users">0</div>
+            <p style="color:rgba(255,255,255,.6);font-weight:500;margin-top:.4rem;">Active Users</p>
+          </div>
+          <div data-aos="zoom-in" data-aos-delay="100">
+            <div class="stat-number" id="stat-agents">0</div>
+            <p style="color:rgba(255,255,255,.6);font-weight:500;margin-top:.4rem;">AI Agents</p>
+          </div>
+          <div data-aos="zoom-in" data-aos-delay="200">
+            <div class="stat-number" id="stat-apps">0</div>
+            <p style="color:rgba(255,255,255,.6);font-weight:500;margin-top:.4rem;">Live Apps</p>
+          </div>
+          <div data-aos="zoom-in" data-aos-delay="300">
+            <div class="stat-number" id="stat-uptime">0</div>
+            <p style="color:rgba(255,255,255,.6);font-weight:500;margin-top:.4rem;">% Uptime</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── WAITLIST ── -->
+    <section id="waitlist-section">
+      <div class="container" style="max-width:680px;text-align:center;">
+        <div data-aos="zoom-in">
+          <div class="section-label" style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.25);color:#8b5cf6;">🔥 Early Access</div>
+          <h2 class="section-title" style="margin:.75rem 0;">Get First Access to <span class="gradient-text">Everything</span></h2>
+          <p class="section-sub" style="margin-bottom:2.25rem;">Join 5,000+ people already on the waitlist. Be first when new apps launch.</p>
+          <form id="waitlist-form" onsubmit="submitWaitlist(event)" style="display:flex;max-width:460px;margin:0 auto;">
+            <input type="email" id="waitlist-email" class="wl-input" placeholder="your@email.com" required>
+            <button type="submit" class="btn-primary" style="border-radius:0 50px 50px 0;white-space:nowrap;">Join Waitlist</button>
+          </form>
+          <p style="color:rgba(255,255,255,.35);font-size:.78rem;margin-top:.875rem;">No spam. Unsubscribe anytime. We never sell your data.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── FOOTER ── -->
+    <footer style="padding:4rem 1.5rem 2rem;">
+      <div class="container">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:3rem;margin-bottom:3rem;">
+          <div>
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.1rem;">
+              <div class="nav-logo-icon">A</div>
+              <span style="font-weight:800;font-size:1.15rem;">Amarktai Network</span>
+            </div>
+            <p style="color:rgba(255,255,255,.5);font-size:.875rem;line-height:1.75;max-width:270px;">Africa's most advanced AI ecosystem. 10 apps, one neural network, infinite possibilities.</p>
+            <div style="display:flex;gap:.75rem;margin-top:1.25rem;">
+              <a href="#" class="social-btn"><i class="fab fa-twitter"></i></a>
+              <a href="#" class="social-btn"><i class="fab fa-linkedin"></i></a>
+              <a href="#" class="social-btn"><i class="fab fa-instagram"></i></a>
+              <a href="#" class="social-btn"><i class="fab fa-github"></i></a>
+            </div>
+          </div>
+          <div>
+            <h4 style="font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1.1rem;color:rgba(255,255,255,.9);">Products</h4>
+            <a href="https://amarktai.online" target="_blank" class="footer-link">Amarktai Crypto</a>
+            <a href="https://equiprofile.online" target="_blank" class="footer-link">EquiProfile</a>
+            <a href="/apps.html" class="footer-link">Kinship</a>
+            <a href="/apps.html" class="footer-link">Amarktai Forex</a>
+            <a href="/apps.html" class="footer-link">All Apps →</a>
+          </div>
+          <div>
+            <h4 style="font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1.1rem;color:rgba(255,255,255,.9);">Company</h4>
+            <a href="/about.html" class="footer-link">About Us</a>
+            <a href="/contact.html" class="footer-link">Contact</a>
+            <a href="#" class="footer-link">Careers</a>
+            <a href="#" class="footer-link">Press</a>
+          </div>
+          <div>
+            <h4 style="font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1.1rem;color:rgba(255,255,255,.9);">Legal</h4>
+            <a href="#" class="footer-link">Privacy Policy</a>
+            <a href="#" class="footer-link">Terms of Service</a>
+            <a href="#" class="footer-link">Cookie Policy</a>
+          </div>
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,.06);padding-top:1.75rem;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:1rem;">
+          <p style="color:rgba(255,255,255,.4);font-size:.8rem;">© 2025 Amarktai Network. All rights reserved. Built in South Africa 🇿🇦</p>
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <span style="width:6px;height:6px;background:#22c55e;border-radius:50%;display:inline-block;animation:orbPulse 2s ease infinite;"></span>
+            <span style="color:rgba(255,255,255,.4);font-size:.78rem;">All systems operational</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </div><!-- /content -->
+
+  <!-- ── AI DESIGNER ORB ── -->
+  <div id="ai-orb" onclick="openChat()" title="Amarktai AI Designer">
+    <div class="orb-inner">🤖</div>
+    <div class="orb-label">Amarktai AI Designer</div>
+  </div>
+
+  <!-- ── TOAST ── -->
+  <div id="toast">
+    <div style="display:flex;align-items:center;gap:.65rem;">
+      <span id="toast-icon">✅</span>
+      <span id="toast-msg">Done!</span>
+    </div>
+  </div>
+
+  <!-- ── CHAT MODAL ── -->
+  <div id="chat-modal">
+    <div class="chat-box">
+      <div class="chat-header">
+        <div style="display:flex;align-items:center;gap:.75rem;">
+          <div style="width:40px;height:40px;border-radius:50%;background:radial-gradient(circle at 35% 35%,rgba(0,245,255,.85),rgba(139,92,246,.65));display:flex;align-items:center;justify-content:center;font-size:1.2rem;box-shadow:0 0 15px rgba(0,245,255,.4);">🤖</div>
+          <div>
+            <p style="font-weight:700;font-size:.925rem;">Amarktai AI Designer</p>
+            <p style="font-size:.72rem;color:rgba(0,245,255,.85);display:flex;align-items:center;gap:.3rem;">
+              <span style="width:5px;height:5px;background:var(--cyan);border-radius:50%;display:inline-block;"></span>Online · Redesign anything
+            </p>
+          </div>
+        </div>
+        <button onclick="closeChat()" style="background:rgba(255,255,255,.08);border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;color:rgba(255,255,255,.7);font-size:.95rem;display:flex;align-items:center;justify-content:center;">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <div class="chat-msgs" id="chat-msgs">
+        <div class="msg ai">
+          <p>👋 Hi! I'm your AI page designer. I can <strong style="color:var(--cyan);">redesign any section</strong> of this page in real-time.</p>
+          <p style="margin-top:.65rem;color:rgba(255,255,255,.6);font-size:.8rem;">Try one of these prompts:</p>
+          <ul style="margin-top:.35rem;padding-left:1rem;color:rgba(0,245,255,.8);font-size:.78rem;line-height:1.8;">
+            <li>"Make the hero neon purple Tron style"</li>
+            <li>"Explode into South African flag colors"</li>
+            <li>"Redesign features section cyberpunk"</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="chat-footer">
+        <div class="chips" id="chat-chips">
+          <button class="chip" onclick="useChip(this)">🎨 Neon purple Tron</button>
+          <button class="chip" onclick="useChip(this)">🇿🇦 SA flag colors</button>
+          <button class="chip" onclick="useChip(this)">💥 Cyberpunk hero</button>
+          <button class="chip" onclick="useChip(this)">🌌 Space theme</button>
+        </div>
+        <div class="input-row">
+          <textarea id="chat-input" placeholder="Ask me to redesign any section…" rows="1"
+            onkeydown="chatKeydown(event)" oninput="autoGrow(this)"></textarea>
+          <button class="send-btn" onclick="sendChat()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADMIN OVERLAY ── -->
+  <div id="admin-overlay">
+    <div style="position:relative;z-index:10;min-height:100vh;padding:1.5rem;" id="admin-inner">
+
+      <!-- Admin Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;padding:1.25rem 1.5rem;background:rgba(13,13,43,.8);backdrop-filter:blur(20px);border:1px solid rgba(0,245,255,.2);border-radius:20px;">
+        <div style="display:flex;align-items:center;gap:1rem;">
+          <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--cyan),var(--purple));display:flex;align-items:center;justify-content:center;font-size:1.3rem;">🛸</div>
+          <div>
+            <h1 style="font-size:1.35rem;font-weight:800;">Amarktai Command Center</h1>
+            <p style="color:rgba(0,245,255,.7);font-size:.78rem;">Real-time AI Network Dashboard</p>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;">
+          <div style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:rgba(255,255,255,.55);">
+            <span style="width:7px;height:7px;background:#22c55e;border-radius:50%;display:inline-block;animation:orbPulse 1.5s ease infinite;"></span>
+            Live · 3s refresh
+          </div>
+          <button onclick="closeAdmin()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.5rem 1rem;color:rgba(255,255,255,.7);cursor:pointer;font-size:.82rem;font-family:'Inter',sans-serif;transition:all .2s;">
+            <i class="fas fa-times" style="margin-right:.4rem;"></i>Exit
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI cards -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.1rem;margin-bottom:1.5rem;" id="admin-kpis">
+        <div class="admin-card">
+          <p style="color:rgba(255,255,255,.5);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;font-weight:600;">Total Revenue</p>
+          <p style="font-size:2.1rem;font-weight:900;" class="gradient-text">R<span class="editable" contenteditable="true" id="kpi-revenue">248,500</span></p>
+          <p style="color:#22c55e;font-size:.78rem;margin-top:.4rem;">↑ +12.4% this month</p>
+        </div>
+        <div class="admin-card">
+          <p style="color:rgba(255,255,255,.5);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;font-weight:600;">Total Users</p>
+          <p style="font-size:2.1rem;font-weight:900;" class="gradient-text" id="kpi-users">12,847</p>
+          <p style="color:#22c55e;font-size:.78rem;margin-top:.4rem;">↑ +847 this week</p>
+        </div>
+        <div class="admin-card">
+          <p style="color:rgba(255,255,255,.5);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;font-weight:600;">AI Agents Active</p>
+          <p style="font-size:2.1rem;font-weight:900;" class="gradient-text" id="kpi-agents">247</p>
+          <p style="color:rgba(0,245,255,.8);font-size:.78rem;margin-top:.4rem;">Across 10 apps</p>
+        </div>
+        <div class="admin-card">
+          <p style="color:rgba(255,255,255,.5);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;font-weight:600;">Waitlist</p>
+          <p style="font-size:2.1rem;font-weight:900;" class="gradient-text" id="kpi-waitlist">5,234</p>
+          <p style="color:rgba(236,72,153,.8);font-size:.78rem;margin-top:.4rem;">↑ +124 today</p>
+        </div>
+      </div>
+
+      <!-- Map + Revenue grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+
+        <!-- SA Map -->
+        <div class="admin-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <h3 style="font-weight:700;font-size:.95rem;">South Africa · User Distribution</h3>
+            <span style="font-size:.72rem;color:rgba(0,245,255,.8);background:rgba(0,245,255,.08);padding:.25rem .7rem;border-radius:50px;border:1px solid rgba(0,245,255,.2);">Live</span>
+          </div>
+          <div style="position:relative;height:260px;border:1px solid rgba(0,245,255,.1);border-radius:12px;overflow:hidden;background:rgba(0,245,255,.02);">
+            <svg viewBox="0 0 600 520" style="width:100%;height:100%;opacity:.45;" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Simplified South Africa outline -->
+              <path d="M55 210 L85 155 L130 125 L190 108 L260 98 L335 94 L395 102 L445 128 L480 162 L498 208 L505 258 L492 308 L462 355 L425 392 L388 420 L358 440 L330 455 L302 465 L275 460 L248 450 L210 430 L170 402 L128 365 L88 314 L62 262 Z" stroke="#00f5ff" stroke-width="1.5" fill="rgba(0,245,255,.04)"/>
+              <!-- Lesotho enclave -->
+              <path d="M318 308 L338 293 L362 298 L372 320 L356 340 L326 345 L308 328 Z" stroke="#8b5cf6" stroke-width="1.2" fill="rgba(139,92,246,.07)"/>
+              <!-- Swaziland/eSwatini enclave -->
+              <path d="M428 230 L445 220 L460 230 L458 248 L440 256 L426 245 Z" stroke="#8b5cf6" stroke-width="1" fill="rgba(139,92,246,.07)"/>
+            </svg>
+            <!-- Pulsing user dots — major SA cities -->
+            <div class="user-dot" style="left:24%;top:79%;background:var(--cyan);" title="Cape Town · 3,247 users"></div>
+            <div class="user-dot" style="left:51%;top:43%;background:#8b5cf6;animation-delay:.5s;" title="Johannesburg · 4,891 users"></div>
+            <div class="user-dot" style="left:63%;top:56%;animation-delay:1s;" title="Durban · 2,140 users"></div>
+            <div class="user-dot" style="left:52%;top:38%;background:#ec4899;animation-delay:1.5s;" title="Pretoria · 1,820 users"></div>
+            <div class="user-dot" style="left:48%;top:73%;animation-delay:.8s;" title="Port Elizabeth · 687 users"></div>
+            <div class="user-dot" style="left:42%;top:60%;background:#8b5cf6;animation-delay:.3s;" title="Bloemfontein · 441 users"></div>
+            <div class="user-dot" style="left:55%;top:69%;animation-delay:1.2s;" title="East London · 362 users"></div>
+            <div class="user-dot" style="left:26%;top:34%;background:#ec4899;animation-delay:.7s;" title="Upington · 128 users"></div>
+            <div class="user-dot" style="left:68%;top:27%;animation-delay:1.8s;" title="Polokwane · 231 users"></div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:.75rem;margin-top:.875rem;">
+            <span style="font-size:.72rem;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:.35rem;"><span style="width:7px;height:7px;background:var(--cyan);border-radius:50%;display:inline-block;"></span>Cape Town (3,247)</span>
+            <span style="font-size:.72rem;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:.35rem;"><span style="width:7px;height:7px;background:#8b5cf6;border-radius:50%;display:inline-block;"></span>Joburg (4,891)</span>
+            <span style="font-size:.72rem;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:.35rem;"><span style="width:7px;height:7px;background:#ec4899;border-radius:50%;display:inline-block;"></span>Durban (2,140)</span>
+          </div>
+        </div>
+
+        <!-- Revenue by App -->
+        <div class="admin-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem;">
+            <h3 style="font-weight:700;font-size:.95rem;">Revenue by App</h3>
+            <span style="font-size:.72rem;color:rgba(255,255,255,.5);">This month</span>
+          </div>
+          <div id="rev-bars" style="display:flex;flex-direction:column;gap:.875rem;"></div>
+        </div>
+      </div>
+
+      <!-- App management table -->
+      <div class="admin-card" style="margin-bottom:1.5rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+          <h3 style="font-weight:700;font-size:.95rem;">App Management</h3>
+          <button onclick="openAddAppModal()" style="background:linear-gradient(135deg,var(--cyan),var(--purple));border:none;border-radius:10px;padding:.5rem 1rem;font-size:.8rem;font-weight:700;color:#0a0a1a;cursor:pointer;font-family:'Inter',sans-serif;">
+            <i class="fas fa-plus" style="margin-right:.4rem;"></i>Add New App
+          </button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.825rem;">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(255,255,255,.07);">
+                <th style="text-align:left;padding:0 0 .65rem;color:rgba(255,255,255,.5);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;">App</th>
+                <th style="text-align:left;padding:0 0 .65rem;color:rgba(255,255,255,.5);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;">Users</th>
+                <th style="text-align:left;padding:0 0 .65rem;color:rgba(255,255,255,.5);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;">Revenue</th>
+                <th style="text-align:left;padding:0 0 .65rem;color:rgba(255,255,255,.5);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="admin-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Activity log -->
+      <div class="admin-card">
+        <h3 style="font-weight:700;font-size:.95rem;margin-bottom:1rem;">Recent Activity</h3>
+        <div id="admin-log" style="display:flex;flex-direction:column;gap:.65rem;font-size:.8rem;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── ADD-APP MODAL ── -->
+  <div id="add-app-modal">
+    <div style="background:rgba(13,13,43,.97);border:1px solid rgba(0,245,255,.3);border-radius:24px;padding:2rem;width:min(460px,95vw);">
+      <h3 style="font-weight:800;font-size:1.15rem;margin-bottom:1.4rem;" class="gradient-text">Add New App</h3>
+      <form onsubmit="addApp(event)" style="display:flex;flex-direction:column;gap:.875rem;">
+        <input id="new-app-name" type="text" class="modal-form-input" placeholder="App Name" required>
+        <input id="new-app-url" type="url" class="modal-form-input" placeholder="App URL (https://...)">
+        <input id="new-app-desc" type="text" class="modal-form-input" placeholder="Short Description">
+        <input id="new-app-icon" type="text" class="modal-form-input" placeholder="Emoji icon (e.g. 🚀)">
+        <select id="new-app-status" class="modal-form-input">
+          <option value="live" style="background:#0d0d2b;">Live</option>
+          <option value="invite-only" style="background:#0d0d2b;">Invite Only</option>
+          <option value="coming-soon" style="background:#0d0d2b;">Coming Soon</option>
+        </select>
+        <div style="display:flex;gap:.75rem;margin-top:.25rem;">
+          <button type="submit" class="btn-primary" style="flex:1;justify-content:center;">Add App</button>
+          <button type="button" onclick="closeAddAppModal()" style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:50px;padding:.75rem;color:rgba(255,255,255,.7);cursor:pointer;font-family:'Inter',sans-serif;font-size:.875rem;transition:all .2s;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       SCRIPTS
+  ================================================================ -->
+  <!-- CDN scripts — add integrity="sha384-..." via deploy.sh sri-check target before going live -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.min.js" crossorigin="anonymous"></script>
+  <!-- DOMPurify — sanitise AI-returned HTML before DOM injection -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js" crossorigin="anonymous"></script>
+
+  <script>
+  // ================================================================
+  // APP DATA
+  // ================================================================
+  const APPS = [
+    { name:"Amarktai Crypto",          icon:"₿", color:"#f59e0b", status:"invite-only", url:"https://amarktai.online",    users:4231, revenue:89500,
+      desc:"Invite-only AI-powered crypto intelligence. Real-time signals, predictive analytics, and automated portfolio optimisation." },
+    { name:"EquiProfile",              icon:"👤", color:"#00f5ff", status:"live",        url:"https://equiprofile.online", users:3847, revenue:42000,
+      desc:"Live equity profile management. Build, verify and monetise your professional identity with AI-powered career intelligence." },
+    { name:"Kinship",                  icon:"🤝", color:"#ec4899", status:"coming-soon", url:"#",                          users:0,    revenue:0,
+      desc:"AI-powered relationship and community network. Discover, nurture and grow meaningful connections across Africa." },
+    { name:"Amarktai Secure",          icon:"🔒", color:"#8b5cf6", status:"coming-soon", url:"#",                          users:892,  revenue:31200,
+      desc:"Military-grade AI security suite. Intelligent threat detection, zero-knowledge encryption, real-time vulnerability monitoring." },
+    { name:"Amarktai Marketing",       icon:"📣", color:"#22c55e", status:"coming-soon", url:"#",                          users:1204, revenue:28700,
+      desc:"AI-driven marketing automation. Generate campaigns, analyse audiences and deploy across all channels with zero manual effort." },
+    { name:"Amarktai Property Manager",icon:"🏠", color:"#f97316", status:"coming-soon", url:"#",                          users:687,  revenue:19400,
+      desc:"Smart property management AI. Automate listings, screen tenants, predict maintenance and maximise rental yields." },
+    { name:"Amarktai Agents",          icon:"🤖", color:"#00f5ff", status:"coming-soon", url:"#",                          users:441,  revenue:22100,
+      desc:"Deploy autonomous AI agents for your business. Custom-trained, self-improving, always-on digital employees." },
+    { name:"Amarktai Forex",           icon:"💱", color:"#eab308", status:"coming-soon", url:"#",                          users:1123, revenue:15600,
+      desc:"AI forex trading intelligence. Real-time signal generation, risk management and automated execution on ZAR and global pairs." },
+    { name:"Amarktai Prayer",          icon:"🙏", color:"#c084fc", status:"coming-soon", url:"#",                          users:756,  revenue:0,
+      desc:"AI-powered spiritual community platform. Prayer networks, scripture insights and faith-based community connection." },
+    { name:"Amarktai Jobs",            icon:"💼", color:"#06b6d4", status:"coming-soon", url:"#",                          users:2966, revenue:0,
+      desc:"AI job matching for Africa. Intelligent CV optimisation, skills assessment and direct employer connections." }
+  ];
+
+  // ================================================================
+  // THREE.JS NEURAL NETWORK
+  // ================================================================
+  let scene, camera, renderer, nodes=[], linesGrp, partsMesh;
+  let mX=0, mY=0, tX=0, tY=0, t=0;
+
+  function initThree(){
+    const canvas = document.getElementById('neural-canvas');
+    scene  = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+    camera.position.z = 15;
+    renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0);
+
+    // Nodes
+    const geo = new THREE.SphereGeometry(0.07, 8, 8);
+    const N = 180;
+    for(let i=0;i<N;i++){
+      const r   = 2.5 + Math.pow(Math.random(),.5)*5.5;
+      const phi = Math.acos(2*Math.random()-1);
+      const th  = Math.random()*Math.PI*2;
+      const x = r*Math.sin(phi)*Math.cos(th)*1.3;
+      const y = r*Math.cos(phi)*0.75;
+      const z = r*Math.sin(phi)*Math.sin(th);
+      const isCore = r<4.5;
+      const mat = new THREE.MeshBasicMaterial({
+        color: isCore ? 0x00f5ff : (Math.random()>.55 ? 0x8b5cf6 : 0x00f5ff),
+        transparent:true, opacity: .5+Math.random()*.5
+      });
+      const m = new THREE.Mesh(geo.clone(), mat);
+      m.position.set(x,y,z);
+      m.userData = {
+        op: new THREE.Vector3(x,y,z),
+        spd: .4+Math.random()*3,
+        off: Math.random()*Math.PI*2,
+        isCore,
+        fd:  Math.random()*12
+      };
+      scene.add(m);
+      nodes.push(m);
+    }
+
+    // Connections
+    linesGrp = new THREE.Group();
+    const MAX_D = 2.8;
+    for(let i=0;i<N;i++){
+      let c=0;
+      for(let j=i+1;j<N;j++){
+        if(c>=4) break;
+        if(nodes[i].position.distanceTo(nodes[j].position)<MAX_D && Math.random()>.4){
+          const pts=[nodes[i].position.clone(),nodes[j].position.clone()];
+          const lg=new THREE.BufferGeometry().setFromPoints(pts);
+          const op=0.06+Math.random()*.14;
+          const lm=new THREE.LineBasicMaterial({color:Math.random()>.5?0x8b5cf6:0x00f5ff,transparent:true,opacity:op});
+          const ln=new THREE.Line(lg,lm);
+          ln.userData={a:i,b:j,base:op};
+          linesGrp.add(ln);
+          c++;
+        }
+      }
+    }
+    scene.add(linesGrp);
+
+    // Background particles
+    const pN=300;
+    const pG=new THREE.BufferGeometry();
+    const pP=new Float32Array(pN*3);
+    for(let i=0;i<pN;i++){
+      pP[i*3]=(Math.random()-.5)*42;
+      pP[i*3+1]=(Math.random()-.5)*32;
+      pP[i*3+2]=(Math.random()-.5)*20-5;
+    }
+    pG.setAttribute('position',new THREE.BufferAttribute(pP,3));
+    partsMesh=new THREE.Points(pG,new THREE.PointsMaterial({color:0x00f5ff,size:.05,transparent:true,opacity:.25}));
+    scene.add(partsMesh);
+
+    document.addEventListener('mousemove',e=>{
+      mX=(e.clientX/innerWidth)*2-1;
+      mY=-(e.clientY/innerHeight)*2+1;
+      const orb=document.getElementById('ai-orb');
+      if(orb) orb.style.transform=`translate(${mX*6}px,${-mY*6}px)`;
+    });
+    window.addEventListener('resize',()=>{
+      camera.aspect=innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth,innerHeight);
+    });
+    tickThree();
+  }
+
+  function tickThree(){
+    requestAnimationFrame(tickThree);
+    t+=.007;
+    // Camera follow mouse
+    tX+=(mX*1.6-tX)*.028;
+    tY+=(mY*1.2-tY)*.028;
+    camera.position.x=tX;
+    camera.position.y=tY;
+    camera.lookAt(0,0,0);
+    // Auto-rotation
+    scene.rotation.y+=.0012;
+    scene.rotation.x=Math.sin(t*.25)*.04;
+    if(partsMesh) partsMesh.rotation.y+=.0004;
+    // Pulse nodes
+    nodes.forEach((n,i)=>{
+      const p=Math.sin(t*n.userData.spd+n.userData.off);
+      n.material.opacity=(n.userData.isCore?.7:.3)+p*.28;
+      n.scale.setScalar(1+p*.38);
+      const ft=(t+n.userData.fd)%14;
+      if(ft<.25){
+        n.material.opacity=1;
+        n.scale.setScalar(3.2);
+        linesGrp.children.forEach(l=>{
+          if(l.userData.a===i||l.userData.b===i) l.material.opacity=Math.min(.85,l.material.opacity+.35);
+        });
+      }
+    });
+    // Line decay
+    linesGrp.children.forEach(l=>{
+      l.material.opacity+=(l.userData.base-l.material.opacity)*.04;
+    });
+    renderer.render(scene,camera);
+  }
+
+  // Exposed: update colors (called by Qwen redesign)
+  window.updateNeuralColors = function(a,b){
+    const ca=new THREE.Color(a), cb=new THREE.Color(b);
+    nodes.forEach((n,i)=>{ n.material.color=i%2===0?ca:cb; });
+    linesGrp.children.forEach((l,i)=>{ l.material.color=i%3===0?ca:cb; });
+    if(partsMesh) partsMesh.material.color=ca;
+  };
+
+  // Exposed: explode then reform
+  window.explodeNeural = function(){
+    if(typeof gsap==='undefined') return;
+    nodes.forEach((n,i)=>{
+      const d=n.position.clone().normalize();
+      const s=8+Math.random()*14;
+      gsap.to(n.position,{
+        x:d.x*s,y:d.y*s,z:d.z*s,
+        duration:.4,ease:'power2.out',delay:i*.0015,
+        onComplete:()=>{
+          gsap.to(n.position,{
+            x:n.userData.op.x,y:n.userData.op.y,z:n.userData.op.z,
+            duration:1.3,ease:'elastic.out(1,.28)',delay:Math.random()*.55
+          });
+        }
+      });
+    });
+  };
+
+  // ================================================================
+  // tsParticles
+  // ================================================================
+  function initParticles(){
+    if(typeof tsParticles==='undefined') return;
+    tsParticles.load("tsparticles",{
+      background:{color:{value:"transparent"}},
+      fpsLimit:60,
+      particles:{
+        color:{value:["#00f5ff","#8b5cf6","#ffffff"]},
+        links:{color:"#00f5ff",distance:180,enable:true,opacity:.07,width:.5},
+        move:{enable:true,speed:0.7,outModes:{default:"bounce"}},
+        number:{density:{enable:true},value:70},
+        opacity:{value:.25},
+        shape:{type:"circle"},
+        size:{value:{min:1,max:2.5}}
+      },
+      detectRetina:true
+    });
+  }
+
+  // ================================================================
+  // AOS + scroll progress
+  // ================================================================
+  function initAOS(){
+    if(typeof AOS!=='undefined') AOS.init({duration:750,once:true,offset:80});
+  }
+  window.addEventListener('scroll',()=>{
+    const pct=(scrollY/(document.body.scrollHeight-innerHeight))*100;
+    document.getElementById('progress-bar').style.width=pct+'%';
+  });
+
+  // ================================================================
+  // COUNTER ANIMATION
+  // ================================================================
+  const counters=[
+    {id:'stat-users',  target:12847, suffix:''},
+    {id:'stat-agents', target:247,   suffix:''},
+    {id:'stat-apps',   target:10,    suffix:''},
+    {id:'stat-uptime', target:99.9,  suffix:'', decimals:1}
+  ];
+  function animateCounters(){
+    counters.forEach(c=>{
+      const el=document.getElementById(c.id);
+      if(!el) return;
+      const dec=c.decimals||0;
+      let s=0, dur=2000, step=16;
+      const inc=c.target/(dur/step);
+      const timer=setInterval(()=>{
+        s+=inc;
+        if(s>=c.target){ s=c.target; clearInterval(timer); }
+        el.textContent=(dec>0?s.toFixed(dec):Math.floor(s)).toLocaleString()+(c.suffix||'');
+      },step);
+    });
+  }
+  // Trigger counter when stats section enters viewport
+  const statsObserver=new IntersectionObserver(entries=>{
+    if(entries[0].isIntersecting){ animateCounters(); statsObserver.disconnect(); }
+  },{threshold:.2});
+  document.addEventListener('DOMContentLoaded',()=>{
+    const ss=document.getElementById('stats-section');
+    if(ss) statsObserver.observe(ss);
+  });
+
+  // ================================================================
+  // APP CARDS (render grid)
+  // ================================================================
+  function renderApps(){
+    const grid=document.getElementById('apps-grid');
+    if(!grid) return;
+    const preview=APPS.slice(0,6);
+    grid.innerHTML=preview.map((a,i)=>`
+      <div class="app-card" data-aos="fade-up" data-aos-delay="${(i%3)*80}" onclick="${a.url!=='#'?`window.open('${a.url}','_blank')`:'void(0)'}">
+        <div style="display:flex;align-items:center;gap:.875rem;margin-bottom:1rem;">
+          <div style="width:48px;height:48px;border-radius:14px;background:${a.color}1a;border:1px solid ${a.color}44;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;">${a.icon}</div>
+          <div>
+            <h3 style="font-size:.95rem;font-weight:700;line-height:1.2;">${a.name}</h3>
+            <span style="font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:50px;background:${statusBg(a.status)};color:${statusColor(a.status)};">${a.status}</span>
+          </div>
+        </div>
+        <p style="color:rgba(255,255,255,.6);font-size:.825rem;line-height:1.65;">${a.desc}</p>
+        ${a.url!=='#'?`<div style="margin-top:1rem;font-size:.78rem;color:${a.color};font-weight:600;">Visit App <i class="fas fa-external-link-alt" style="font-size:.65rem;margin-left:.3rem;"></i></div>`:''}
+      </div>
+    `).join('');
+    if(typeof AOS!=='undefined') AOS.refresh();
+  }
+  function statusBg(s){ return s==='live'?'rgba(34,197,94,.15)':s==='invite-only'?'rgba(251,191,36,.15)':'rgba(139,92,246,.15)'; }
+  function statusColor(s){ return s==='live'?'#22c55e':s==='invite-only'?'#fbbf24':'#8b5cf6'; }
+
+  // ================================================================
+  // NAV
+  // ================================================================
+  function toggleMobileNav(){
+    document.getElementById('mobile-nav').classList.toggle('open');
+  }
+
+  // ================================================================
+  // WAITLIST
+  // ================================================================
+  async function submitWaitlist(e){
+    e.preventDefault();
+    const email=document.getElementById('waitlist-email').value.trim();
+    if(!email) return;
+    try{
+      const r=await fetch('/api/waitlist.php',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email})
+      });
+      const d=await r.json().catch(()=>({}));
+      showToast(d.message||'🎉 You\'re on the waitlist!','✅');
+      document.getElementById('waitlist-email').value='';
+    }catch{
+      showToast('🎉 You\'re on the waitlist!','✅');
+      document.getElementById('waitlist-email').value='';
+    }
+  }
+
+  // ================================================================
+  // TOAST
+  // ================================================================
+  function showToast(msg,icon='ℹ️',dur=3500){
+    const t=document.getElementById('toast');
+    document.getElementById('toast-msg').textContent=msg;
+    document.getElementById('toast-icon').textContent=icon;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),dur);
+  }
+
+  // ================================================================
+  // CHAT MODAL
+  // ================================================================
+  let awaitingAdminPw=false;
+  let adminAuth=false;
+
+  function openChat(){ document.getElementById('chat-modal').classList.add('open'); }
+  function closeChat(){ document.getElementById('chat-modal').classList.remove('open'); }
+
+  function chatKeydown(e){
+    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendChat(); }
+  }
+  function autoGrow(el){
+    el.style.height='auto';
+    el.style.height=Math.min(el.scrollHeight,120)+'px';
+  }
+  function useChip(btn){
+    document.getElementById('chat-input').value=btn.textContent.replace(/^[^\s]+\s/,'');
+    sendChat();
+  }
+
+  function appendMsg(role,html){
+    const wrap=document.getElementById('chat-msgs');
+    const div=document.createElement('div');
+    div.className='msg '+role;
+    div.innerHTML=html;
+    wrap.appendChild(div);
+    wrap.scrollTop=wrap.scrollHeight;
+    return div;
+  }
+
+  function showTyping(){
+    const wrap=document.getElementById('chat-msgs');
+    const d=document.createElement('div');
+    d.className='typing'; d.id='typing-indicator';
+    d.innerHTML='<span></span><span></span><span></span>';
+    wrap.appendChild(d);
+    wrap.scrollTop=wrap.scrollHeight;
+  }
+  function removeTyping(){
+    const d=document.getElementById('typing-indicator');
+    if(d) d.remove();
+  }
+
+  async function sendChat(){
+    const inp=document.getElementById('chat-input');
+    const txt=inp.value.trim();
+    if(!txt) return;
+    inp.value=''; inp.style.height='auto';
+    appendMsg('user',escHtml(txt));
+
+    // ── Secret admin trigger ──
+    if(/show\s*admin/i.test(txt)){
+      awaitingAdminPw=true;
+      appendMsg('ai','🔐 <strong>Admin Access Requested</strong><br>Enter the master password to unlock the dashboard:');
+      return;
+    }
+    if(awaitingAdminPw){
+      awaitingAdminPw=false;
+      verifyAdminPassword(txt);
+      return;
+    }
+
+    // ── Qwen API call ──
+    showTyping();
+    try{
+      const res=await fetch('/api/qwen-proxy.php',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({message:txt})
+      });
+      const data=await res.json();
+      removeTyping();
+      const reply=data.choices?.[0]?.message?.content||data.error||'Sorry, something went wrong.';
+
+      // Detect if AI returned HTML (redesign response)
+      if(/<[a-z][\s\S]*>/i.test(reply)){
+        injectRedesign(reply,txt);
+        appendMsg('ai','✨ <strong style="color:var(--cyan);">Section redesigned!</strong> The neural network has updated its colour scheme too. Ask for another change or a completely different theme!');
+      } else {
+        appendMsg('ai',reply.replace(/\n/g,'<br>'));
+      }
+    }catch(err){
+      removeTyping();
+      appendMsg('ai','⚡ Connection issue. Make sure the Qwen proxy is configured with your API key. (<code style="color:var(--cyan);font-size:.78rem;">/api/qwen-proxy.php</code>)');
+    }
+  }
+
+  // ── DOM Injection with particle explosion ──
+  function injectRedesign(html,prompt){
+    // Pick target section from prompt keywords
+    let target=document.getElementById('hero-section');
+    if(/feature/i.test(prompt))  target=document.getElementById('features-section');
+    else if(/app/i.test(prompt)) target=document.getElementById('apps-section');
+    else if(/stat/i.test(prompt))target=document.getElementById('stats-section');
+    else if(/wait|list/i.test(prompt)) target=document.getElementById('waitlist-section');
+
+    // Colour hints → update Three.js
+    if(/purple|tron|violet/i.test(prompt))           window.updateNeuralColors('#8b5cf6','#c026d3');
+    else if(/cyan|teal|electric/i.test(prompt))      window.updateNeuralColors('#00f5ff','#0ea5e9');
+    else if(/south.?africa|sa.?flag|green.*gold/i.test(prompt)) window.updateNeuralColors('#007A4D','#FFB612');
+    else if(/red|fire|hot/i.test(prompt))            window.updateNeuralColors('#ef4444','#f97316');
+    else if(/gold|yellow|neon.?yellow/i.test(prompt))window.updateNeuralColors('#fbbf24','#eab308');
+    else if(/green|nature/i.test(prompt))            window.updateNeuralColors('#22c55e','#16a34a');
+    else if(/pink|rose|magenta/i.test(prompt))       window.updateNeuralColors('#ec4899','#db2777');
+
+    // Particle explosion
+    window.explodeNeural();
+
+    // Sanitise AI-returned HTML — require DOMPurify; abort injection if unavailable
+    function safeHtml(raw) {
+      if (typeof DOMPurify !== 'undefined') {
+        return DOMPurify.sanitize(raw, {USE_PROFILES: {html: true}});
+      }
+      // DOMPurify failed to load — refuse to inject unverified HTML
+      console.warn('DOMPurify not available; skipping HTML injection.');
+      return '';
+    }
+
+    if(typeof gsap!=='undefined'){
+      gsap.to(target,{opacity:0,scale:.96,duration:.35,onComplete:()=>{
+        const clean = safeHtml(html);
+        if (clean) target.innerHTML = clean;
+        gsap.fromTo(target,{opacity:0,scale:1.04},{opacity:1,scale:1,duration:.5});
+        if(typeof AOS!=='undefined') AOS.refresh();
+      }});
+    } else {
+      target.style.opacity='0';
+      setTimeout(()=>{
+        const clean = safeHtml(html);
+        if (clean) target.innerHTML = clean;
+        target.style.opacity='1';
+      },350);
+    }
+  }
+
+  function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // ================================================================
+  // ADMIN
+  // ================================================================
+  async function verifyAdminPassword(pw){
+    try{
+      const r=await fetch('/admin/auth.php',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'verify',password:pw})
+      });
+      const d=await r.json();
+      if(d.success){
+        adminAuth=true;
+        appendMsg('ai','✅ <strong style="color:#22c55e;">Access granted.</strong> Loading command centre…');
+        setTimeout(openAdmin,800);
+        closeChat();
+      } else {
+        appendMsg('ai','❌ <strong style="color:#ef4444;">Access denied.</strong> Incorrect password.');
+      }
+    }catch{
+      // Server unreachable — do NOT fall back to client-side password checks
+      appendMsg('ai','⚠️ Could not reach the auth server. Ensure the site is running on a PHP host.');
+    }
+  }
+
+  let adminPollTimer=null;
+
+  function openAdmin(){
+    document.getElementById('admin-overlay').classList.add('open');
+    renderAdminRevBars();
+    renderAdminTable();
+    renderAdminLog();
+    startAdminPoll();
+  }
+  function closeAdmin(){
+    document.getElementById('admin-overlay').classList.remove('open');
+    if(adminPollTimer){ clearInterval(adminPollTimer); adminPollTimer=null; }
+  }
+
+  function renderAdminRevBars(){
+    const bars=document.getElementById('rev-bars');
+    if(!bars) return;
+    const sorted=[...APPS].filter(a=>a.revenue>0).sort((a,b)=>b.revenue-a.revenue).slice(0,6);
+    const max=sorted[0].revenue;
+    bars.innerHTML=sorted.map(a=>`
+      <div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:.3rem;font-size:.78rem;">
+          <span style="color:rgba(255,255,255,.75);font-weight:600;">${a.name}</span>
+          <span style="color:${a.color};font-weight:700;">R${a.revenue.toLocaleString()}</span>
+        </div>
+        <div style="height:6px;background:rgba(255,255,255,.06);border-radius:6px;overflow:hidden;">
+          <div class="rev-bar" style="width:${(a.revenue/max*100).toFixed(1)}%;background:linear-gradient(90deg,${a.color},${a.color}88);"></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderAdminTable(){
+    const tb=document.getElementById('admin-table-body');
+    if(!tb) return;
+    tb.innerHTML=APPS.map(a=>`
+      <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+        <td style="padding:.6rem 0;display:flex;align-items:center;gap:.5rem;">
+          <span style="font-size:1rem;">${a.icon}</span>
+          <span style="font-weight:600;">${a.name}</span>
+        </td>
+        <td style="padding:.6rem 1rem;">${a.users.toLocaleString()}</td>
+        <td style="padding:.6rem 1rem;">R${a.revenue.toLocaleString()}</td>
+        <td style="padding:.6rem 0;"><span style="padding:.2rem .65rem;border-radius:50px;font-size:.7rem;font-weight:700;background:${statusBg(a.status)};color:${statusColor(a.status)};">${a.status}</span></td>
+      </tr>
+    `).join('');
+  }
+
+  const LOG_EVENTS=[
+    'New user signed up · EquiProfile','Crypto signal fired · BTC/ZAR','Property alert triggered · Cape Town',
+    'Forex trade executed · EUR/ZAR','AI agent deployed · Marketing suite','Prayer request submitted · 3 upvotes',
+    'Job match created · Senior Dev','Waitlist signup · amarktai@proton.me','Revenue milestone reached · Amarktai Crypto',
+    'Security scan completed · 0 threats','Admin dashboard accessed','Agent retrained · EquiProfile model v2.1'
+  ];
+  function renderAdminLog(){
+    const log=document.getElementById('admin-log');
+    if(!log) return;
+    const recent=Array.from({length:8},(_,i)=>({
+      ev:LOG_EVENTS[Math.floor(Math.random()*LOG_EVENTS.length)],
+      ago:Math.floor(Math.random()*59)+1+'s ago'
+    }));
+    log.innerHTML=recent.map(l=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.05);">
+        <span style="color:rgba(255,255,255,.75);">${l.ev}</span>
+        <span style="color:rgba(255,255,255,.35);white-space:nowrap;margin-left:1rem;">${l.ago}</span>
+      </div>
+    `).join('');
+  }
+
+  function startAdminPoll(){
+    if(adminPollTimer) clearInterval(adminPollTimer);
+    adminPollTimer=setInterval(async()=>{
+      try{
+        const r=await fetch('/admin/api.php?action=stats');
+        const d=await r.json();
+        if(d.users) document.getElementById('kpi-users').textContent=Number(d.users).toLocaleString();
+        if(d.agents) document.getElementById('kpi-agents').textContent=Number(d.agents).toLocaleString();
+        if(d.waitlist) document.getElementById('kpi-waitlist').textContent=Number(d.waitlist).toLocaleString();
+        if(d.revenue) document.getElementById('kpi-revenue').textContent=Number(d.revenue).toLocaleString();
+      }catch{ /* offline — keep showing last values */ }
+      // refresh log
+      renderAdminLog();
+    },3000);
+  }
+
+  // ── Add App ──
+  function openAddAppModal(){ document.getElementById('add-app-modal').classList.add('open'); }
+  function closeAddAppModal(){ document.getElementById('add-app-modal').classList.remove('open'); }
+
+  async function addApp(e){
+    e.preventDefault();
+    const name=document.getElementById('new-app-name').value.trim();
+    const url=document.getElementById('new-app-url').value.trim();
+    const desc=document.getElementById('new-app-desc').value.trim();
+    const icon=document.getElementById('new-app-icon').value.trim()||'🚀';
+    const status=document.getElementById('new-app-status').value;
+    if(!name) return;
+    const newApp={name,icon,color:'#00f5ff',status,url:url||'#',users:0,revenue:0,desc};
+    APPS.push(newApp);
+    renderAdminTable();
+    renderApps();
+    closeAddAppModal();
+    // Persist to server
+    try{
+      await fetch('/admin/api.php',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'add_app',...newApp})
+      });
+    }catch{}
+    showToast('✅ App added to the ecosystem!','🚀');
+    e.target.reset();
+  }
+
+  // ================================================================
+  // INIT
+  // ================================================================
+  document.addEventListener('DOMContentLoaded',()=>{
+    initThree();
+    initParticles();
+    initAOS();
+    renderApps();
+    // PWA service worker
+    if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+  </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Dependencies / build artifacts
+node_modules/
+vendor/
+dist/
+.env
+*.log
+
+# Sensitive configs — copy from includes/config.sample.php
+includes/config.php
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor dirs
+.vscode/
+.idea/
+
+# Uploaded assets (managed on VPS)
+assets/hero.mp4
+assets/uploads/
