@@ -14,18 +14,25 @@ const productSchema = z.object({
   featured: z.boolean().optional(),
   primaryUrl: z.string().optional(),
   hostedHere: z.boolean().optional(),
+  hostingScope: z.string().optional(),
+  subdomain: z.string().optional(),
+  customDomain: z.string().optional(),
+  environment: z.string().optional(),
+  publicVisibility: z.boolean().optional(),
+  monitoringEnabled: z.boolean().optional(),
+  integrationEnabled: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
 })
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession()
   if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+  const { id } = await params
   const product = await prisma.product.findUnique({
-    where: { id: parseInt(params.id) },
+    where: { id: parseInt(id) },
     include: { integration: true, metricDefinitions: true },
   })
   if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -34,35 +41,29 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession()
   if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+  const { id } = await params
   try {
     const body = await request.json()
     const data = productSchema.parse(body)
-    const product = await prisma.product.update({
-      where: { id: parseInt(params.id) },
-      data,
-    })
+    const product = await prisma.product.update({ where: { id: parseInt(id) }, data })
     return NextResponse.json(product)
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
-    }
-    console.error('Update product error:', error)
+    if (error instanceof z.ZodError) return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession()
   if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  await prisma.product.delete({ where: { id: parseInt(params.id) } })
+  const { id } = await params
+  await prisma.product.delete({ where: { id: parseInt(id) } })
   return NextResponse.json({ success: true })
 }
