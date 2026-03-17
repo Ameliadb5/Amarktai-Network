@@ -45,6 +45,7 @@ export default function ContactPage() {
     setForm(f => ({ ...f, [k]: e.target.value }))
 
   const isWaitlist = form.reason === 'early-access'
+  const reasonLabel = REASONS.find(r => r.value === form.reason)?.label ?? form.reason
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,7 +66,7 @@ export default function ContactPage() {
             name: form.name,
             email: form.email,
             companyOrProject: form.company,
-            message: `[${REASONS.find(r => r.value === form.reason)?.label ?? form.reason}]\n\n${form.message}`,
+            message: `[${reasonLabel}]\n\n${form.message}`,
           }),
         })
         if (!res.ok) throw new Error()
