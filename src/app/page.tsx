@@ -676,7 +676,7 @@ export default function HomePage() {
             {ecosystemApps.map((app) => {
               const Card = app.href ? 'a' : 'div'
               const cardProps = app.href
-                ? { href: app.href, target: '_blank', rel: 'noopener noreferrer' }
+                ? { href: app.href, target: '_blank', rel: 'noopener noreferrer', 'aria-label': `${app.name} — opens in new window` }
                 : {}
               return (
                 <motion.div

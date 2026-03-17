@@ -369,6 +369,7 @@ function AppCard({ app, featured = false, index }: { app: App; featured?: boolea
               href={app.href}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label={`Visit ${app.name} (opens in new window)`}
               className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-white transition-colors duration-200 group/cta"
             >
               <span>Visit Site</span>
