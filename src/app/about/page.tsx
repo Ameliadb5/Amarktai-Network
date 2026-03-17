@@ -3,203 +3,226 @@
 import { motion } from 'framer-motion'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
-import { Brain, Target, Globe, Zap, Shield, Users, ArrowRight } from 'lucide-react'
+import { Brain, Target, Globe, Zap, Shield, Users, ArrowRight, Network, Cpu, Layers, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 
 const values = [
-  {
-    icon: Brain,
-    title: 'Intelligence First',
-    description: 'AI is not an afterthought. Every system, product, and platform we build has intelligence embedded at its core architecture.',
-  },
-  {
-    icon: Target,
-    title: 'Precision Engineering',
-    description: 'We obsess over the details. From database schemas to pixel-perfect UIs, precision defines everything we ship.',
-  },
-  {
-    icon: Globe,
-    title: 'African Innovation',
-    description: 'Proudly building from Africa for the world. We believe the continent\'s next great technology companies are being built today.',
-  },
-  {
-    icon: Zap,
-    title: 'Speed & Scale',
-    description: 'We move fast without breaking things. Our architecture is designed for rapid iteration and infinite scale.',
-  },
-  {
-    icon: Shield,
-    title: 'Security by Default',
-    description: 'Privacy and security are not features — they are foundational principles baked into every system we design.',
-  },
-  {
-    icon: Users,
-    title: 'Community Impact',
-    description: 'Technology should uplift communities. Every product we build is designed to create meaningful impact.',
-  },
+  { icon: Brain, title: 'Intelligence First', description: 'AI is not an afterthought. Every system, product, and platform we build has intelligence embedded at its core architecture.', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+  { icon: Target, title: 'Precision Engineering', description: 'We obsess over the details. From database schemas to pixel-perfect UIs, precision defines everything we ship.', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
+  { icon: Globe, title: 'African Innovation', description: 'Proudly building from Africa for the world. We believe the continent\'s next great technology companies are being built today.', color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' },
+  { icon: Zap, title: 'Speed & Scale', description: 'We move fast without breaking things. Our architecture is designed for rapid iteration and infinite scale.', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+  { icon: Shield, title: 'Security by Default', description: 'Privacy and security are not features — they are foundational principles baked into every system we design.', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  { icon: Users, title: 'Community Impact', description: 'Technology should uplift communities. Every product we build is designed to create meaningful impact at scale.', color: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/20' },
 ]
 
 const milestones = [
-  { year: '2022', title: 'Foundation', description: 'Amarktai Network was conceived as a vision to build Africa\'s premier AI technology ecosystem.' },
-  { year: '2023', title: 'Research & Architecture', description: 'Deep research phase. Designing the intelligence layer, system architecture, and product roadmap.' },
-  { year: '2024', title: 'Development Sprint', description: 'Full-scale development begins. Amarktai Crypto and Forex enter closed beta. Core platform built.' },
-  { year: '2025', title: 'Ecosystem Launch', description: 'Phased launch of all platforms. Invitation access opens. Africa\'s AI ecosystem goes live.' },
+  { year: '2022', title: 'Foundation', description: 'Amarktai Network conceived as a vision to build Africa\'s premier AI technology ecosystem.', icon: Sparkles, color: 'from-blue-500 to-cyan-500' },
+  { year: '2023', title: 'Architecture Phase', description: 'Deep research phase. Designing the intelligence layer, system architecture, and product roadmap.', icon: Brain, color: 'from-cyan-500 to-violet-500' },
+  { year: '2024', title: 'Development Sprint', description: 'Full-scale development begins. Crypto and Forex enter closed beta. Core platform built.', icon: Cpu, color: 'from-violet-500 to-purple-500' },
+  { year: '2025', title: 'Ecosystem Launch', description: 'Phased launch of all platforms. Invitation access opens. Africa\'s AI ecosystem goes live.', icon: Zap, color: 'from-purple-500 to-blue-500' },
+]
+
+const pillars = [
+  { icon: Brain, title: 'AI Systems', desc: 'Proprietary intelligence models and inference pipelines that power every decision across the network.' },
+  { icon: Network, title: 'Connected Platforms', desc: 'Eight distinct products, one unified intelligence layer — each platform amplifies the others.' },
+  { icon: Layers, title: 'Full-Stack Ownership', desc: 'We own every layer: from model training to UI polish. No handoffs. No compromises.' },
 ]
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-[#060816]">
+    <div className="min-h-screen bg-[#050816]">
       <Header />
 
       {/* Hero */}
-      <section className="relative pt-32 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-purple-600/8 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/3 left-1/4 w-96 h-96 bg-blue-600/8 rounded-full blur-3xl" />
+      <section className="relative pt-40 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/8 rounded-full blur-[100px]" />
+          <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-violet-600/6 rounded-full blur-[80px]" />
+          <div className="absolute inset-0 grid-bg opacity-30" />
         </div>
-        <div className="max-w-5xl mx-auto relative z-10">
+        <div className="max-w-4xl mx-auto text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="text-center"
+            className="inline-flex items-center gap-2 px-3 py-1.5 glass rounded-full text-xs text-blue-400 mb-6 border border-blue-500/20"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1 glass rounded-full text-xs text-purple-400 mb-6 border border-purple-500/20">
-              <Brain className="w-3 h-3" />
-              About Amarktai Network
-            </div>
-            <h1 className="text-5xl lg:text-6xl font-bold text-white mb-6" style={{ fontFamily: 'Space Grotesk' }}>
-              Africa&apos;s Premier{' '}
-              <span className="gradient-text">AI Technology</span>
-              <br />
-              Company
-            </h1>
-            <p className="text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed">
-              We are an AI-first technology company building the next generation of intelligent platforms, applications, and digital infrastructure — engineered for the world, built from Africa.
-            </p>
+            <Sparkles className="w-3 h-3" />
+            Our Story
           </motion.div>
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.1 }}
+            className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] mb-6 tracking-tight"
+            style={{ fontFamily: 'Space Grotesk' }}
+          >
+            <span className="text-white">We Build</span>
+            <br />
+            <span className="gradient-text">Digital</span>
+            <br />
+            <span className="text-white/70 font-light">Ecosystems</span>
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.3 }}
+            className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed"
+          >
+            Amarktai Network is not a single product company. We are an interconnected ecosystem of AI-powered platforms, each designed to redefine its domain and amplify the others.
+          </motion.p>
         </div>
       </section>
 
-      {/* Mission */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8">
+      {/* Who We Are */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -24 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
             >
-              <h2 className="text-4xl font-bold text-white mb-6" style={{ fontFamily: 'Space Grotesk' }}>
-                Our <span className="gradient-text">Mission</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 glass rounded-full text-xs text-cyan-400 mb-6 border border-cyan-500/20">
+                <Globe className="w-3 h-3" />
+                Who We Are
+              </div>
+              <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-6" style={{ fontFamily: 'Space Grotesk' }}>
+                The Headquarters of an{' '}
+                <span className="gradient-text-blue-cyan">Advanced</span>{' '}
+                Digital Ecosystem
               </h2>
-              <p className="text-slate-400 leading-relaxed mb-6">
-                Amarktai Network exists to close the gap between the potential of artificial intelligence and its real-world application. We build systems that think, platforms that adapt, and applications that deliver measurable impact.
+              <p className="text-slate-400 leading-relaxed mb-5">
+                Amarktai Network is a technology company headquartered in the vision of building Africa&apos;s most sophisticated AI ecosystem. We design, develop, and deploy intelligent systems that solve real problems at scale.
               </p>
-              <p className="text-slate-400 leading-relaxed mb-6">
-                We are not a traditional software company. Every product in our ecosystem is designed around an intelligence layer that learns, predicts, and optimizes — creating compounding value over time.
+              <p className="text-slate-400 leading-relaxed mb-8">
+                We are not building a product. We are building a network — a constellation of interconnected platforms, each powered by our proprietary AI intelligence layer, each serving a distinct domain, each amplifying the others.
               </p>
-              <p className="text-slate-400 leading-relaxed">
-                From financial intelligence platforms to community applications, our ecosystem spans the full spectrum of human digital experience — all unified by a common commitment to AI excellence.
-              </p>
+              <Link href="/apps" className="btn-primary group inline-flex">
+                View the Ecosystem
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform relative z-10" />
+              </Link>
             </motion.div>
+
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: 24 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              className="glass rounded-2xl p-8 space-y-6"
+              className="space-y-4"
             >
-              {[
-                { label: 'Applications in Development', value: '8+' },
-                { label: 'AI Models Deployed', value: '12+' },
-                { label: 'Countries Targeted', value: '54' },
-                { label: 'Technology Partners', value: 'Growing' },
-              ].map((stat) => (
-                <div key={stat.label} className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
-                  <span className="text-sm text-slate-400">{stat.label}</span>
-                  <span className="text-lg font-bold gradient-text-blue-cyan" style={{ fontFamily: 'Space Grotesk' }}>{stat.value}</span>
-                </div>
+              {pillars.map((p, i) => (
+                <motion.div
+                  key={p.title}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.12 }}
+                  className="glass-card rounded-xl p-5 flex gap-4 ring-hover"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0 text-blue-400 border border-blue-500/20">
+                    <p.icon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1" style={{ fontFamily: 'Space Grotesk' }}>{p.title}</h4>
+                    <p className="text-sm text-slate-400 leading-relaxed">{p.desc}</p>
+                  </div>
+                </motion.div>
               ))}
             </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Values */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0B1020]/40 to-transparent" />
-        <div className="max-w-7xl mx-auto relative z-10">
+      {/* Timeline */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0A1020]/50 to-transparent pointer-events-none" />
+        <div className="max-w-5xl mx-auto relative">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl font-bold text-white mb-4" style={{ fontFamily: 'Space Grotesk' }}>
-              What We <span className="gradient-text">Stand For</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 glass rounded-full text-xs text-violet-400 mb-5 border border-violet-500/20">
+              <Target className="w-3 h-3" />
+              Our Journey
+            </div>
+            <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-4" style={{ fontFamily: 'Space Grotesk' }}>
+              How We Got <span className="gradient-text-violet">Here</span>
             </h2>
-            <p className="text-slate-400 max-w-2xl mx-auto">
-              Our values are not aspirations — they are operating principles that define how we build, ship, and grow.
-            </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {values.map((value, i) => (
-              <motion.div
-                key={value.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="glass rounded-2xl p-6"
-              >
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center mb-4">
-                  <value.icon className="w-5 h-5 text-blue-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2" style={{ fontFamily: 'Space Grotesk' }}>{value.title}</h3>
-                <p className="text-sm text-slate-400 leading-relaxed">{value.description}</p>
-              </motion.div>
-            ))}
+          <div className="relative">
+            {/* Timeline line */}
+            <div className="absolute left-8 sm:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-blue-500/50 via-violet-500/50 to-transparent" />
+
+            <div className="space-y-12">
+              {milestones.map((m, i) => (
+                <motion.div
+                  key={m.year}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.15 }}
+                  className={`relative flex flex-col sm:flex-row gap-6 items-start ${i % 2 === 0 ? 'sm:flex-row' : 'sm:flex-row-reverse'}`}
+                >
+                  {/* Dot */}
+                  <div className={`absolute left-8 sm:left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gradient-to-br ${m.color} border-2 border-[#050816] shadow-lg z-10 mt-5`} />
+
+                  {/* Content */}
+                  <div className={`ml-16 sm:ml-0 sm:w-[calc(50%-2.5rem)] ${i % 2 === 0 ? 'sm:mr-10' : 'sm:ml-10'}`}>
+                    <div className="glass-card rounded-2xl p-6 ring-hover">
+                      <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gradient-to-r ${m.color} opacity-90 text-white text-xs font-bold mb-3`}>
+                        {m.year}
+                      </div>
+                      <h3 className="text-xl font-bold text-white mb-2" style={{ fontFamily: 'Space Grotesk' }}>{m.title}</h3>
+                      <p className="text-sm text-slate-400 leading-relaxed">{m.description}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Timeline */}
+      {/* Values */}
       <section className="py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl font-bold text-white mb-4" style={{ fontFamily: 'Space Grotesk' }}>
-              Our <span className="gradient-text">Journey</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 glass rounded-full text-xs text-blue-400 mb-5 border border-blue-500/20">
+              <Brain className="w-3 h-3" />
+              How We Think
+            </div>
+            <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-4" style={{ fontFamily: 'Space Grotesk' }}>
+              Our <span className="gradient-text">Core Values</span>
             </h2>
+            <p className="text-slate-400 max-w-xl mx-auto">
+              These are not corporate buzzwords. These are the real principles that guide every decision we make.
+            </p>
           </motion.div>
 
-          <div className="space-y-0">
-            {milestones.map((milestone, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {values.map((v, i) => (
               <motion.div
-                key={milestone.year}
-                initial={{ opacity: 0, x: i % 2 === 0 ? -20 : 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
+                key={v.title}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="flex gap-8 pb-12 last:pb-0"
+                transition={{ delay: i * 0.08 }}
+                whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                className={`glass-card rounded-2xl p-6 ring-hover border ${v.border} cursor-default`}
               >
-                <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-full glass border border-blue-500/30 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-blue-400">{milestone.year}</span>
-                  </div>
-                  {i < milestones.length - 1 && (
-                    <div className="w-px flex-1 bg-gradient-to-b from-blue-500/30 to-transparent mt-2" />
-                  )}
+                <div className={`w-11 h-11 rounded-xl ${v.bg} flex items-center justify-center mb-4 ${v.color}`}>
+                  <v.icon className="w-5 h-5" />
                 </div>
-                <div className="pt-2 pb-4">
-                  <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: 'Space Grotesk' }}>{milestone.title}</h3>
-                  <p className="text-slate-400">{milestone.description}</p>
-                </div>
+                <h3 className="font-semibold text-white mb-2" style={{ fontFamily: 'Space Grotesk' }}>{v.title}</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">{v.description}</p>
               </motion.div>
             ))}
           </div>
@@ -207,27 +230,33 @@ export default function AboutPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8">
+      <section className="py-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto text-center">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="glass rounded-3xl p-12"
+            className="glass rounded-3xl p-12 relative overflow-hidden border border-blue-500/15"
           >
-            <h2 className="text-3xl font-bold text-white mb-4" style={{ fontFamily: 'Space Grotesk' }}>
-              Be Part of the Ecosystem
-            </h2>
-            <p className="text-slate-400 mb-8">
-              Join thousands waiting for early access to Africa&apos;s most advanced AI platforms.
-            </p>
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
-            >
-              Get in Touch
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-600/8 to-violet-600/8" />
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+            <div className="relative z-10">
+              <h2 className="text-4xl font-extrabold text-white mb-4" style={{ fontFamily: 'Space Grotesk' }}>
+                Join the Network
+              </h2>
+              <p className="text-slate-400 mb-8">
+                Whether you want to collaborate, invest, or simply learn more about what we&apos;re building — we&apos;d love to hear from you.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link href="/contact" className="btn-primary group">
+                  Get in Touch
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform relative z-10" />
+                </Link>
+                <Link href="/apps" className="btn-ghost">
+                  Explore Apps
+                </Link>
+              </div>
+            </div>
           </motion.div>
         </div>
       </section>
