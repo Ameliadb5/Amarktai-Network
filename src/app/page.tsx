@@ -5,6 +5,7 @@ import { useRef, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import NetworkCanvas from '@/components/NetworkCanvas'
 import {
   ArrowRight, Brain, Code2, Globe, Layers, Shield, Zap,
   Activity, ChevronRight, Sparkles, Cpu, Network, Rocket,
@@ -147,6 +148,11 @@ export default function HomePage() {
 
         {/* Grid overlay */}
         <div className="absolute inset-0 grid-bg opacity-40" />
+
+        {/* Network canvas visualization */}
+        <div className="absolute inset-0 pointer-events-none">
+          <NetworkCanvas className="opacity-70" />
+        </div>
 
         {/* Particles */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">

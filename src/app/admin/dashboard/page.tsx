@@ -145,9 +145,18 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'Space Grotesk' }}>Dashboard</h1>
-        <p className="text-sm text-slate-400 mt-1">Overview of the Amarktai Network platform</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'Space Grotesk' }}>Control Center</h1>
+          <p className="text-sm text-slate-400 mt-1 font-mono">amarktai.network / admin — real-time overview</p>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+          </span>
+          <span className="text-xs text-emerald-400 font-mono">LIVE</span>
+        </div>
       </div>
 
       {/* Metric Cards */}

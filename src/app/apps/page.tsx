@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useRef } from 'react'
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import NetworkCanvas from '@/components/NetworkCanvas'
 import {
   TrendingUp, BookOpen, Briefcase, Heart, Users, Shield, Camera, Lock,
-  ChevronRight, Sparkles, Globe, ArrowRight,
+  Sparkles, Globe, ArrowRight, ExternalLink,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -181,29 +182,69 @@ const categoryFilters: { key: Category; label: string }[] = [
 function AppCard({ app, i }: { app: App; i: number }) {
   const [expanded, setExpanded] = useState(false)
   const status = statusConfig[app.status]
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  // 3D tilt effect
+  const mouseX = useMotionValue(0)
+  const mouseY = useMotionValue(0)
+  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [8, -8]), { stiffness: 300, damping: 30 })
+  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-8, 8]), { stiffness: 300, damping: 30 })
+  const glowX = useTransform(mouseX, [-0.5, 0.5], ['0%', '100%'])
+  const glowY = useTransform(mouseY, [-0.5, 0.5], ['0%', '100%'])
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current) return
+    const rect = cardRef.current.getBoundingClientRect()
+    mouseX.set((e.clientX - rect.left) / rect.width - 0.5)
+    mouseY.set((e.clientY - rect.top) / rect.height - 0.5)
+  }
+
+  const handleMouseLeave = () => {
+    mouseX.set(0)
+    mouseY.set(0)
+  }
 
   return (
     <motion.div
+      ref={cardRef}
       layout
       initial={{ opacity: 0, y: 24, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.4, delay: i * 0.06 }}
-      whileHover={{ y: -6, transition: { duration: 0.2 } }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       onClick={() => setExpanded(!expanded)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded) } }}
       role="button"
       tabIndex={0}
       aria-expanded={expanded}
-      className={`glass-card rounded-2xl p-6 flex flex-col gap-4 cursor-pointer border ${app.borderColor} bg-gradient-to-br ${app.gradient} group transition-all duration-300`}
-      style={{ boxShadow: expanded ? `0 12px 40px ${app.glowColor}` : undefined }}
+      className={`glass-card rounded-2xl p-6 flex flex-col gap-4 cursor-pointer border ${app.borderColor} bg-gradient-to-br ${app.gradient} group transition-all duration-300 relative overflow-hidden`}
+      style={{
+        rotateX,
+        rotateY,
+        transformStyle: 'preserve-3d' as const,
+        perspective: 800,
+        boxShadow: expanded ? `0 16px 50px ${app.glowColor}, 0 0 0 1px ${app.glowColor}` : undefined,
+      }}
     >
+      {/* Dynamic spotlight glow on hover */}
+      <motion.div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+        style={{
+          background: `radial-gradient(circle at ${glowX} ${glowY}, ${app.glowColor} 0%, transparent 60%)`,
+        }}
+      />
+
+      {/* Top glow line */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 relative z-10">
         <div className="flex items-center gap-3">
           <div
-            className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border border-white/10"
-            style={{ background: `radial-gradient(circle, ${app.glowColor} 0%, transparent 70%)` }}
+            className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border border-white/10 group-hover:scale-110 transition-transform duration-300"
+            style={{ background: `radial-gradient(circle, ${app.glowColor} 0%, transparent 70%)`, boxShadow: `0 0 20px ${app.glowColor}` }}
           >
             <app.Icon className="w-5 h-5 text-white" />
           </div>
@@ -219,7 +260,7 @@ function AppCard({ app, i }: { app: App; i: number }) {
       </div>
 
       {/* Description */}
-      <p className="text-sm text-slate-400 leading-relaxed">{app.description}</p>
+      <p className="text-sm text-slate-400 leading-relaxed relative z-10">{app.description}</p>
 
       {/* Expanded */}
       <AnimatePresence>
@@ -228,7 +269,7 @@ function AppCard({ app, i }: { app: App; i: number }) {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
+            className="overflow-hidden relative z-10"
           >
             <div className="pt-3 border-t border-white/5">
               <p className="text-sm text-slate-300 leading-relaxed mb-4">{app.longDescription}</p>
@@ -243,7 +284,7 @@ function AppCard({ app, i }: { app: App; i: number }) {
       </AnimatePresence>
 
       {/* Footer */}
-      <div className="flex items-center justify-between mt-auto pt-3 border-t border-white/5">
+      <div className="flex items-center justify-between mt-auto pt-3 border-t border-white/5 relative z-10">
         <span className="text-xs text-slate-600 font-mono">{app.category}</span>
         <div className="flex items-center gap-3">
           {app.status === 'invite_only' && (
@@ -252,7 +293,7 @@ function AppCard({ app, i }: { app: App; i: number }) {
               onClick={e => e.stopPropagation()}
               className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
             >
-              Request Access <ChevronRight className="w-3 h-3" />
+              Request Access <ExternalLink className="w-3 h-3" />
             </Link>
           )}
           <span className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">
@@ -279,6 +320,7 @@ export default function AppsPage() {
           <div className="absolute top-0 left-1/3 w-96 h-96 bg-blue-600/8 rounded-full blur-[100px]" />
           <div className="absolute top-1/4 right-1/4 w-80 h-80 bg-violet-600/6 rounded-full blur-[80px]" />
           <div className="absolute inset-0 grid-bg opacity-20" />
+          <NetworkCanvas className="opacity-40" />
         </div>
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <motion.div

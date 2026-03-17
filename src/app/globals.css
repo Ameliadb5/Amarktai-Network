@@ -378,3 +378,49 @@ input:focus, textarea:focus, select:focus {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* ─── 3D Card perspective ───────────────────────── */
+.perspective-card {
+  perspective: 800px;
+}
+
+/* ─── Glowing border on hover ────────────────────── */
+.glow-border-hover {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.glow-border-hover:hover {
+  box-shadow: 0 0 0 1px rgba(59,130,246,0.5), 0 8px 40px rgba(59,130,246,0.2);
+  border-color: rgba(59,130,246,0.4) !important;
+}
+
+/* ─── Text glow ──────────────────────────────────── */
+.text-glow-blue {
+  text-shadow: 0 0 20px rgba(59,130,246,0.6), 0 0 40px rgba(59,130,246,0.3);
+}
+.text-glow-cyan {
+  text-shadow: 0 0 20px rgba(34,211,238,0.6), 0 0 40px rgba(34,211,238,0.3);
+}
+
+/* ─── Animated border ────────────────────────────── */
+@keyframes border-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(59,130,246,0.3), inset 0 0 5px rgba(59,130,246,0.1); }
+  50% { box-shadow: 0 0 20px rgba(59,130,246,0.6), inset 0 0 10px rgba(59,130,246,0.2); }
+}
+.animate-border-glow { animation: border-glow 3s ease-in-out infinite; }
+
+/* ─── Data stream / scanline ─────────────────────── */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+.scanline {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(59,130,246,0.15), transparent);
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+  z-index: 9999;
+}
+
