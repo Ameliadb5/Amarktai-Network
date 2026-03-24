@@ -29,7 +29,7 @@ import {
 
 /* ─── System Architecture Visualisation ─────────────────────── */
 const architectureLayers = [
-  { label: 'Connected Apps', items: ['EquiProfile', 'Crypto', 'Forex', 'Marketing', 'More…'], color: 'text-blue-400', borderColor: 'border-blue-500/30' },
+  { label: 'Connected Apps', items: ['EquiProfile', 'Crypto', 'Travel', 'Marketing', 'More…'], color: 'text-blue-400', borderColor: 'border-blue-500/30' },
   { label: 'AI Orchestration Layer', items: ['Model Routing', 'Shared Memory', 'Task Queue'], color: 'text-cyan-400', borderColor: 'border-cyan-500/30' },
   { label: 'Intelligence Core', items: ['Multi-Model Engine', 'Context Store', 'Monitoring'], color: 'text-violet-400', borderColor: 'border-violet-500/30' },
   { label: 'Infrastructure', items: ['Auth & Security', 'Data Layer', 'Event Bus'], color: 'text-emerald-400', borderColor: 'border-emerald-500/30' },

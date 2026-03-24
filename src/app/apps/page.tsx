@@ -7,7 +7,7 @@ import Footer from '@/components/layout/Footer'
 import NetworkCanvas from '@/components/NetworkCanvas'
 import {
   TrendingUp, Globe, Heart, BookOpen, Briefcase, Users, Megaphone, BarChart2,
-  Sparkles, ArrowRight, Lock, Zap, Brain, Shield, type LucideIcon,
+  Sparkles, ArrowRight, Lock, Zap, Brain, Shield, MapPin, type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
 import { STATUS_CONFIG, type AmarktaiApp } from '@/lib/apps'
@@ -15,8 +15,9 @@ import { STATUS_CONFIG, type AmarktaiApp } from '@/lib/apps'
 // ── Icon lookup (derived from category) ─────────────────────
 function iconForCategory(category: string): LucideIcon {
   const lower = category.toLowerCase()
-  if (lower.includes('finance') || lower.includes('crypto') || lower.includes('forex')) return TrendingUp
-  if (lower.includes('social') || lower.includes('family')) return Users
+  if (lower.includes('finance') || lower.includes('crypto')) return TrendingUp
+  if (lower.includes('travel') || lower.includes('hospitality')) return MapPin
+  if (lower.includes('social')) return Users
   if (lower.includes('community') || lower.includes('faith')) return Heart
   if (lower.includes('education') || lower.includes('learn')) return BookOpen
   if (lower.includes('employment') || lower.includes('job')) return Briefcase
@@ -469,7 +470,7 @@ export default function AppsPage() {
                 <span className="gradient-text">the network?</span>
               </h2>
               <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto leading-relaxed">
-                Amarktai Crypto and Forex are invite-only during the closed access phase. Apply to join the early network and gain priority access.
+                Amarktai Crypto is invite-only during the closed access phase. Apply to join the early network and gain priority access.
               </p>
               <Link href="/contact" className="btn-primary group inline-flex">
                 Apply for Access

@@ -48,10 +48,14 @@ async function main() {
   })
   console.log('✅ Admin user: admin@amarktai.com / admin123!')
 
-  // ── Rename Kinship → Amarktai Family if legacy slug exists ─────────
+  // ── Rename legacy slugs if they exist ────────────────────────────
   await prisma.product.updateMany({
     where: { slug: 'kinship' },
-    data: { name: 'Amarktai Family', slug: 'amarktai-family' },
+    data: { name: 'Amarktai Travel', slug: 'amarktai-travel' },
+  })
+  await prisma.product.updateMany({
+    where: { slug: 'amarktai-family' },
+    data: { name: 'Amarktai Travel', slug: 'amarktai-travel' },
   })
 
   // ── Products ───────────────────────────────────────────────────────
@@ -77,11 +81,11 @@ async function main() {
       category: 'Marketing & AI',
       shortDescription: 'AI-powered marketing intelligence and automation for modern growth teams.',
       longDescription: 'Amarktai Marketing brings AI-driven campaign intelligence, audience segmentation, and automated growth workflows to teams that demand results.',
-      status: 'in_development', accessType: 'public', featured: false,
-      hostedHere: true, hostingScope: 'same_vps', subdomain: '', customDomain: '',
-      environment: 'development', publicVisibility: true, monitoringEnabled: false, integrationEnabled: false,
-      primaryUrl: '', sortOrder: 2,
-      appType: 'app', readyToDeploy: false, aiEnabled: true, connectedToBrain: false,
+      status: 'live', accessType: 'public', featured: true,
+      hostedHere: true, hostingScope: 'same_vps', subdomain: 'marketing', customDomain: '',
+      environment: 'production', publicVisibility: true, monitoringEnabled: true, integrationEnabled: false,
+      primaryUrl: 'https://marketing.amarktai.com', sortOrder: 2,
+      appType: 'app', readyToDeploy: true, aiEnabled: true, connectedToBrain: false,
       onboardingStatus: 'configuring',
       onboardingCompletedAt: null,
       appSecret: '', customInstructions: '',
@@ -107,29 +111,29 @@ async function main() {
       category: 'Finance & AI',
       shortDescription: 'Institutional-grade forex analysis powered by proprietary AI models and market intelligence.',
       longDescription: 'Amarktai Forex brings institutional-level market intelligence to retail and professional traders. Our AI engine processes millions of data points per second.',
-      status: 'invite_only', accessType: 'invite', featured: true,
+      status: 'in_development', accessType: 'invite', featured: false,
       hostedHere: true, hostingScope: 'subdomain', subdomain: 'forex', customDomain: '',
-      environment: 'production', publicVisibility: true, monitoringEnabled: true, integrationEnabled: true,
-      primaryUrl: 'https://forex.amarktai.com', sortOrder: 4,
-      appType: 'app', readyToDeploy: true, aiEnabled: true, connectedToBrain: false,
-      onboardingStatus: 'connected',
-      onboardingCompletedAt: new Date(),
+      environment: 'development', publicVisibility: false, monitoringEnabled: false, integrationEnabled: false,
+      primaryUrl: '', sortOrder: 4,
+      appType: 'app', readyToDeploy: false, aiEnabled: true, connectedToBrain: false,
+      onboardingStatus: 'unconfigured',
+      onboardingCompletedAt: null,
       appSecret: '', customInstructions: 'Forex trading intelligence platform. Provide macro analysis and proprietary AI signals.',
     },
     {
-      name: 'Amarktai Family',
-      slug: 'amarktai-family',
-      category: 'Social',
-      shortDescription: 'Community-driven platform fostering meaningful family and community connections.',
-      longDescription: 'Amarktai Family is a community platform focused on quality of connection over quantity. Shared interests, family groups, and collaborative experiences form the foundation of genuine digital community.',
-      status: 'in_development', accessType: 'public', featured: false,
-      hostedHere: true, hostingScope: 'same_vps', subdomain: '', customDomain: '',
-      environment: 'development', publicVisibility: true, monitoringEnabled: false, integrationEnabled: false,
-      primaryUrl: '', sortOrder: 5,
-      appType: 'app', readyToDeploy: false, aiEnabled: false, connectedToBrain: false,
+      name: 'Amarktai Travel',
+      slug: 'amarktai-travel',
+      category: 'Travel & AI',
+      shortDescription: 'Intelligent travel platform bringing AI-powered discovery, planning, and booking to modern travellers.',
+      longDescription: 'Amarktai Travel is a smart travel platform that uses AI to surface personalised destination recommendations, real-time pricing intelligence, and seamless itinerary planning — all in one connected experience.',
+      status: 'live', accessType: 'public', featured: true,
+      hostedHere: true, hostingScope: 'same_vps', subdomain: 'travel', customDomain: '',
+      environment: 'production', publicVisibility: true, monitoringEnabled: true, integrationEnabled: false,
+      primaryUrl: 'https://travel.amarktai.com', sortOrder: 5,
+      appType: 'app', readyToDeploy: true, aiEnabled: true, connectedToBrain: false,
       onboardingStatus: 'configuring',
       onboardingCompletedAt: null,
-      appSecret: '', customInstructions: '',
+      appSecret: '', customInstructions: 'Travel intelligence platform. Provide personalised recommendations, itinerary assistance, and destination insights.',
     },
     {
       name: 'Faith Haven',
@@ -139,11 +143,11 @@ async function main() {
       longDescription: 'Faith Haven is building a premium digital sanctuary for faith communities worldwide.',
       status: 'in_development', accessType: 'public', featured: false,
       hostedHere: false, hostingScope: 'external_domain', subdomain: '', customDomain: 'faithhaven.app',
-      environment: 'staging', publicVisibility: true, monitoringEnabled: true, integrationEnabled: true,
-      primaryUrl: 'https://faithhaven.app', sortOrder: 6,
+      environment: 'staging', publicVisibility: false, monitoringEnabled: false, integrationEnabled: false,
+      primaryUrl: '', sortOrder: 6,
       appType: 'app', readyToDeploy: false, aiEnabled: false, connectedToBrain: false,
-      onboardingStatus: 'configured',
-      onboardingCompletedAt: new Date(),
+      onboardingStatus: 'unconfigured',
+      onboardingCompletedAt: null,
       appSecret: '', customInstructions: '',
     },
     {
@@ -154,11 +158,11 @@ async function main() {
       longDescription: 'Learn Digital is an adaptive education platform that meets learners where they are.',
       status: 'in_development', accessType: 'public', featured: false,
       hostedHere: true, hostingScope: 'same_vps', subdomain: '', customDomain: '',
-      environment: 'staging', publicVisibility: true, monitoringEnabled: true, integrationEnabled: true,
+      environment: 'staging', publicVisibility: false, monitoringEnabled: false, integrationEnabled: false,
       primaryUrl: '', sortOrder: 7,
       appType: 'app', readyToDeploy: false, aiEnabled: false, connectedToBrain: false,
-      onboardingStatus: 'configured',
-      onboardingCompletedAt: new Date(),
+      onboardingStatus: 'unconfigured',
+      onboardingCompletedAt: null,
       appSecret: '', customInstructions: '',
     },
     {
@@ -169,7 +173,7 @@ async function main() {
       longDescription: 'Jobs SA uses AI to match South African professionals with opportunities that align with their skills.',
       status: 'in_development', accessType: 'public', featured: false,
       hostedHere: false, hostingScope: 'external_domain', subdomain: '', customDomain: 'jobssa.co.za',
-      environment: 'development', publicVisibility: true, monitoringEnabled: false, integrationEnabled: false,
+      environment: 'development', publicVisibility: false, monitoringEnabled: false, integrationEnabled: false,
       primaryUrl: '', sortOrder: 8,
       appType: 'app', readyToDeploy: false, aiEnabled: false, connectedToBrain: false,
       onboardingStatus: 'unconfigured',
@@ -184,7 +188,7 @@ async function main() {
       longDescription: 'Amarktai Secure provides threat detection, zero-trust architecture, and AI-powered anomaly detection for digital platforms.',
       status: 'concept', accessType: 'private', featured: false,
       hostedHere: false, hostingScope: 'external_vps', subdomain: '', customDomain: '',
-      environment: 'development', publicVisibility: true, monitoringEnabled: false, integrationEnabled: false,
+      environment: 'development', publicVisibility: false, monitoringEnabled: false, integrationEnabled: false,
       primaryUrl: '', sortOrder: 9,
       appType: 'app', readyToDeploy: false, aiEnabled: false, connectedToBrain: false,
       onboardingStatus: 'unconfigured',
@@ -199,7 +203,7 @@ async function main() {
       longDescription: 'Crowd Lens uses computer vision and NLP to analyze crowds, events, and social dynamics in real time.',
       status: 'concept', accessType: 'private', featured: false,
       hostedHere: false, hostingScope: 'external_vps', subdomain: '', customDomain: '',
-      environment: 'development', publicVisibility: true, monitoringEnabled: false, integrationEnabled: false,
+      environment: 'development', publicVisibility: false, monitoringEnabled: false, integrationEnabled: false,
       primaryUrl: '', sortOrder: 10,
       appType: 'app', readyToDeploy: false, aiEnabled: false, connectedToBrain: false,
       onboardingStatus: 'unconfigured',
@@ -252,19 +256,14 @@ async function main() {
       { key: 'signals_generated', label: 'Signals Generated', type: 'number', chartType: 'line' },
       { key: 'portfolio_value_usd', label: 'Portfolio Value (USD)', type: 'currency', chartType: 'area' },
     ],
-    'amarktai-forex': [
-      { key: 'active_traders', label: 'Active Traders', type: 'number', chartType: 'area' },
-      { key: 'open_positions', label: 'Open Positions', type: 'number', chartType: 'bar' },
-      { key: 'analysis_requests', label: 'Analysis Requests', type: 'number', chartType: 'line' },
-      { key: 'avg_confidence', label: 'Avg AI Confidence %', type: 'percent', chartType: 'line' },
+    'amarktai-travel': [
+      { key: 'active_users', label: 'Active Users', type: 'number', chartType: 'area' },
+      { key: 'searches_per_hour', label: 'Searches / Hour', type: 'number', chartType: 'bar' },
+      { key: 'bookings', label: 'Bookings', type: 'number', chartType: 'line' },
     ],
-    'faith-haven': [
-      { key: 'members', label: 'Members', type: 'number', chartType: 'area' },
-      { key: 'daily_active', label: 'Daily Active', type: 'number', chartType: 'bar' },
-    ],
-    'learn-digital': [
-      { key: 'enrolled_learners', label: 'Enrolled Learners', type: 'number', chartType: 'area' },
-      { key: 'lessons_completed', label: 'Lessons Completed', type: 'number', chartType: 'bar' },
+    'amarktai-marketing': [
+      { key: 'campaigns_active', label: 'Active Campaigns', type: 'number', chartType: 'bar' },
+      { key: 'leads_generated', label: 'Leads Generated', type: 'number', chartType: 'area' },
     ],
   }
 
@@ -291,26 +290,22 @@ async function main() {
 
   // ── Metric Points ──────────────────────────────────────────────────
   const cryptoProd = createdProducts.find(p => p.slug === 'amarktai-crypto')!
-  const forexProd = createdProducts.find(p => p.slug === 'amarktai-forex')!
-  const faithProd = createdProducts.find(p => p.slug === 'faith-haven')!
-  const learnProd = createdProducts.find(p => p.slug === 'learn-digital')!
+  const travelProd = createdProducts.find(p => p.slug === 'amarktai-travel')!
+  const marketingProd = createdProducts.find(p => p.slug === 'amarktai-marketing')!
 
   const existingMetricCount = await prisma.appMetricPoint.count()
-  if (existingMetricCount === 0) {
+  if (existingMetricCount === 0 && cryptoProd) {
     await prisma.appMetricPoint.createMany({
       data: [
         ...genMetricPoints(cryptoProd.id, 'active_users', 48, 120, 350),
         ...genMetricPoints(cryptoProd.id, 'trades_per_hour', 48, 400, 1200),
         ...genMetricPoints(cryptoProd.id, 'signals_generated', 48, 80, 200),
         ...genMetricPoints(cryptoProd.id, 'portfolio_value_usd', 48, 2000000, 5000000),
-        ...genMetricPoints(forexProd.id, 'active_traders', 48, 80, 220),
-        ...genMetricPoints(forexProd.id, 'open_positions', 48, 150, 450),
-        ...genMetricPoints(forexProd.id, 'analysis_requests', 48, 300, 900),
-        ...genMetricPoints(forexProd.id, 'avg_confidence', 48, 78, 96),
-        ...genMetricPoints(faithProd.id, 'members', 24, 800, 1200),
-        ...genMetricPoints(faithProd.id, 'daily_active', 24, 80, 200),
-        ...genMetricPoints(learnProd.id, 'enrolled_learners', 24, 300, 600),
-        ...genMetricPoints(learnProd.id, 'lessons_completed', 24, 150, 400),
+        ...(travelProd ? genMetricPoints(travelProd.id, 'active_users', 48, 200, 600) : []),
+        ...(travelProd ? genMetricPoints(travelProd.id, 'searches_per_hour', 48, 100, 400) : []),
+        ...(travelProd ? genMetricPoints(travelProd.id, 'bookings', 48, 20, 80) : []),
+        ...(marketingProd ? genMetricPoints(marketingProd.id, 'campaigns_active', 24, 5, 20) : []),
+        ...(marketingProd ? genMetricPoints(marketingProd.id, 'leads_generated', 24, 50, 200) : []),
       ],
     })
     console.log('✅ Metric points seeded')
@@ -319,7 +314,8 @@ async function main() {
   // ── VPS Snapshots ──────────────────────────────────────────────────
   const existingVpsCount = await prisma.vpsResourceSnapshot.count()
   if (existingVpsCount === 0) {
-    for (const prod of [cryptoProd, forexProd, faithProd, learnProd]) {
+    const vpsProds = [cryptoProd, travelProd, marketingProd].filter(Boolean)
+    for (const prod of vpsProds) {
       await prisma.vpsResourceSnapshot.createMany({ data: genVpsSnapshots(prod.id, 48) })
     }
     console.log('✅ VPS snapshots seeded')
@@ -377,7 +373,7 @@ async function main() {
   const contacts = [
     { name: 'Sipho Ndlovu', email: 'sipho@example.com', companyOrProject: 'TechVentures SA', message: 'Interested in Amarktai Crypto integration for our platform.' },
     { name: 'Amara Diallo', email: 'amara@example.com', companyOrProject: 'FinEdge Ltd', message: 'We would like to discuss a partnership opportunity.' },
-    { name: 'James Osei', email: 'james.osei@example.com', companyOrProject: '', message: 'Please add me to the Amarktai Forex waitlist.' },
+    { name: 'James Osei', email: 'james.osei@example.com', companyOrProject: '', message: 'Love the Travel platform — would like to explore integrating it with our booking service.' },
   ]
   for (const c of contacts) {
     const exists = await prisma.contactSubmission.findFirst({ where: { email: c.email } })
@@ -385,11 +381,11 @@ async function main() {
   }
 
   const waitlist = [
-    { name: 'Zara Ahmed', email: 'zara@example.com', interest: 'Amarktai Crypto' },
-    { name: 'Kwame Mensah', email: 'kwame@example.com', interest: 'Amarktai Forex' },
-    { name: 'Aisha Kamara', email: 'aisha@example.com', interest: 'Learn Digital' },
-    { name: 'Tendai Moyo', email: 'tendai@example.com', interest: 'Jobs SA' },
-    { name: 'Olumide Bello', email: 'olumide@example.com', interest: 'Amarktai Crypto' },
+    { name: 'Zara Ahmed', email: 'zara@example.com', interest: 'crypto' },
+    { name: 'Kwame Mensah', email: 'kwame@example.com', interest: 'travel' },
+    { name: 'Aisha Kamara', email: 'aisha@example.com', interest: 'marketing' },
+    { name: 'Tendai Moyo', email: 'tendai@example.com', interest: 'equiprofile' },
+    { name: 'Olumide Bello', email: 'olumide@example.com', interest: 'crypto' },
   ]
   for (const w of waitlist) {
     const exists = await prisma.waitlistEntry.findFirst({ where: { email: w.email } })

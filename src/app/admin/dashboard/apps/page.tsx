@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Pencil, Trash2, X, Loader2, Check, ChevronRight, ChevronLeft,
   Brain, Zap, MonitorDot, Globe, LayoutGrid, Search, RefreshCw,
-  TrendingUp, Heart, BookOpen, Briefcase, Users, Megaphone, BarChart2, Shield, Sparkles,
+  TrendingUp, Heart, BookOpen, Briefcase, Users, Megaphone, BarChart2, Shield, Sparkles, MapPin,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────
@@ -62,8 +62,9 @@ const ONBOARDING_LABELS: Record<string, { label: string; color: string; bg: stri
 
 function iconForCategory(category: string) {
   const lower = category.toLowerCase()
-  if (lower.includes('finance') || lower.includes('crypto') || lower.includes('forex')) return TrendingUp
-  if (lower.includes('social') || lower.includes('family')) return Users
+  if (lower.includes('finance') || lower.includes('crypto')) return TrendingUp
+  if (lower.includes('travel') || lower.includes('hospitality')) return MapPin
+  if (lower.includes('social')) return Users
   if (lower.includes('community') || lower.includes('faith')) return Heart
   if (lower.includes('education') || lower.includes('learn')) return BookOpen
   if (lower.includes('employment') || lower.includes('job')) return Briefcase

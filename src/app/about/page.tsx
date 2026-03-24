@@ -19,7 +19,7 @@ const values = [
 const milestones = [
   { year: '2022', title: 'Foundation', description: 'Amarktai Network conceived as a vision to build Africa\'s premier AI technology ecosystem.', icon: Sparkles, color: 'from-blue-500 to-cyan-500' },
   { year: '2023', title: 'Architecture Phase', description: 'Deep research phase. Designing the intelligence layer, system architecture, and product roadmap.', icon: Brain, color: 'from-cyan-500 to-violet-500' },
-  { year: '2024', title: 'Development Sprint', description: 'Full-scale development begins. Crypto and Forex enter closed beta. Core platform built.', icon: Cpu, color: 'from-violet-500 to-purple-500' },
+  { year: '2024', title: 'Development Sprint', description: 'Full-scale development begins. Crypto enters closed beta. Travel and Marketing platforms in active development. Core platform built.', icon: Cpu, color: 'from-violet-500 to-purple-500' },
   { year: '2025', title: 'Platform Operational', description: 'Core platform architecture operational. First connected apps going live.', icon: Zap, color: 'from-purple-500 to-blue-500' },
   { year: '2026', title: 'Super Brain Phase', description: 'AI orchestration, multi-model routing, and shared intelligence layer in active development.', icon: Network, color: 'from-blue-500 to-cyan-500' },
 ]
