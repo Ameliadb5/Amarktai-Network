@@ -1,92 +1,41 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
-import { motion, useScroll, useTransform, useInView, AnimatePresence } from 'framer-motion'
+import { useRef } from 'react'
+import { motion, useScroll, useTransform, useInView } from 'framer-motion'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import NetworkCanvas from '@/components/NetworkCanvas'
+import { getAppCount } from '@/lib/apps'
 import {
   Brain,
   Globe,
-  Zap,
   Shield,
-  BarChart2,
-  Server,
   ArrowRight,
   Cpu,
   Lock,
   Layers,
-  TrendingUp,
   Activity,
   Database,
   CheckCircle,
   Sparkles,
-  Wifi,
+  Network,
+  Route,
+  Eye,
+  GitBranch,
+  Workflow,
+  Radio,
 } from 'lucide-react'
 
-/* ─── Live Terminal Feed ────────────────────────────────────── */
-const logPool = [
-  { label: 'MODEL', text: 'GPT-4 inference engine — online', color: 'text-cyan-400' },
-  { label: 'DATA', text: () => `Real-time market feed — ${(Math.floor(Math.random()*400)+600)} signals/s`, color: 'text-blue-400' },
-  { label: 'RISK', text: () => `Portfolio risk model — accuracy ${(93+Math.random()*3).toFixed(1)}%`, color: 'text-green-400' },
-  { label: 'PATTERN', text: 'Anomaly detected in BTC/USD — flagging', color: 'text-yellow-400' },
-  { label: 'NLP', text: () => `Sentiment scan — ${(11000+Math.floor(Math.random()*3000)).toLocaleString()} docs indexed`, color: 'text-violet-400' },
-  { label: 'ALERT', text: 'Threat signature matched — quarantine applied', color: 'text-red-400' },
-  { label: 'LEARN', text: () => `Checkpoint saved — epoch ${Math.floor(Math.random()*200)+800} / 1000`, color: 'text-cyan-400' },
-  { label: 'SYS', text: () => `All systems nominal — uptime ${(99.9+Math.random()*0.09).toFixed(2)}%`, color: 'text-green-400' },
-  { label: 'API', text: () => `${Math.floor(Math.random()*500)+1200} req/s — p99: ${Math.floor(Math.random()*30)+18}ms`, color: 'text-blue-400' },
-  { label: 'SYNC', text: 'Cross-app data layer synced — 6 nodes active', color: 'text-teal-400' },
-  { label: 'AUTH', text: () => `${Math.floor(Math.random()*40)+120} auth events processed`, color: 'text-violet-400' },
-  { label: 'INFER', text: () => `Sub-${Math.floor(Math.random()*30)+55}ms inference — batch complete`, color: 'text-cyan-400' },
-  { label: 'CACHE', text: () => `Cache hit ratio: ${(87+Math.random()*10).toFixed(1)}%`, color: 'text-emerald-400' },
-  { label: 'SCHED', text: 'Training job scheduled — queue position 1', color: 'text-yellow-400' },
+/* ─── System Architecture Visualisation ─────────────────────── */
+const architectureLayers = [
+  { label: 'Connected Apps', items: ['EquiProfile', 'Crypto', 'Forex', 'Marketing', 'More…'], color: 'text-blue-400', borderColor: 'border-blue-500/30' },
+  { label: 'AI Orchestration Layer', items: ['Model Routing', 'Shared Memory', 'Task Queue'], color: 'text-cyan-400', borderColor: 'border-cyan-500/30' },
+  { label: 'Intelligence Core', items: ['Multi-Model Engine', 'Context Store', 'Monitoring'], color: 'text-violet-400', borderColor: 'border-violet-500/30' },
+  { label: 'Infrastructure', items: ['Auth & Security', 'Data Layer', 'Event Bus'], color: 'text-emerald-400', borderColor: 'border-emerald-500/30' },
 ]
 
-function getTimestamp() {
-  const d = new Date()
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`
-}
-
-function resolveText(t: string | (() => string)): string {
-  return typeof t === 'function' ? t() : t
-}
-
-interface LogLine { id: number; time: string; label: string; text: string; color: string }
-
-function LiveTerminal() {
-  const [lines, setLines] = useState<LogLine[]>([])
-  const [cursor, setCursor] = useState(true)
-  const idRef = useRef(100)
-  const poolIdxRef = useRef(6)
-
-  useEffect(() => {
-    // Populate initial lines on the client only to avoid hydration mismatch
-    setLines(
-      logPool.slice(0, 6).map((l, i) => ({
-        id: i,
-        time: getTimestamp(),
-        label: l.label,
-        text: resolveText(l.text),
-        color: l.color,
-      }))
-    )
-    const cursorInterval = setInterval(() => setCursor(v => !v), 530)
-    const lineInterval = setInterval(() => {
-      const entry = logPool[poolIdxRef.current % logPool.length]
-      poolIdxRef.current += 1
-      const newLine: LogLine = {
-        id: idRef.current++,
-        time: getTimestamp(),
-        label: entry.label,
-        text: resolveText(entry.text),
-        color: entry.color,
-      }
-      setLines(prev => [...prev.slice(-9), newLine])
-    }, 1600)
-    return () => { clearInterval(cursorInterval); clearInterval(lineInterval) }
-  }, [])
-
+function SystemArchitecture() {
   return (
     <div className="terminal rounded-2xl overflow-hidden ring-1 ring-blue-500/15">
       <div className="terminal-header">
@@ -95,37 +44,49 @@ function LiveTerminal() {
           <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
           <div className="w-3 h-3 rounded-full bg-green-500/70" />
           <span className="ml-4 text-xs text-blue-400/50 font-mono flex items-center gap-2">
-            amarktai-ai v2.4.1
-            <span className="inline-flex items-center gap-1 text-green-400/70">
-              <Wifi size={10} />
-              <span className="text-[10px]">live</span>
+            amarktai-superbrain
+            <span className="inline-flex items-center gap-1 text-cyan-400/70">
+              <Radio size={10} />
+              <span className="text-[10px]">architecture</span>
             </span>
           </span>
         </div>
       </div>
-      <div className="p-5 font-mono text-[11px] h-[300px] overflow-hidden flex flex-col justify-end">
-        <div className="space-y-2.5">
-          <AnimatePresence initial={false} mode="popLayout">
-            {lines.map((line) => (
-              <motion.div
-                key={line.id}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex gap-3"
-              >
-                <span className="text-blue-500/35 shrink-0">[{line.time}]</span>
-                <span className={`font-bold shrink-0 w-[4.5rem] ${line.color}`}>{line.label}</span>
-                <span className="text-blue-100/65">{line.text}</span>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          <div className="flex gap-3 pt-1">
-            <span className="text-blue-500/35">{'>'}</span>
-            <span className={`text-cyan-400 font-bold transition-opacity duration-100 ${cursor ? 'opacity-100' : 'opacity-0'}`}>█</span>
-          </div>
-        </div>
+      <div className="p-5 font-mono text-[11px] space-y-3">
+        {architectureLayers.map((layer, i) => (
+          <motion.div
+            key={layer.label}
+            initial={{ opacity: 0, x: -12 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: i * 0.12 }}
+          >
+            <div className={`rounded-xl border ${layer.borderColor} bg-white/[0.02] p-3`}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={`font-bold uppercase tracking-wider ${layer.color}`}>{layer.label}</span>
+                {i === 0 && (
+                  <span className="text-[9px] text-blue-100/30 ml-auto">{getAppCount()} apps registered</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {layer.items.map((item) => (
+                  <span key={item} className="text-blue-100/50 bg-white/[0.04] px-2 py-0.5 rounded text-[10px]">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {i < architectureLayers.length - 1 && (
+              <div className="flex justify-center py-1">
+                <div className="flex flex-col items-center gap-0.5">
+                  <div className="w-px h-2 bg-blue-500/20" />
+                  <div className="w-1 h-1 rounded-full bg-blue-500/30" />
+                  <div className="w-px h-2 bg-blue-500/20" />
+                </div>
+              </div>
+            )}
+          </motion.div>
+        ))}
       </div>
     </div>
   )
@@ -135,57 +96,57 @@ function LiveTerminal() {
 const capabilities = [
   {
     icon: Brain,
-    title: 'AI Systems',
-    description: 'End-to-end machine learning pipelines, real-time inference engines, and intelligent automation at scale.',
+    title: 'AI Orchestration',
+    description: 'A central command layer that routes AI requests, manages model selection, and coordinates intelligence across every connected app.',
     color: 'text-blue-400',
   },
   {
-    icon: Globe,
-    title: 'Web Applications',
-    description: 'High-performance, real-time web apps built on modern frameworks with seamless, production-grade UX.',
+    icon: Database,
+    title: 'Shared Memory Layer',
+    description: 'Unified context store that lets apps share knowledge, user preferences, and learned insights — so every app gets smarter together.',
     color: 'text-cyan-400',
   },
   {
-    icon: Zap,
-    title: 'Automation',
-    description: 'Intelligent workflow automation that eliminates friction and multiplies business velocity.',
+    icon: Route,
+    title: 'Multi-Model Routing',
+    description: 'Dynamically route each AI task to the right model based on capability, cost, and latency. Not locked to a single provider.',
     color: 'text-violet-400',
   },
   {
-    icon: Server,
-    title: 'Infrastructure',
-    description: 'Resilient cloud-native architecture designed for massive scale and zero-downtime deployments.',
+    icon: Eye,
+    title: 'Centralized Monitoring',
+    description: 'Observe every AI operation, model call, and data flow across the entire network from a single operations dashboard.',
     color: 'text-teal-400',
   },
   {
-    icon: Shield,
-    title: 'Security',
-    description: 'Defense-in-depth security with real-time threat detection and zero-trust architecture at every layer.',
+    icon: Workflow,
+    title: 'Workflow Automation',
+    description: 'Chain AI operations across apps with intelligent triggers, pipelines, and event-driven automation — all managed centrally.',
     color: 'text-emerald-400',
   },
   {
-    icon: BarChart2,
-    title: 'Analytics',
-    description: 'Deep data intelligence with AI-powered dashboards that surface insights and drive decisions.',
+    icon: Shield,
+    title: 'Security & Access Control',
+    description: 'Centralized authentication, encryption, and granular permissions governing all AI operations across the ecosystem.',
     color: 'text-blue-400',
   },
 ]
 
 const differentiators = [
   {
-    icon: Cpu,
-    title: 'AI-Native Architecture',
+    icon: Network,
+    title: 'The Central Nervous System',
     description:
-      'Every product is designed from first principles with artificial intelligence at its core — not bolted on as an afterthought.',
+      'Not a single app — a brain that connects, coordinates, and empowers every application in the ecosystem. One intelligence layer powering them all.',
     color: 'text-blue-400',
     borderColor: 'border-blue-500/25',
     glowColor: 'rgba(59,130,246,0.06)',
   },
   {
     icon: Layers,
-    title: 'Ecosystem Thinking',
+    title: 'Multi-Model Ecosystem',
     description:
-      'Our apps interoperate by design, creating a compounding intelligence network that grows more powerful with each new addition.',
+      'Not locked to one AI provider. The Super Brain routes to the best model for each task — OpenAI, local models, or custom-trained — always choosing the optimal path.',
     color: 'text-violet-400',
     borderColor: 'border-violet-500/25',
     glowColor: 'rgba(139,92,246,0.06)',
@@ -194,16 +155,16 @@ const differentiators = [
     icon: Globe,
     title: 'Africa → World',
     description:
-      'Built in Africa, engineered for the world. We solve real, hard problems for real people — and then export that intelligence globally.',
+      'Built in Africa, engineered for the world. We solve real, hard problems for real people — and export that intelligence globally.',
     color: 'text-cyan-400',
     borderColor: 'border-cyan-500/25',
     glowColor: 'rgba(34,211,238,0.06)',
   },
   {
     icon: Lock,
-    title: 'Security First',
+    title: 'Secure by Architecture',
     description:
-      'Enterprise-grade security woven into every layer of every application. Your data, your control — always. Non-negotiable.',
+      'Security and monitoring are not afterthoughts — they are baked into the network fabric. Every model call is logged, every permission is enforced.',
     color: 'text-emerald-400',
     borderColor: 'border-emerald-500/25',
     glowColor: 'rgba(16,185,129,0.06)',
@@ -212,24 +173,28 @@ const differentiators = [
 
 const aiFeatures = [
   {
+    icon: Cpu,
+    title: 'Intelligent Model Routing',
+    description: 'Each AI request is analysed and routed to the optimal model — balancing capability, speed, and cost in real time.',
+    status: 'Rolling out',
+  },
+  {
     icon: Activity,
-    title: 'Real-Time Inference',
-    description: 'Sub-100ms model inference flowing across every application in the ecosystem.',
+    title: 'Shared Context Engine',
+    description: 'Apps share memory and context through a unified store, enabling compounding intelligence as the ecosystem grows.',
+    status: 'In development',
   },
   {
-    icon: Database,
-    title: 'Unified Data Layer',
-    description: 'A shared data fabric powering cross-app intelligence and compounding insights.',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Continuous Learning',
-    description: 'Models retrain automatically on new data streams — always improving.',
+    icon: GitBranch,
+    title: 'Operations Dashboard',
+    description: 'Every model call, latency metric, and cost is tracked and visualised from one centralized command center.',
+    status: 'Live in admin',
   },
   {
     icon: CheckCircle,
-    title: 'Explainable AI',
-    description: 'Every decision is transparent, auditable, and fully traceable.',
+    title: 'Full Audit Trail',
+    description: 'Complete traceability for every AI decision across the network — built for transparency and compliance.',
+    status: 'Rolling out',
   },
 ]
 
@@ -250,6 +215,8 @@ const itemVariants = {
 
 /* ─── Page Component ────────────────────────────────────────── */
 export default function HomePage() {
+  const appCount = getAppCount()
+
   /* Parallax */
   const heroRef = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({
@@ -333,7 +300,7 @@ export default function HomePage() {
               transition={{ duration: 1.8, repeat: Infinity }}
             />
             <span className="text-sm font-medium text-blue-200 tracking-wide">
-              Building Africa&apos;s Most Advanced AI Platform
+              The AI Command Center — {appCount} Apps Connected
             </span>
             <Sparkles size={13} className="text-cyan-400" />
           </motion.div>
@@ -345,9 +312,9 @@ export default function HomePage() {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="text-[clamp(2.5rem,6.5vw,5rem)] font-black leading-[0.93] tracking-tight mb-5"
           >
-            <span className="block text-white/85">Intelligence</span>
-            <span className="block gradient-text-blue-cyan py-1">Engineered</span>
-            <span className="block text-white/85">for Impact</span>
+            <span className="block text-white/85">The Central</span>
+            <span className="block gradient-text-blue-cyan py-1">Nervous System</span>
+            <span className="block text-white/85">for AI Operations</span>
           </motion.h1>
 
           {/* Sub-headline */}
@@ -357,9 +324,9 @@ export default function HomePage() {
             transition={{ duration: 0.6, delay: 0.65 }}
             className="max-w-2xl mx-auto text-base md:text-lg text-blue-100/60 mb-10 leading-relaxed"
           >
-            Amarktai Network is an interconnected portfolio of AI applications built to
-            transform how Africa works, learns, trades, and connects — and export that
-            intelligence to the world.
+            Amarktai Network is the orchestration and intelligence layer that connects every app
+            in the ecosystem. One brain for AI routing, shared memory, monitoring,
+            and automation — built in Africa, engineered for the world.
           </motion.p>
 
           {/* CTAs */}
@@ -412,7 +379,7 @@ export default function HomePage() {
               className="inline-flex items-center gap-2 glass px-4 py-2 rounded-full mb-6 border border-blue-500/20"
             >
               <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-[0.18em]">
-                The Platform
+                The Nervous System
               </span>
             </motion.div>
 
@@ -420,12 +387,13 @@ export default function HomePage() {
               variants={itemVariants}
               className="text-4xl md:text-6xl font-black mb-5 tracking-tight"
             >
-              What We{' '}
-              <span className="gradient-text">Build</span>
+              What the{' '}
+              <span className="gradient-text">Super Brain</span>
+              {' '}Does
             </motion.h2>
 
             <motion.p variants={itemVariants} className="text-blue-100/45 text-lg max-w-xl mx-auto">
-              Six core capabilities powering every product in the Amarktai ecosystem.
+              Six core capabilities that make Amarktai the command center for all connected AI operations.
             </motion.p>
           </div>
 
@@ -487,7 +455,7 @@ export default function HomePage() {
             </motion.h2>
 
             <motion.p variants={itemVariants} className="text-blue-100/45 text-lg max-w-xl mx-auto">
-              We&apos;re not building another app. We&apos;re engineering a new kind of intelligence ecosystem.
+              We&apos;re not building another app. We&apos;re engineering the brain that powers every app.
             </motion.p>
           </div>
 
@@ -500,7 +468,7 @@ export default function HomePage() {
                 className={`glass-strong p-9 rounded-3xl border ${item.borderColor} transition-all duration-300 cursor-default`}
               >
                 <div
-                  className={`w-13 h-13 w-14 h-14 rounded-2xl glass flex items-center justify-center mb-6 ${item.color}`}
+                  className={`w-14 h-14 rounded-2xl glass flex items-center justify-center mb-6 ${item.color}`}
                 >
                   <item.icon size={24} />
                 </div>
@@ -545,14 +513,14 @@ export default function HomePage() {
             </motion.h2>
 
             <motion.p variants={itemVariants} className="text-blue-100/45 text-lg max-w-xl mx-auto">
-              A shared intelligence layer running beneath every Amarktai application.
+              The shared intelligence engine that powers every application in the Amarktai network.
             </motion.p>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-14 items-center">
-            {/* Live Terminal */}
+            {/* System Architecture */}
             <motion.div variants={itemVariants}>
-              <LiveTerminal />
+              <SystemArchitecture />
             </motion.div>
 
             {/* Features list */}
@@ -563,7 +531,12 @@ export default function HomePage() {
                     <feature.icon size={18} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-white mb-1">{feature.title}</h3>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="font-bold text-white">{feature.title}</h3>
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/[0.06] text-blue-200/50 border border-white/[0.06]">
+                        {feature.status}
+                      </span>
+                    </div>
                     <p className="text-sm text-blue-100/50 leading-relaxed">
                       {feature.description}
                     </p>
@@ -577,7 +550,7 @@ export default function HomePage() {
 
       <div className="section-divider" />
 
-      {/* ── ONE NETWORK. ONE VISION. ──────────────────────────── */}
+      {/* ── ONE NETWORK. ONE BRAIN. ───────────────────────────── */}
       <motion.section
         ref={ecosystemRef}
         variants={sectionVariants}
@@ -617,7 +590,7 @@ export default function HomePage() {
             className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight leading-tight mb-8"
           >
             <span className="block text-white/90">One Network.</span>
-            <span className="block gradient-text-blue-cyan py-2">One Vision.</span>
+            <span className="block gradient-text-blue-cyan py-2">One Brain.</span>
           </motion.h2>
 
           {/* Supporting copy */}
@@ -625,17 +598,17 @@ export default function HomePage() {
             variants={itemVariants}
             className="text-lg md:text-xl text-blue-100/55 max-w-2xl mx-auto leading-relaxed mb-6"
           >
-            Every application we build is a node in a single, unified intelligence network.
-            Each product is stronger for every other product that exists — compounding intelligence,
-            compounding impact.
+            Every application in the Amarktai ecosystem is a node connected to a single,
+            central intelligence layer. The Super Brain orchestrates AI across all of
+            them — shared memory, unified routing, centralized control.
           </motion.p>
 
           <motion.p
             variants={itemVariants}
             className="text-base text-blue-100/40 max-w-xl mx-auto leading-relaxed mb-14"
           >
-            From finance to education, social connection to cybersecurity — one ecosystem,
-            one underlying intelligence layer, one unstoppable vision.
+            From fintech to education, marketing to community — {appCount} apps and growing,
+            all powered by one nervous system, one command center.
           </motion.p>
 
           {/* Premium divider treatment */}
