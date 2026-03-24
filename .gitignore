@@ -45,3 +45,9 @@ prisma/migrations/
 # editors
 .idea
 .vscode
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+backend/venv/
