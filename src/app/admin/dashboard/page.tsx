@@ -41,6 +41,12 @@ interface DashboardData {
       lastHeartbeatAt: string | null
     } | null
   }>
+  brainStats: {
+    totalRequests: number
+    successCount: number
+    errorCount: number
+    avgLatencyMs: number | null
+  } | null
 }
 
 interface VpsSnapshot {
@@ -188,16 +194,18 @@ export default function DashboardPage() {
             <div>
               <p className="text-sm font-medium text-white">AI Providers</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Not configured yet — add providers in AI Providers section
+                Configure providers in AI Providers vault
               </p>
             </div>
           </div>
           <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5">
             <MessageSquare className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-white">Brain Chat</p>
+              <p className="text-sm font-medium text-white">Brain Gateway</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Ready for backend connection
+                {data?.brainStats?.totalRequests
+                  ? `${data.brainStats.totalRequests} req · ${data.brainStats.successCount} ok`
+                  : 'Active · no requests yet'}
               </p>
             </div>
           </div>

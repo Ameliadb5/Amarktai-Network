@@ -14,6 +14,8 @@ export async function GET() {
     recentContacts,
     recentEvents,
     productStats,
+    brainStats,
+    recentBrainEvents,
   ] = await Promise.all([
     prisma.product.count(),
     prisma.contactSubmission.count(),
@@ -40,6 +42,25 @@ export async function GET() {
       },
       orderBy: { sortOrder: 'asc' },
     }),
+    // Brain gateway stats
+    Promise.all([
+      prisma.brainEvent.count(),
+      prisma.brainEvent.count({ where: { success: true } }),
+      prisma.brainEvent.aggregate({ _avg: { latencyMs: true }, where: { latencyMs: { not: null } } }),
+    ]).then(([total, success, latency]) => ({
+      totalRequests: total,
+      successCount: success,
+      errorCount: total - success,
+      avgLatencyMs: latency._avg.latencyMs ? Math.round(latency._avg.latencyMs) : null,
+    })),
+    prisma.brainEvent.findMany({
+      orderBy: { timestamp: 'desc' },
+      take: 5,
+      select: {
+        id: true, traceId: true, appSlug: true, taskType: true,
+        routedProvider: true, success: true, latencyMs: true, timestamp: true,
+      },
+    }),
   ])
 
   return NextResponse.json({
@@ -52,5 +73,7 @@ export async function GET() {
     recentContacts,
     recentEvents,
     productStats,
+    brainStats,
+    recentBrainEvents,
   })
 }
