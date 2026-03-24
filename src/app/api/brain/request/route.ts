@@ -3,11 +3,10 @@ import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import {
   authenticateApp,
-  resolveRoute,
-  callProvider,
   logBrainEvent,
   type BrainResponse,
 } from '@/lib/brain'
+import { orchestrate } from '@/lib/orchestrator'
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -17,7 +16,7 @@ const requestSchema = z.object({
   externalUserId: z.string().optional(),
   taskType: z.string().min(1).max(100),
   message: z.string().min(1).max(32_000),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   requestMode: z.enum(['sync', 'async']).optional(),
   traceId: z.string().optional(),
 })
@@ -30,6 +29,14 @@ const requestSchema = z.object({
  *
  * Auth:   appId (product slug) + appSecret
  * Output: normalised BrainResponse — consistent regardless of provider or failure mode
+ *
+ * The orchestration layer (src/lib/orchestrator.ts) handles:
+ *   - task classification
+ *   - execution mode selection (direct / specialist / review / consensus)
+ *   - specialist profile injection
+ *   - multi-provider coordination
+ *   - confidence scoring
+ *   - fallback handling
  */
 export async function POST(request: NextRequest) {
   const start = Date.now()
@@ -60,9 +67,21 @@ export async function POST(request: NextRequest) {
   const auth = await authenticateApp(body.appId, body.appSecret)
   if (!auth.ok || !auth.app) {
     await logBrainEvent({
-      traceId, productId: null, appSlug: body.appId, taskType: body.taskType,
-      routedProvider: null, routedModel: null, success: false,
-      errorMessage: auth.error ?? 'Auth failed', latencyMs: Date.now() - start,
+      traceId,
+      productId: null,
+      appSlug: body.appId,
+      taskType: body.taskType,
+      executionMode: 'direct',
+      classificationJson: '{}',
+      routedProvider: null,
+      routedModel: null,
+      validationUsed: false,
+      consensusUsed: false,
+      confidenceScore: null,
+      success: false,
+      errorMessage: auth.error ?? 'Auth failed',
+      warningsJson: '[]',
+      latencyMs: Date.now() - start,
     })
     return NextResponse.json(
       errorResponse({ traceId, taskType: body.taskType, error: auth.error ?? 'Unauthorized', statusCode: auth.statusCode, latencyMs: Date.now() - start }),
@@ -72,54 +91,65 @@ export async function POST(request: NextRequest) {
 
   const { app } = auth
 
-  // ── Resolve routing policy ────────────────────────────────────────────
-  const route = await resolveRoute(app.category, body.taskType)
-  if (!route) {
-    await logBrainEvent({
-      traceId, productId: app.id, appSlug: app.slug, taskType: body.taskType,
-      routedProvider: null, routedModel: null, success: false,
-      errorMessage: 'No provider available', latencyMs: Date.now() - start,
-    })
-    return NextResponse.json(
-      errorResponse({ traceId, taskType: body.taskType, app, error: 'No AI provider is available — all providers are unconfigured or disabled', statusCode: 503, latencyMs: Date.now() - start }),
-      { status: 503 },
-    )
-  }
+  // ── Orchestrate ───────────────────────────────────────────────────────
+  const result = await orchestrate({
+    appCategory: app.category,
+    taskType: body.taskType,
+    message: body.message,
+  })
 
-  // ── Call provider ─────────────────────────────────────────────────────
-  const providerResult = await callProvider(route.providerKey, route.model, body.message)
   const latencyMs = Date.now() - start
+  const hasErrors = result.errors.length > 0
+  const success = !hasErrors && result.output !== null
 
   // ── Log brain event ───────────────────────────────────────────────────
   await logBrainEvent({
-    traceId, productId: app.id, appSlug: app.slug, taskType: body.taskType,
-    routedProvider: route.providerKey, routedModel: providerResult.model,
-    success: providerResult.ok,
-    errorMessage: providerResult.error ?? null,
+    traceId,
+    productId: app.id,
+    appSlug: app.slug,
+    taskType: body.taskType,
+    executionMode: result.executionMode,
+    classificationJson: JSON.stringify(result.classification),
+    routedProvider: result.routedProvider,
+    routedModel: result.routedModel,
+    validationUsed: result.validationUsed,
+    consensusUsed: result.consensusUsed,
+    confidenceScore: result.confidenceScore,
+    success,
+    errorMessage: hasErrors ? result.errors.join('; ') : null,
+    warningsJson: JSON.stringify(result.warnings),
     latencyMs,
   })
 
   // ── Build normalised response ─────────────────────────────────────────
-  const warnings: string[] = []
-  if (route.fallbackUsed) warnings.push(`Routed via fallback provider (${route.reason})`)
+  if (!success && result.routedProvider === null && result.errors.some(e => e.includes('No AI provider'))) {
+    return NextResponse.json(
+      errorResponse({ traceId, taskType: body.taskType, app, error: result.errors[0], statusCode: 503, latencyMs }),
+      { status: 503 },
+    )
+  }
 
   const response: BrainResponse = {
-    success: providerResult.ok,
+    success,
     traceId,
     app: { id: app.id, name: app.name, slug: app.slug },
-    routedProvider: route.providerKey,
-    routedModel: providerResult.model,
+    routedProvider: result.routedProvider,
+    routedModel: result.routedModel,
     taskType: body.taskType,
-    output: providerResult.output,
-    warnings,
-    errors: providerResult.error ? [providerResult.error] : [],
+    executionMode: result.executionMode,
+    confidenceScore: result.confidenceScore,
+    validationUsed: result.validationUsed,
+    consensusUsed: result.consensusUsed,
+    output: result.output,
+    warnings: result.warnings,
+    errors: result.errors,
     latencyMs,
-    memoryUsed: false,
-    fallbackUsed: route.fallbackUsed,
+    memoryUsed: result.memoryUsed,
+    fallbackUsed: result.fallbackUsed,
     timestamp: new Date().toISOString(),
   }
 
-  const httpStatus = providerResult.ok ? 200 : 502
+  const httpStatus = success ? 200 : 502
   return NextResponse.json(response, { status: httpStatus })
 }
 
@@ -140,6 +170,10 @@ function errorResponse(opts: {
     routedProvider: null,
     routedModel: null,
     taskType: opts.taskType,
+    executionMode: 'direct',
+    confidenceScore: null,
+    validationUsed: false,
+    consensusUsed: false,
     output: null,
     warnings: [],
     errors: [opts.error],
@@ -149,3 +183,4 @@ function errorResponse(opts: {
     timestamp: new Date().toISOString(),
   }
 }
+

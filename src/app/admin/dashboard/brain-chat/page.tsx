@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Brain, Send, RefreshCw, PanelRightOpen, PanelRightClose,
   CheckCircle, AlertCircle, Clock, Activity, Zap,
-  ChevronRight, WifiOff, Loader2, RotateCcw,
+  WifiOff, Loader2, RotateCcw,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -17,8 +17,12 @@ interface BrainTestResponse {
   output: string | null
   routedProvider: string | null
   routedModel: string | null
-  routingReason: string | null
+  executionMode: string
+  confidenceScore: number | null
+  validationUsed?: boolean
+  consensusUsed?: boolean
   fallbackUsed: boolean
+  warnings?: string[]
   error: string | null
   latencyMs: number | null
   timestamp: string

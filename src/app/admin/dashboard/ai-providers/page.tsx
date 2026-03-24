@@ -267,7 +267,7 @@ function ProviderCard({ provider, index, onConfigure, onHealthCheck, checking }:
   const meta = PROVIDER_META[provider.providerKey] ?? PROVIDER_META.openai
   const health = HEALTH_CONFIG[provider.healthStatus] ?? HEALTH_CONFIG.unconfigured
   const Icon = meta.icon
-  const HealthIcon = health.icon
+  const _HealthIcon = health.icon
 
   return (
     <motion.div

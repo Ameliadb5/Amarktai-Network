@@ -60,33 +60,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-
-
-export async function GET() {
-  const session = await getSession()
-  if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const products = await prisma.product.findMany({
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    include: { integration: true },
-  })
-  return NextResponse.json(products)
-}
-
-export async function POST(request: NextRequest) {
-  const session = await getSession()
-  if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  try {
-    const body = await request.json()
-    const data = productSchema.parse(body)
-    const product = await prisma.product.create({ data })
-    return NextResponse.json(product, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
-    }
-    console.error('Create product error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}

@@ -4,19 +4,31 @@ import { getSession } from '@/lib/session'
 import { safeParseJson } from '@/lib/utils'
 
 /**
- * GET /api/admin/brain/events
+ * GET /api/admin/events
  *
- * Returns the 50 most recent brain events with full trace data for the admin dashboard.
+ * Returns paginated brain execution trace events for admin observability.
+ * Supports query params: limit (default 50, max 200), appSlug, executionMode.
  * Requires active admin session.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession()
   if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const [events, totalRequests, successCount, errorCount] = await Promise.all([
+  const { searchParams } = new URL(request.url)
+  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10) || 50))
+  const appSlug = searchParams.get('appSlug') ?? undefined
+  const executionMode = searchParams.get('executionMode') ?? undefined
+
+  const where = {
+    ...(appSlug ? { appSlug } : {}),
+    ...(executionMode ? { executionMode } : {}),
+  }
+
+  const [events, total] = await Promise.all([
     prisma.brainEvent.findMany({
+      where,
       orderBy: { timestamp: 'desc' },
-      take: 50,
+      take: limit,
       select: {
         id: true,
         traceId: true,
@@ -36,17 +48,10 @@ export async function GET() {
         timestamp: true,
       },
     }),
-    prisma.brainEvent.count(),
-    prisma.brainEvent.count({ where: { success: true } }),
-    prisma.brainEvent.count({ where: { success: false } }),
+    prisma.brainEvent.count({ where }),
   ])
 
-  const avgLatencyResult = await prisma.brainEvent.aggregate({
-    _avg: { latencyMs: true, confidenceScore: true },
-    where: { latencyMs: { not: null } },
-  })
-
-  const enrichedEvents = events.map(e => ({
+  const enriched = events.map(e => ({
     ...e,
     classification: safeParseJson<Record<string, unknown>>(e.classificationJson, {}),
     warnings: safeParseJson<string[]>(e.warningsJson, []),
@@ -54,19 +59,5 @@ export async function GET() {
     warningsJson: undefined,
   }))
 
-  return NextResponse.json({
-    events: enrichedEvents,
-    stats: {
-      totalRequests,
-      successCount,
-      errorCount,
-      avgLatencyMs: avgLatencyResult._avg.latencyMs
-        ? Math.round(avgLatencyResult._avg.latencyMs)
-        : null,
-      avgConfidenceScore: avgLatencyResult._avg.confidenceScore
-        ? Math.round(avgLatencyResult._avg.confidenceScore * 100) / 100
-        : null,
-    },
-  })
+  return NextResponse.json({ events: enriched, total, limit })
 }
-

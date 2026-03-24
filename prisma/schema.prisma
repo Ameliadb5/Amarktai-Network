@@ -209,19 +209,26 @@ model AiProvider {
 }
 
 model BrainEvent {
-  id             Int      @id @default(autoincrement())
-  traceId        String   @map("trace_id")
-  productId      Int?     @map("product_id")       // nullable — app may not be in registry
-  appSlug        String   @default("") @map("app_slug")
-  taskType       String   @default("") @map("task_type")
-  routedProvider String?  @map("routed_provider")
-  routedModel    String?  @map("routed_model")
-  success        Boolean  @default(false)
-  errorMessage   String?  @map("error_message")
-  latencyMs      Int?     @map("latency_ms")
-  timestamp      DateTime @default(now())
+  id                 Int      @id @default(autoincrement())
+  traceId            String   @map("trace_id")
+  productId          Int?     @map("product_id")       // nullable — app may not be in registry
+  appSlug            String   @default("") @map("app_slug")
+  taskType           String   @default("") @map("task_type")
+  executionMode      String   @default("direct") @map("execution_mode")   // direct|specialist|review|consensus
+  classificationJson String   @default("{}") @map("classification_json")  // JSON: ClassificationResult
+  routedProvider     String?  @map("routed_provider")
+  routedModel        String?  @map("routed_model")
+  validationUsed     Boolean  @default(false) @map("validation_used")
+  consensusUsed      Boolean  @default(false) @map("consensus_used")
+  confidenceScore    Float?   @map("confidence_score")
+  success            Boolean  @default(false)
+  errorMessage       String?  @map("error_message")
+  warningsJson       String   @default("[]") @map("warnings_json")        // JSON: string[]
+  latencyMs          Int?     @map("latency_ms")
+  timestamp          DateTime @default(now())
 
   @@index([appSlug])
+  @@index([traceId])
   @@index([timestamp])
   @@map("brain_events")
 }

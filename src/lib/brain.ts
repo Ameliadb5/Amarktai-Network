@@ -34,11 +34,15 @@ export interface BrainResponse {
   routedProvider: string | null
   routedModel: string | null
   taskType: string
+  executionMode: string       // direct | specialist | review | consensus
+  confidenceScore: number | null
+  validationUsed: boolean
+  consensusUsed: boolean
   output: string | null
   warnings: string[]
   errors: string[]
   latencyMs: number | null
-  memoryUsed: boolean   // false until memory layer is built
+  memoryUsed: boolean         // false until memory layer is built
   fallbackUsed: boolean
   timestamp: string
 }
@@ -109,86 +113,7 @@ export async function authenticateApp(appId: string, appSecret: string): Promise
   return { ok: true, statusCode: 200, app: safeApp }
 }
 
-// ── Routing Policy ────────────────────────────────────────────────────────────
-
-export interface RouteDecision {
-  providerKey: string
-  model: string
-  reason: string
-  fallbackUsed: boolean
-}
-
-/**
- * Resolve which provider + model to use for a request.
- * Reads enabled, non-disabled providers from the vault.
- *
- * Routing tiers (extensible — add consensus/voting/multi-step later):
- *   crypto / finance / forex → openai > grok > gemini > qwen > huggingface > nvidia
- *   equine / horse / family  → openai > gemini > grok > huggingface > qwen > nvidia
- *   marketing / content      → gemini > openai > grok > huggingface > qwen > nvidia
- *   default / generic        → openai > gemini > grok > huggingface > qwen > nvidia
- */
-export async function resolveRoute(
-  appCategory: string,
-  taskType: string,
-): Promise<RouteDecision | null> {
-  const providers = await prisma.aiProvider.findMany({
-    where: { enabled: true, healthStatus: { notIn: ['disabled', 'error'] } },
-    orderBy: { sortOrder: 'asc' },
-    select: {
-      providerKey: true,
-      displayName: true,
-      defaultModel: true,
-      healthStatus: true,
-      apiKey: true,
-    },
-  })
-
-  // Only providers with a key set can be routed to
-  const available = providers.filter(p => p.apiKey)
-  if (available.length === 0) return null
-
-  const preferenceOrder = buildPreferenceOrder(appCategory, taskType)
-  const firstChoice = preferenceOrder[0]
-
-  for (const preferred of preferenceOrder) {
-    const provider = available.find(p => p.providerKey === preferred)
-    if (provider) {
-      return {
-        providerKey: provider.providerKey,
-        model: provider.defaultModel || defaultModelFor(provider.providerKey),
-        reason: `Routed via ${appCategory} policy → ${provider.providerKey}`,
-        fallbackUsed: preferred !== firstChoice,
-      }
-    }
-  }
-
-  // Last resort: take the first available provider regardless of order
-  const last = available[0]
-  return {
-    providerKey: last.providerKey,
-    model: last.defaultModel || defaultModelFor(last.providerKey),
-    reason: `Emergency fallback to ${last.providerKey} — all preferred providers unavailable`,
-    fallbackUsed: true,
-  }
-}
-
-function buildPreferenceOrder(category: string, taskType: string): string[] {
-  const cat = (category || '').toLowerCase()
-  const task = (taskType || '').toLowerCase()
-
-  if (cat.includes('crypto') || cat.includes('finance') || cat.includes('forex')) {
-    return ['openai', 'grok', 'gemini', 'qwen', 'huggingface', 'nvidia']
-  }
-  if (cat.includes('equine') || cat.includes('horse') || cat.includes('family')) {
-    return ['openai', 'gemini', 'grok', 'huggingface', 'qwen', 'nvidia']
-  }
-  if (cat.includes('marketing') || cat.includes('content') || task.includes('content')) {
-    return ['gemini', 'openai', 'grok', 'huggingface', 'qwen', 'nvidia']
-  }
-  // Default / generic
-  return ['openai', 'gemini', 'grok', 'huggingface', 'qwen', 'nvidia']
-}
+// ── Provider Abstraction ──────────────────────────────────────────────────────
 
 function defaultModelFor(providerKey: string): string {
   switch (providerKey) {
@@ -201,8 +126,6 @@ function defaultModelFor(providerKey: string): string {
     default:            return 'unknown'
   }
 }
-
-// ── Provider Abstraction ──────────────────────────────────────────────────────
 
 export interface ProviderCallResult {
   ok: boolean
@@ -359,10 +282,16 @@ export interface BrainEventPayload {
   productId: number | null
   appSlug: string
   taskType: string
+  executionMode: string
+  classificationJson: string    // JSON string of ClassificationResult
   routedProvider: string | null
   routedModel: string | null
+  validationUsed: boolean
+  consensusUsed: boolean
+  confidenceScore: number | null
   success: boolean
   errorMessage: string | null
+  warningsJson: string          // JSON string of string[]
   latencyMs: number | null
 }
 
