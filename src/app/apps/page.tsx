@@ -469,7 +469,7 @@ export default function AppsPage() {
                 <span className="gradient-text">the network?</span>
               </h2>
               <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto leading-relaxed">
-                Amarktai Crypto and Forex are invite-only during the closed access phase. Apply to join the early network and gain priority access.
+                Some apps in the ecosystem are in active development or invite-only access. Get in touch to learn more or request early access.
               </p>
               <Link href="/contact" className="btn-primary group inline-flex">
                 Apply for Access

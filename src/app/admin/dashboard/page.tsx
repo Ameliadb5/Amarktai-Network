@@ -144,7 +144,7 @@ export default function DashboardPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'Space Grotesk' }}>Super Brain Overview</h1>
+          <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'Space Grotesk' }}>Brain Overview</h1>
           <p className="text-sm text-slate-400 mt-1 font-mono">amarktai.network / admin — real-time overview</p>
         </div>
         <div className="flex flex-col items-end gap-1">

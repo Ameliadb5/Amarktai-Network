@@ -28,8 +28,8 @@ export default function AboutPage() {
   const appCount = getAppCount()
 
   const pillars = [
-    { icon: Cpu, title: 'AI Command Center', desc: 'Multi-model orchestration, shared memory, real-time monitoring, and automation — the central nervous system powering every connected app.' },
-    { icon: Network, title: 'Connected Ecosystem', desc: `${appCount} connected apps, one unified intelligence layer — each platform feeds data and context back into the Super Brain.` },
+    { icon: Cpu, title: 'AI Orchestration Layer', desc: 'Multi-model orchestration, shared memory, real-time monitoring, and automation — the shared intelligence layer powering every connected app.' },
+    { icon: Network, title: 'Connected Ecosystem', desc: `${appCount} connected apps, one unified intelligence layer — each platform feeds data and context back into the network brain.` },
     { icon: Layers, title: 'Full-Stack Ownership', desc: 'We own every layer: from model routing to UI polish. No handoffs. No compromises.' },
   ]
 
@@ -73,7 +73,7 @@ export default function AboutPage() {
             transition={{ duration: 0.7, delay: 0.3 }}
             className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed"
           >
-            Amarktai Network is the central nervous system and AI command center for all connected apps — the Super Brain that orchestrates, monitors, and powers an entire ecosystem of intelligent platforms.
+            Amarktai Network is the shared intelligence layer and AI operating layer for all connected apps — the brain that orchestrates, monitors, and powers an entire ecosystem of intelligent platforms.
           </motion.p>
         </div>
       </section>

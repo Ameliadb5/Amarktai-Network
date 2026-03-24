@@ -20,7 +20,7 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: 'Amarktai Network — The AI Command Center',
   description: "Amarktai Network is the central nervous system for AI operations. Multi-model orchestration, shared memory, monitoring, and automation across connected apps. Africa's premier AI operations platform.",
-  keywords: ['AI operations', 'AI orchestration', 'multi-model AI', 'AI command center', 'Africa', 'connected apps', 'AI monitoring'],
+  keywords: ['AI operations', 'AI orchestration', 'multi-model AI', 'AI operating layer', 'Africa', 'connected apps', 'AI monitoring'],
   authors: [{ name: 'Amarktai Network' }],
   robots: 'index, follow',
 }

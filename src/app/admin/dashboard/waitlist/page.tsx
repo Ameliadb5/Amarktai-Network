@@ -16,6 +16,10 @@ interface WaitlistEntry {
 const interestLabels: Record<string, string> = {
   crypto: 'Amarktai Crypto',
   forex: 'Amarktai Forex',
+  marketing: 'Amarktai Marketing',
+  travel: 'Amarktai Travel',
+  equiprofile: 'EquiProfile',
+  'amarktai-online': 'Amarktai Online',
   'faith-haven': 'Faith Haven',
   'learn-digital': 'Learn Digital',
   'jobs-sa': 'Jobs SA',

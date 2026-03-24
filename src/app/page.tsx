@@ -29,7 +29,7 @@ import {
 
 /* ─── System Architecture Visualisation ─────────────────────── */
 const architectureLayers = [
-  { label: 'Connected Apps', items: ['EquiProfile', 'Crypto', 'Forex', 'Marketing', 'More…'], color: 'text-blue-400', borderColor: 'border-blue-500/30' },
+  { label: 'Connected Apps', items: ['Amarktai Marketing', 'Amarktai Travel', 'EquiProfile', 'Amarktai Online'], color: 'text-blue-400', borderColor: 'border-blue-500/30' },
   { label: 'AI Orchestration Layer', items: ['Model Routing', 'Shared Memory', 'Task Queue'], color: 'text-cyan-400', borderColor: 'border-cyan-500/30' },
   { label: 'Intelligence Core', items: ['Multi-Model Engine', 'Context Store', 'Monitoring'], color: 'text-violet-400', borderColor: 'border-violet-500/30' },
   { label: 'Infrastructure', items: ['Auth & Security', 'Data Layer', 'Event Bus'], color: 'text-emerald-400', borderColor: 'border-emerald-500/30' },
@@ -187,7 +187,7 @@ const aiFeatures = [
   {
     icon: GitBranch,
     title: 'Operations Dashboard',
-    description: 'Every model call, latency metric, and cost is tracked and visualised from one centralized command center.',
+    description: 'Every model call, latency metric, and cost is tracked and visualised from a single operations dashboard — live in admin.',
     status: 'Live in admin',
   },
   {
@@ -300,7 +300,7 @@ export default function HomePage() {
               transition={{ duration: 1.8, repeat: Infinity }}
             />
             <span className="text-sm font-medium text-blue-200 tracking-wide">
-              The AI Command Center — {appCount} Apps Connected
+              One Brain. {appCount} Connected Apps.
             </span>
             <Sparkles size={13} className="text-cyan-400" />
           </motion.div>
@@ -393,7 +393,7 @@ export default function HomePage() {
             </motion.h2>
 
             <motion.p variants={itemVariants} className="text-blue-100/45 text-lg max-w-xl mx-auto">
-              Six core capabilities that make Amarktai the command center for all connected AI operations.
+              Six core capabilities that make Amarktai the shared intelligence layer across all connected apps.
             </motion.p>
           </div>
 
@@ -608,8 +608,8 @@ export default function HomePage() {
             variants={itemVariants}
             className="text-base text-blue-100/40 max-w-xl mx-auto leading-relaxed mb-14"
           >
-            From fintech to education, marketing to community — {appCount} apps and growing,
-            all powered by one nervous system, one command center.
+            Marketing, travel, finance, community — {appCount} apps and growing,
+            all powered by one shared intelligence layer.
           </motion.p>
 
           {/* Premium divider treatment */}

@@ -61,18 +61,13 @@ export const ONBOARDING_CONFIG: Record<OnboardingStatus, { label: string; color:
 }
 
 // ── Canonical app names (used by contact/about pages as display hints) ──
-// These match the registry slugs. Update when new apps are added to the DB.
+// These reflect the live Amarktai ecosystem. Update when new apps go live.
 const CANONICAL_APP_NAMES = [
-  'EquiProfile',
+  'Amarktai Network',
   'Amarktai Marketing',
-  'Amarktai Crypto',
-  'Amarktai Forex',
-  'Amarktai Family',
-  'Faith Haven',
-  'Learn Digital',
-  'Jobs SA',
-  'Amarktai Secure',
-  'Crowd Lens',
+  'Amarktai Travel',
+  'EquiProfile',
+  'Amarktai Online',
 ]
 
 export function getAppCount(): number {
