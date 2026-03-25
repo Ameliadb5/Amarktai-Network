@@ -70,6 +70,9 @@ interface VpsProduct {
   vpsSnapshots: VpsSnapshot[]
 }
 
+// ── Derived types ────────────────────────────────────────────────
+type SystemStatus = 'Active' | 'Ready' | 'Standby'
+
 // ── Helpers ──────────────────────────────────────────────────────
 function HealthDot({ status }: { status: string }) {
   if (status === 'healthy') {
@@ -92,14 +95,14 @@ function SeverityDot({ severity }: { severity: string }) {
   return <span className={`inline-flex h-1.5 w-1.5 rounded-full flex-shrink-0 ${cls}`} />
 }
 
-function deriveSystemStatus(data: DashboardData | null): 'Active' | 'Ready' | 'Standby' {
+function deriveSystemStatus(data: DashboardData | null): SystemStatus {
   if (!data) return 'Standby'
   if ((data.brainStats?.totalRequests ?? 0) > 0) return 'Active'
   if (data.productStats.some(p => p.integration?.healthStatus === 'healthy')) return 'Ready'
   return 'Standby'
 }
 
-const STATUS_STYLES = {
+const STATUS_STYLES: Record<SystemStatus, { pill: string; dot: string }> = {
   Active:  { pill: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300', dot: 'bg-emerald-400' },
   Ready:   { pill: 'border-blue-500/30 bg-blue-500/10 text-blue-300',          dot: 'bg-blue-400' },
   Standby: { pill: 'border-slate-500/30 bg-slate-500/10 text-slate-400',       dot: 'bg-slate-500' },
@@ -129,8 +132,8 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([
       fetch('/api/admin/dashboard').then((r) => r.json()),
-      // VPS data fetched but not rendered — kept for future use
-      fetch('/api/admin/vps').then((r) => r.json()),
+      // TODO: surface VPS snapshot data in a dedicated infrastructure page
+    fetch('/api/admin/vps').then((r) => r.json()),
     ]).then(([dash]: [DashboardData, unknown]) => {
       setData(dash)
       setLoading(false)
