@@ -179,7 +179,7 @@ export default function DashboardPage() {
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1.5">
-            <h1 className="text-2xl font-bold font-heading gradient-text tracking-tight">AmarktAI Status</h1>
+            <h1 className="text-2xl font-bold font-heading tracking-tight"><span className="text-white">Amarkt</span><span className="text-blue-400">AI</span> Status</h1>
             {/* System status pill */}
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold font-mono ${statusStyle.pill}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}`} />

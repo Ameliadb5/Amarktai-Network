@@ -83,7 +83,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </div>
           <div>
             <p className="text-sm font-bold text-white font-heading">
-              <span className="gradient-text-blue-cyan">Amarktai</span>
+              <span className="text-white">Amarkt</span><span className="text-blue-400">AI</span>
             </p>
             <p className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">CNS</p>
           </div>

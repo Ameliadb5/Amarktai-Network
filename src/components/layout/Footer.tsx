@@ -21,7 +21,7 @@ export default function Footer() {
               </div>
               <div>
                 <span className="font-bold text-base block leading-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-                  <span className="gradient-text-blue-cyan">Amarktai</span>
+                  <span className="text-white">Amarkt</span><span className="text-blue-400">AI</span>
                   <span className="text-slate-400 ml-1.5 font-light">Network</span>
                 </span>
               </div>
@@ -88,7 +88,7 @@ export default function Footer() {
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-slate-600 font-mono">
-            © {new Date().getFullYear()} Amarktai Network. All rights reserved.
+            © {new Date().getFullYear()} AmarktAI Network. All rights reserved.
           </p>
         </div>
       </div>

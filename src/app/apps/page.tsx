@@ -431,7 +431,7 @@ export default function AppsPage() {
                 style={{ fontFamily: 'Space Grotesk' }}
               >
                 Why Apps Connect Through{' '}
-                <span className="gradient-text">Amarktai AI</span>
+                <span className="text-white">Amarkt</span><span className="text-blue-400">AI</span>
               </h2>
               <p className="text-slate-400 text-lg max-w-2xl mx-auto leading-relaxed">
                 Every platform in the ecosystem feeds into one shared intelligence layer.

@@ -14,11 +14,11 @@ interface Message {
   timestamp: Date
 }
 
-const WELCOME_MSG = `Hello! I'm the Amarktai AI assistant.\n\nType **help** for commands, or ask me anything about the platform.`
+const WELCOME_MSG = `Hello! I'm the AmarktAI assistant.\n\nType **help** for commands, or ask me anything about the platform.`
 
 const COMMANDS: Record<string, string> = {
   help: `Available commands:\n• **show admin** — access the control panel\n• **status** — system status\n• **apps** — view the ecosystem`,
-  status: `◈ Amarktai CNS — operational shell ready\n◈ ${getAppCount()} apps in ecosystem\n◈ Network: ONLINE\n◈ AI orchestration: awaiting backend configuration`,
+  status: `◈ AmarktAI CNS — operational shell ready\n◈ ${getAppCount()} apps in ecosystem\n◈ Network: ONLINE\n◈ AI orchestration: awaiting backend configuration`,
   apps: `__navigate:/apps__`,
 }
 
@@ -221,7 +221,7 @@ export default function AIChatWidget() {
                     <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#07091A]" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-white" style={{ fontFamily: 'Space Grotesk' }}>Amarktai AI</p>
+                    <p className="text-xs font-semibold text-white" style={{ fontFamily: 'Space Grotesk' }}>Amarkt<span className="text-blue-400">AI</span></p>
                     <div className="flex items-center gap-1.5">
                       <span className="w-1 h-1 rounded-full bg-emerald-400" />
                       <p className="text-[10px] text-emerald-400 font-mono">online · ai assistant</p>

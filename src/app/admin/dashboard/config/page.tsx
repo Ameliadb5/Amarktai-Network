@@ -1,499 +1,676 @@
 'use client'
 
+import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
-  CheckCircle, AlertCircle, Clock, ChevronRight, Info,
-  BrainCircuit, Database, Mail, CreditCard, Plug,
-  Shield, Plane,
+  CheckCircle, AlertCircle, Clock, ChevronRight,
+  BrainCircuit, Plug, Activity, RefreshCw, Loader2,
+  Shield, Zap, LayoutGrid, WifiOff, AlertTriangle,
+  ArrowRight, Info, Radio,
 } from 'lucide-react'
 import Link from 'next/link'
+import { formatDistanceToNow } from 'date-fns'
 
 // ── Types ────────────────────────────────────────────────────────
-type ItemStatus = 'configured' | 'not-configured' | 'pending' | 'optional-unconfigured'
-type ItemRequired = 'required' | 'optional'
+interface AiProvider {
+  id: number
+  providerKey: string
+  displayName: string
+  enabled: boolean
+  maskedPreview: string
+  healthStatus: string
+  healthMessage: string
+  lastCheckedAt: string | null
+  defaultModel: string
+}
 
-interface SetupItem {
+interface AppStat {
+  id: number
   name: string
-  status: ItemStatus
-  required: ItemRequired
-  usedIn: string
-  whyItMatters: string
-  note?: string
-  actionHref?: string
-  actionLabel?: string
+  status: string
+  integration: { healthStatus: string; lastHeartbeatAt: string | null } | null
 }
 
-interface SetupSection {
-  id: string
+interface BrainStats {
+  totalRequests: number
+  successCount: number
+  errorCount: number
+  avgLatencyMs: number | null
+}
+
+interface RecentEvent {
+  id: number
+  eventType: string
+  severity: string
   title: string
-  description: string
-  icon: typeof BrainCircuit
-  color: string
-  borderColor: string
-  items: SetupItem[]
+  timestamp: string
+  product: { name: string }
 }
 
-// ── Setup Matrix Data ─────────────────────────────────────────────
-const setupMatrix: SetupSection[] = [
-  {
-    id: 'ai-providers',
-    title: 'Intelligence Layer Keys',
-    description: 'API keys for the AI execution layers. AmarktAI routes requests across these internally.',
-    icon: BrainCircuit,
-    color: 'text-violet-400',
-    borderColor: 'border-violet-500/20',
-    items: [
-      {
-        name: 'OpenAI (GPT-4o, GPT-4)',
-        status: 'pending',
-        required: 'required',
-        usedIn: 'Brain orchestration, default model routing',
-        whyItMatters: 'Primary AI model for most app requests. Required for the brain to function.',
-        note: 'Configure in AI Providers vault',
-        actionHref: '/admin/dashboard/ai-providers',
-        actionLabel: 'Configure',
-      },
-      {
-        name: 'Google Gemini',
-        status: 'pending',
-        required: 'required',
-        usedIn: 'Fallback routing, multimodal tasks',
-        whyItMatters: 'Second-tier model for cost optimisation and multimodal capability.',
-        note: 'Configure in AI Providers vault',
-        actionHref: '/admin/dashboard/ai-providers',
-        actionLabel: 'Configure',
-      },
-      {
-        name: 'Grok / xAI',
-        status: 'pending',
-        required: 'optional',
-        usedIn: 'Alternative routing, reasoning tasks',
-        whyItMatters: 'Strong reasoning model for complex analytical requests.',
-        actionHref: '/admin/dashboard/ai-providers',
-        actionLabel: 'Configure',
-      },
-      {
-        name: 'Qwen (Alibaba)',
-        status: 'pending',
-        required: 'optional',
-        usedIn: 'Multi-language tasks, low-latency routing',
-        whyItMatters: 'Cost-efficient for high-volume multilingual workloads.',
-        actionHref: '/admin/dashboard/ai-providers',
-        actionLabel: 'Configure',
-      },
-      {
-        name: 'Hugging Face',
-        status: 'pending',
-        required: 'optional',
-        usedIn: 'Custom model inference, open-source models',
-        whyItMatters: 'Access to thousands of open-source models and custom fine-tuned models.',
-        actionHref: '/admin/dashboard/ai-providers',
-        actionLabel: 'Configure',
-      },
-      {
-        name: 'NVIDIA NIM',
-        status: 'not-configured',
-        required: 'optional',
-        usedIn: 'High-performance inference, LLaMA models',
-        whyItMatters: 'GPU-optimised inference for performance-critical tasks.',
-        note: 'Reserved slot — configure when needed',
-        actionHref: '/admin/dashboard/ai-providers',
-        actionLabel: 'Configure',
-      },
-    ],
-  },
-  {
-    id: 'databases',
-    title: 'Data Layer',
-    description: 'Core storage and caching infrastructure the network depends on.',
-    icon: Database,
-    color: 'text-cyan-400',
-    borderColor: 'border-cyan-500/20',
-    items: [
-      {
-        name: 'MongoDB',
-        status: 'pending',
-        required: 'required',
-        usedIn: 'AI brain memory, event logs, context storage',
-        whyItMatters: 'Stores all AI brain state, shared memory, and event history. Critical for persistence.',
-        note: 'Set MONGODB_URI in environment',
-      },
-      {
-        name: 'MariaDB / MySQL',
-        status: 'pending',
-        required: 'required',
-        usedIn: 'App registry, product data, relational records',
-        whyItMatters: 'Primary relational database for all structured app and user data.',
-        note: 'Set DATABASE_URL in environment (Prisma)',
-      },
-      {
-        name: 'Redis',
-        status: 'not-configured',
-        required: 'optional',
-        usedIn: 'Session caching, rate limiting, real-time pub/sub',
-        whyItMatters: 'Improves performance significantly for session management and real-time features.',
-        note: 'Set REDIS_URL in environment',
-      },
-    ],
-  },
-  {
-    id: 'communications',
-    title: 'Communications',
-    description: 'Email and SMS infrastructure for transactional and alert messaging.',
-    icon: Mail,
-    color: 'text-blue-400',
-    borderColor: 'border-blue-500/20',
-    items: [
-      {
-        name: 'SMTP (Email)',
-        status: 'not-configured',
-        required: 'required',
-        usedIn: 'Contact form emails, system alerts, waitlist confirmation',
-        whyItMatters: 'All email delivery flows through SMTP. Required for contact forms and admin alerts.',
-        note: 'Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in environment',
-      },
-      {
-        name: 'Twilio (SMS)',
-        status: 'not-configured',
-        required: 'optional',
-        usedIn: 'SMS alerts, two-factor authentication, notifications',
-        whyItMatters: 'Enables SMS-based alerts and 2FA for admin security.',
-        note: 'Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in environment',
-      },
-    ],
-  },
-  {
-    id: 'payments',
-    title: 'Payments',
-    description: 'Stripe integration for billing, subscriptions, and payment processing.',
-    icon: CreditCard,
-    color: 'text-emerald-400',
-    borderColor: 'border-emerald-500/20',
-    items: [
-      {
-        name: 'Stripe (API key)',
-        status: 'not-configured',
-        required: 'optional',
-        usedIn: 'Subscriptions, one-time payments, billing management',
-        whyItMatters: 'Required for any paid features or app monetisation across the ecosystem.',
-        note: 'Set STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY in environment',
-      },
-      {
-        name: 'Stripe Webhook Secret',
-        status: 'not-configured',
-        required: 'optional',
-        usedIn: 'Payment event processing, subscription lifecycle',
-        whyItMatters: 'Needed to securely receive Stripe payment events and update billing state.',
-        note: 'Set STRIPE_WEBHOOK_SECRET in environment',
-      },
-    ],
-  },
-  {
-    id: 'app-connections',
-    title: 'App Integration Layer',
-    description: 'APIs that allow connected apps to communicate with Amarktai Network.',
-    icon: Plug,
-    color: 'text-teal-400',
-    borderColor: 'border-teal-500/20',
-    items: [
-      {
-        name: 'Integration API',
-        status: 'configured',
-        required: 'required',
-        usedIn: 'All connected apps',
-        whyItMatters: 'The endpoint that apps use to connect and send events to the network.',
-      },
-      {
-        name: 'Token Authentication',
-        status: 'configured',
-        required: 'required',
-        usedIn: 'All app integrations',
-        whyItMatters: 'Secure app-specific tokens prevent unauthorised network access.',
-      },
-      {
-        name: 'Heartbeat Monitoring',
-        status: 'configured',
-        required: 'required',
-        usedIn: 'App health, VPS monitoring',
-        whyItMatters: 'Real-time health status for every connected app.',
-      },
-      {
-        name: 'VPS Resource Feeds',
-        status: 'configured',
-        required: 'optional',
-        usedIn: 'Infrastructure dashboard',
-        whyItMatters: 'CPU, RAM, disk metrics from app servers for the monitoring dashboard.',
-      },
-      {
-        name: 'Event Ingestion',
-        status: 'configured',
-        required: 'optional',
-        usedIn: 'Events & Logs dashboard',
-        whyItMatters: 'Centralised event stream from all apps for audit and diagnostics.',
-      },
-    ],
-  },
-  {
-    id: 'travel-integrations',
-    title: 'Travel App Integrations',
-    description: 'External APIs used by Amarktai Travel.',
-    icon: Plane,
-    color: 'text-amber-400',
-    borderColor: 'border-amber-500/20',
-    items: [
-      {
-        name: 'Flight Search API (e.g. Amadeus)',
-        status: 'not-configured',
-        required: 'optional',
-        usedIn: 'Amarktai Travel — flight search and booking',
-        whyItMatters: 'Required for real-time flight search and booking in the travel app.',
-        note: 'Set AMADEUS_API_KEY or equivalent in environment',
-      },
-      {
-        name: 'Hotel Search API',
-        status: 'not-configured',
-        required: 'optional',
-        usedIn: 'Amarktai Travel — accommodation search',
-        whyItMatters: 'Required for hotel and accommodation search features.',
-        note: 'Configure when travel backend is deployed',
-      },
-      {
-        name: 'Currency / FX API',
-        status: 'not-configured',
-        required: 'optional',
-        usedIn: 'Amarktai Travel, Amarktai Online — price display',
-        whyItMatters: 'Enables multi-currency pricing display across travel and commerce apps.',
-        note: 'Set FX_API_KEY in environment',
-      },
-    ],
-  },
-  {
-    id: 'infrastructure',
-    title: 'Infrastructure & Security',
-    description: 'System-level configuration for sessions, security, and monitoring.',
-    icon: Shield,
-    color: 'text-slate-400',
-    borderColor: 'border-slate-500/20',
-    items: [
-      {
-        name: 'Admin Session Auth',
-        status: 'configured',
-        required: 'required',
-        usedIn: 'Admin dashboard access',
-        whyItMatters: 'Secures all admin routes with session-based authentication.',
-      },
-      {
-        name: 'ADMIN_PASSWORD env variable',
-        status: 'pending',
-        required: 'required',
-        usedIn: 'Admin login',
-        whyItMatters: 'Overrides the default admin password. Must be set in production.',
-        note: 'Set ADMIN_PASSWORD in environment',
-      },
-      {
-        name: 'Rate Limiting',
-        status: 'not-configured',
-        required: 'optional',
-        usedIn: 'All API routes',
-        whyItMatters: 'Protects the network from abuse and cost-attack on AI endpoints.',
-        note: 'Coming in next backend phase',
-      },
-      {
-        name: 'Two-Factor Authentication',
-        status: 'not-configured',
-        required: 'optional',
-        usedIn: 'Admin login',
-        whyItMatters: 'Additional security layer for admin access.',
-        note: 'Coming in next backend phase',
-      },
-    ],
-  },
-]
-
-// ── Status Config ──────────────────────────────────────────────────
-const STATUS_CONFIG: Record<ItemStatus, {
-  icon: typeof CheckCircle
-  color: string
-  label: string
-  bg: string
-}> = {
-  configured: { icon: CheckCircle, color: 'text-emerald-400', label: 'Configured', bg: 'bg-emerald-500/8 border-emerald-500/20' },
-  pending: { icon: Clock, color: 'text-amber-400', label: 'Partial / Pending', bg: 'bg-amber-500/8 border-amber-500/20' },
-  'not-configured': { icon: AlertCircle, color: 'text-slate-500', label: 'Not configured', bg: 'bg-slate-500/5 border-slate-500/15' },
-  'optional-unconfigured': { icon: AlertCircle, color: 'text-slate-600', label: 'Optional — not set', bg: 'bg-white/3 border-white/8' },
+interface ControlPlaneData {
+  providers: AiProvider[]
+  apps: AppStat[]
+  brainStats: BrainStats | null
+  recentEvents: RecentEvent[]
+  loadedAt: string
 }
 
-const REQUIRED_CONFIG = {
-  required: { label: 'Required', color: 'text-red-400', bg: 'bg-red-500/8 border-red-500/20' },
-  optional: { label: 'Optional', color: 'text-slate-500', bg: 'bg-white/3 border-white/10' },
+// ── Health Status Config ──────────────────────────────────────────
+const HEALTH_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string; icon: typeof CheckCircle }> = {
+  healthy:      { label: 'Healthy',       color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30', dot: 'bg-emerald-400',  icon: CheckCircle },
+  configured:   { label: 'Key Set',       color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/30',   dot: 'bg-amber-400',    icon: Clock },
+  degraded:     { label: 'Degraded',      color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/30',   dot: 'bg-amber-400',    icon: AlertTriangle },
+  error:        { label: 'Error',         color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/30',       dot: 'bg-red-400',      icon: AlertCircle },
+  unconfigured: { label: 'No Key',        color: 'text-slate-500',   bg: 'bg-slate-500/10 border-slate-500/30',   dot: 'bg-slate-500',    icon: WifiOff },
+  disabled:     { label: 'Disabled',      color: 'text-slate-500',   bg: 'bg-slate-500/10 border-slate-500/30',   dot: 'bg-slate-500',    icon: WifiOff },
 }
 
-// ── Main Component ────────────────────────────────────────────────
-export default function SetupMatrixPage() {
-  const allItems = setupMatrix.flatMap((s) => s.items)
-  const configuredCount = allItems.filter((i) => i.status === 'configured').length
-  const totalCount = allItems.length
-  const requiredItems = allItems.filter((i) => i.required === 'required')
-  const configuredRequired = requiredItems.filter((i) => i.status === 'configured').length
+const APP_HEALTH_CONFIG: Record<string, { color: string; dot: string }> = {
+  healthy:   { color: 'text-emerald-400', dot: 'bg-emerald-400' },
+  degraded:  { color: 'text-amber-400',   dot: 'bg-amber-400' },
+  error:     { color: 'text-red-400',     dot: 'bg-red-400' },
+  unknown:   { color: 'text-slate-500',   dot: 'bg-slate-500' },
+  offline:   { color: 'text-slate-500',   dot: 'bg-slate-500' },
+}
+
+const SEVERITY_CONFIG: Record<string, { color: string; bg: string; icon: typeof Info }> = {
+  info:     { color: 'text-blue-400',   bg: 'bg-blue-500/10 border-blue-500/20',   icon: Info },
+  warning:  { color: 'text-amber-400',  bg: 'bg-amber-500/10 border-amber-500/20', icon: AlertTriangle },
+  error:    { color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20',     icon: AlertCircle },
+  critical: { color: 'text-red-500',    bg: 'bg-red-500/15 border-red-500/30',     icon: AlertCircle },
+}
+
+// ── Go-Live Verdict ───────────────────────────────────────────────
+type Verdict = 'READY' | 'PARTIAL' | 'NOT_READY'
+
+function computeVerdict(data: ControlPlaneData): { verdict: Verdict; blockers: string[] } {
+  const blockers: string[] = []
+
+  // Check providers
+  const enabledProviders = data.providers.filter(p => p.enabled)
+  const healthyProviders = data.providers.filter(p => p.healthStatus === 'healthy')
+
+  if (enabledProviders.length === 0) {
+    blockers.push('No AI providers enabled — brain requests cannot execute')
+  } else if (healthyProviders.length === 0) {
+    blockers.push('No AI providers have been health-checked as healthy — test connections in AI Providers')
+  }
+
+  // Check apps
+  const connectedApps = data.apps.filter(a => a.integration !== null)
+  if (data.apps.length === 0) {
+    blockers.push('No apps in registry — create apps to enable brain connections')
+  } else if (connectedApps.length === 0) {
+    blockers.push('No apps have integration credentials — enable integrations in App Registry')
+  }
+
+  // Check routing
+  const requiredProviders = ['openai', 'gemini', 'grok']
+  const configuredRequired = data.providers.filter(
+    p => requiredProviders.includes(p.providerKey) && p.maskedPreview && p.enabled
+  )
+  if (configuredRequired.length === 0 && enabledProviders.length === 0) {
+    blockers.push('No tier-1 providers configured (OpenAI, Gemini, or Grok)')
+  }
+
+  if (blockers.length === 0) return { verdict: 'READY', blockers: [] }
+  if (blockers.length <= 2 && enabledProviders.length > 0) return { verdict: 'PARTIAL', blockers }
+  return { verdict: 'NOT_READY', blockers }
+}
+
+// ── Card ──────────────────────────────────────────────────────────
+function SectionCard({ title, children, action }: {
+  title: string
+  children: React.ReactNode
+  action?: { label: string; href: string }
+}) {
+  return (
+    <div className="glass rounded-2xl border border-white/5 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+        <h2 className="text-sm font-semibold text-white">{title}</h2>
+        {action && (
+          <Link href={action.href} className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+            {action.label} <ChevronRight className="w-3 h-3" />
+          </Link>
+        )}
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  )
+}
+
+// ── Provider Row ──────────────────────────────────────────────────
+function ProviderRow({ provider }: { provider: AiProvider }) {
+  const cfg = HEALTH_CONFIG[provider.healthStatus] ?? HEALTH_CONFIG.unconfigured
+  const Icon = cfg.icon
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+        <div className="min-w-0">
+          <p className="text-sm text-white truncate">{provider.displayName}</p>
+          {provider.defaultModel && (
+            <p className="text-[11px] text-slate-600 font-mono">{provider.defaultModel}</p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+        {!provider.enabled && (
+          <span className="text-[10px] text-slate-600 font-mono">disabled</span>
+        )}
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium border ${cfg.bg} ${cfg.color}`}>
+          <Icon className="w-3 h-3" />
+          {cfg.label}
+        </span>
+        {provider.maskedPreview && (
+          <span className="text-[10px] text-slate-600 font-mono hidden sm:block">{provider.maskedPreview}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── App Row ───────────────────────────────────────────────────────
+function AppRow({ app }: { app: AppStat }) {
+  const health = app.integration?.healthStatus ?? 'unknown'
+  const cfg = APP_HEALTH_CONFIG[health] ?? APP_HEALTH_CONFIG.unknown
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+        <div className="min-w-0">
+          <p className="text-sm text-white truncate">{app.name}</p>
+          {app.integration?.lastHeartbeatAt && (
+            <p className="text-[11px] text-slate-600">
+              Last seen {formatDistanceToNow(new Date(app.integration.lastHeartbeatAt), { addSuffix: true })}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex-shrink-0 ml-3">
+        {app.integration ? (
+          <span className={`text-[11px] font-medium ${cfg.color}`}>{health}</span>
+        ) : (
+          <span className="text-[11px] text-slate-600 font-mono">no integration</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Event Row ─────────────────────────────────────────────────────
+function EventRow({ event }: { event: RecentEvent }) {
+  const cfg = SEVERITY_CONFIG[event.severity] ?? SEVERITY_CONFIG.info
+  const Icon = cfg.icon
+  return (
+    <div className="flex items-start gap-3 py-2.5 border-b border-white/5 last:border-0">
+      <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 border ${cfg.bg}`}>
+        <Icon className={`w-3 h-3 ${cfg.color}`} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-white truncate">{event.title}</p>
+        <p className="text-[11px] text-slate-500">
+          {event.product.name} · {formatDistanceToNow(new Date(event.timestamp), { addSuffix: true })}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────
+export default function ControlPlanePage() {
+  const [data, setData] = useState<ControlPlaneData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    else setRefreshing(true)
+    setError(null)
+    try {
+      const [providersRes, dashboardRes] = await Promise.all([
+        fetch('/api/admin/providers'),
+        fetch('/api/admin/dashboard'),
+      ])
+      if (!providersRes.ok || !dashboardRes.ok) throw new Error('Failed to load data')
+      const [providers, dashboard] = await Promise.all([
+        providersRes.json(),
+        dashboardRes.json(),
+      ])
+      setData({
+        providers: Array.isArray(providers) ? providers : [],
+        apps: Array.isArray(dashboard.productStats) ? dashboard.productStats : [],
+        brainStats: dashboard.brainStats ?? null,
+        recentEvents: Array.isArray(dashboard.recentEvents) ? dashboard.recentEvents.slice(0, 6) : [],
+        loadedAt: new Date().toISOString(),
+      })
+      setLastRefresh(new Date())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load control plane data')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => load(true), 30_000)
+    return () => clearInterval(interval)
+  }, [load])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center gap-3 text-slate-400">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm">Loading control plane…</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-3">
+          <AlertCircle className="w-8 h-8 text-red-400 mx-auto" />
+          <p className="text-sm text-red-400">{error ?? 'No data'}</p>
+          <button
+            onClick={() => load()}
+            className="px-4 py-2 text-sm text-white bg-white/5 border border-white/10 rounded-lg hover:bg-white/8 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const { verdict, blockers } = computeVerdict(data)
+  const healthyProviders = data.providers.filter(p => p.healthStatus === 'healthy')
+  const enabledProviders = data.providers.filter(p => p.enabled)
+  const connectedApps = data.apps.filter(a => a.integration !== null)
+  const healthyApps = data.apps.filter(a => a.integration?.healthStatus === 'healthy')
+  const successRate = data.brainStats && data.brainStats.totalRequests > 0
+    ? Math.round((data.brainStats.successCount / data.brainStats.totalRequests) * 100)
+    : null
+
+  const verdictConfig = {
+    READY:     { label: 'READY FOR CONTROLLED GO-LIVE', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: CheckCircle },
+    PARTIAL:   { label: 'PARTIALLY READY',               color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/30',   icon: AlertTriangle },
+    NOT_READY: { label: 'NOT READY',                     color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/30',       icon: AlertCircle },
+  }
+  const vc = verdictConfig[verdict]
+  const VerdictIcon = vc.icon
 
   return (
     <div className="space-y-6 max-w-5xl">
-
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold text-white font-heading">Execution Configuration</h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Configure execution layers and integration keys for the AmarktAI system
-        </p>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-start justify-between gap-4"
+      >
+        <div>
+          <h1 className="text-xl font-bold text-white font-heading">Execution Control Plane</h1>
+          <p className="text-sm text-slate-400 mt-0.5">
+            Live readiness status for the <span className="text-white">Amarkt</span><span className="text-blue-400">AI</span> intelligence layer.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {lastRefresh && (
+            <span className="text-[11px] text-slate-600 font-mono hidden sm:block">
+              Updated {formatDistanceToNow(lastRefresh, { addSuffix: true })}
+            </span>
+          )}
+          <button
+            onClick={() => load(true)}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400 border border-white/10 rounded-lg hover:border-white/20 hover:text-white bg-white/3 transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </motion.div>
 
-      {/* Summary Bar */}
+      {/* Go-Live Verdict */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="glass rounded-2xl p-5 border border-blue-500/10"
+        className={`rounded-2xl border p-5 ${vc.bg}`}
       >
-        <div className="flex flex-wrap gap-6 items-center justify-between">
-          <div className="flex gap-6">
-            <div>
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Overall</p>
-              <p className="text-2xl font-bold text-white font-heading">
-                {Math.round((configuredCount / totalCount) * 100)}%
-              </p>
-              <p className="text-xs text-slate-500">{configuredCount}/{totalCount} items</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Required</p>
-              <p className={`text-2xl font-bold font-heading ${configuredRequired === requiredItems.length ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {configuredRequired}/{requiredItems.length}
-              </p>
-              <p className="text-xs text-slate-500">core items</p>
-            </div>
+        <div className="flex items-start gap-4">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${vc.bg}`}>
+            <VerdictIcon className={`w-5 h-5 ${vc.color}`} />
           </div>
-          <div className="flex-1 min-w-[200px]">
-            <div className="flex justify-between text-xs text-slate-500 mb-1.5">
-              <span className="font-mono">Configuration Progress</span>
-              <span className="font-mono">{Math.round((configuredCount / totalCount) * 100)}%</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className={`text-sm font-bold font-mono tracking-wider ${vc.color}`}>
+                {vc.label}
+              </p>
+              <span className="text-[10px] text-slate-500 font-mono uppercase">Go-Live Audit</span>
             </div>
-            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-700"
-                style={{ width: `${(configuredCount / totalCount) * 100}%` }}
-              />
-            </div>
-            <div className="flex gap-4 mt-2">
-              {[
-                { label: 'Configured', count: allItems.filter(i => i.status === 'configured').length, color: 'text-emerald-400' },
-                { label: 'Pending', count: allItems.filter(i => i.status === 'pending').length, color: 'text-amber-400' },
-                { label: 'Missing', count: allItems.filter(i => i.status === 'not-configured').length, color: 'text-slate-500' },
-              ].map((stat) => (
-                <span key={stat.label} className="flex items-center gap-1 text-[10px] font-mono">
-                  <span className={`font-bold ${stat.color}`}>{stat.count}</span>
-                  <span className="text-slate-600">{stat.label}</span>
-                </span>
-              ))}
-            </div>
+            {blockers.length > 0 ? (
+              <ul className="mt-3 space-y-1.5">
+                {blockers.map((b, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
+                    <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-slate-400 mt-1.5">
+                All critical systems are configured. Monitor providers and heartbeats before full public launch.
+              </p>
+            )}
           </div>
         </div>
       </motion.div>
 
-      {/* Sections */}
-      <div className="space-y-4">
-        {setupMatrix.map((section, si) => {
-          const Icon = section.icon
-          const sectionConfigured = section.items.filter((i) => i.status === 'configured').length
-          return (
-            <motion.div
-              key={section.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 + si * 0.04 }}
-              className={`glass rounded-2xl overflow-hidden border ${section.borderColor}`}
-            >
-              {/* Section Header */}
-              <div className="px-5 py-4 border-b border-white/[0.04] flex items-start gap-3">
-                <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${section.color}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-white font-heading">{section.title}</h2>
-                    <span className="text-[10px] text-slate-600 font-mono">{sectionConfigured}/{section.items.length}</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">{section.description}</p>
-                </div>
-              </div>
-
-              {/* Items */}
-              <div className="divide-y divide-white/[0.03]">
-                {section.items.map((item) => {
-                  const st = STATUS_CONFIG[item.status]
-                  const req = REQUIRED_CONFIG[item.required]
-                  const StIcon = st.icon
-                  return (
-                    <div
-                      key={item.name}
-                      className="px-5 py-4 hover:bg-white/[0.015] transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <StIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${st.color}`} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <span className="text-sm text-white font-medium">{item.name}</span>
-                              <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${req.color} ${req.bg}`}>
-                                {req.label}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 leading-relaxed mb-1.5">{item.whyItMatters}</p>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono">
-                              <span className="text-slate-600">Used in: <span className="text-slate-400">{item.usedIn}</span></span>
-                              {item.note && <span className="text-slate-600">{item.note}</span>}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className={`text-[10px] font-medium px-2 py-1 rounded-lg border ${st.color} ${st.bg}`}>
-                            {st.label}
-                          </span>
-                          {item.actionHref && (
-                            <Link
-                              href={item.actionHref}
-                              className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
-                            >
-                              {item.actionLabel ?? 'Go'} <ChevronRight className="w-2.5 h-2.5" />
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </motion.div>
-          )
-        })}
-      </div>
-
-      {/* Footer Note */}
+      {/* Metrics Row */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="glass rounded-2xl p-5 border border-white/5"
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-2 md:grid-cols-4 gap-3"
+      >
+        {[
+          {
+            label: 'Healthy Providers',
+            value: `${healthyProviders.length} / ${data.providers.length}`,
+            icon: BrainCircuit,
+            color: healthyProviders.length > 0 ? 'text-emerald-400' : 'text-red-400',
+            href: '/admin/dashboard/ai-providers',
+          },
+          {
+            label: 'Connected Apps',
+            value: `${connectedApps.length} / ${data.apps.length}`,
+            icon: Plug,
+            color: connectedApps.length > 0 ? 'text-cyan-400' : 'text-amber-400',
+            href: '/admin/dashboard/apps',
+          },
+          {
+            label: 'Brain Requests',
+            value: data.brainStats?.totalRequests?.toLocaleString() ?? '0',
+            icon: Zap,
+            color: 'text-violet-400',
+            href: '/admin/dashboard/events',
+          },
+          {
+            label: 'Success Rate',
+            value: successRate !== null ? `${successRate}%` : '—',
+            icon: Activity,
+            color: successRate !== null && successRate >= 90 ? 'text-emerald-400' : successRate !== null ? 'text-amber-400' : 'text-slate-500',
+            href: '/admin/dashboard/events',
+          },
+        ].map((m, i) => (
+          <Link
+            key={i}
+            href={m.href}
+            className="glass rounded-xl border border-white/5 p-4 hover:border-white/10 transition-all group"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <m.icon className={`w-4 h-4 ${m.color}`} />
+              <ArrowRight className="w-3 h-3 text-slate-700 group-hover:text-slate-400 transition-colors" />
+            </div>
+            <p className={`text-xl font-bold ${m.color}`}>{m.value}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{m.label}</p>
+          </Link>
+        ))}
+      </motion.div>
+
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* AI Providers */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <SectionCard
+            title={`AI Providers (${data.providers.length})`}
+            action={{ label: 'Configure', href: '/admin/dashboard/ai-providers' }}
+          >
+            {data.providers.length === 0 ? (
+              <div className="text-center py-6">
+                <BrainCircuit className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                <p className="text-sm text-slate-500">No providers configured</p>
+                <Link
+                  href="/admin/dashboard/ai-providers"
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300"
+                >
+                  Add providers <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
+            ) : (
+              <div>
+                {data.providers.map(p => <ProviderRow key={p.id} provider={p} />)}
+                <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-600">
+                  <span>{enabledProviders.length} enabled · {healthyProviders.length} healthy</span>
+                  <Link href="/admin/dashboard/ai-providers" className="text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                    Run health checks <ChevronRight className="w-3 h-3" />
+                  </Link>
+                </div>
+              </div>
+            )}
+          </SectionCard>
+        </motion.div>
+
+        {/* App Registry */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <SectionCard
+            title={`App Registry (${data.apps.length})`}
+            action={{ label: 'Manage Apps', href: '/admin/dashboard/apps' }}
+          >
+            {data.apps.length === 0 ? (
+              <div className="text-center py-6">
+                <LayoutGrid className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                <p className="text-sm text-slate-500">No apps registered</p>
+                <Link
+                  href="/admin/dashboard/apps"
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300"
+                >
+                  Register an app <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
+            ) : (
+              <div>
+                {data.apps.slice(0, 6).map(a => <AppRow key={a.id} app={a} />)}
+                {data.apps.length > 6 && (
+                  <p className="text-[11px] text-slate-600 mt-2">
+                    +{data.apps.length - 6} more apps
+                  </p>
+                )}
+                <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-600">
+                  <span>{connectedApps.length} with integration · {healthyApps.length} healthy</span>
+                </div>
+              </div>
+            )}
+          </SectionCard>
+        </motion.div>
+
+        {/* Brain Gateway */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+        >
+          <SectionCard
+            title="Brain Gateway"
+            action={{ label: 'View Traces', href: '/admin/dashboard/events' }}
+          >
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-white/3 border border-white/5">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-violet-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">POST /api/brain/request</p>
+                  <p className="text-[11px] text-slate-500">App-facing gateway · auth via appId + appSecret</p>
+                </div>
+                <span className="ml-auto text-[10px] text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">LIVE</span>
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-white/3 border border-white/5">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                  <Radio className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">POST /api/integrations/heartbeat</p>
+                  <p className="text-[11px] text-slate-500">App health beacon · stores lastSeen + status</p>
+                </div>
+                <span className="ml-auto text-[10px] text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">LIVE</span>
+              </div>
+              {data.brainStats && (
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  <div className="p-2.5 rounded-lg bg-white/3 border border-white/5 text-center">
+                    <p className="text-base font-bold text-white">{data.brainStats.totalRequests}</p>
+                    <p className="text-[10px] text-slate-500">Total Req</p>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-white/3 border border-white/5 text-center">
+                    <p className="text-base font-bold text-emerald-400">{data.brainStats.successCount}</p>
+                    <p className="text-[10px] text-slate-500">Succeeded</p>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-white/3 border border-white/5 text-center">
+                    <p className="text-base font-bold text-white">
+                      {data.brainStats.avgLatencyMs != null ? `${data.brainStats.avgLatencyMs}ms` : '—'}
+                    </p>
+                    <p className="text-[10px] text-slate-500">Avg Latency</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </SectionCard>
+        </motion.div>
+
+        {/* Recent Events */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <SectionCard
+            title="Recent Events"
+            action={{ label: 'All Events', href: '/admin/dashboard/events' }}
+          >
+            {data.recentEvents.length === 0 ? (
+              <div className="text-center py-6">
+                <Activity className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                <p className="text-sm text-slate-500">No events logged yet</p>
+              </div>
+            ) : (
+              <div>
+                {data.recentEvents.map(e => <EventRow key={e.id} event={e} />)}
+              </div>
+            )}
+          </SectionCard>
+        </motion.div>
+      </div>
+
+      {/* Routing Readiness */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+      >
+        <SectionCard title="Routing & Architecture">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[
+              {
+                label: 'App Registry',
+                status: data.apps.length > 0 ? 'ready' : 'missing',
+                detail: data.apps.length > 0 ? `${data.apps.length} apps registered` : 'No apps — create via App Registry',
+                href: '/admin/dashboard/apps',
+              },
+              {
+                label: 'Provider Config',
+                status: enabledProviders.length > 0 ? (healthyProviders.length > 0 ? 'ready' : 'partial') : 'missing',
+                detail: enabledProviders.length > 0
+                  ? `${enabledProviders.length} enabled · ${healthyProviders.length} healthy`
+                  : 'No providers enabled',
+                href: '/admin/dashboard/ai-providers',
+              },
+              {
+                label: 'Brain Gateway',
+                status: 'ready',
+                detail: 'POST /api/brain/request active',
+                href: '/admin/dashboard/events',
+              },
+              {
+                label: 'App Credentials',
+                status: connectedApps.length > 0 ? 'ready' : 'missing',
+                detail: connectedApps.length > 0 ? `${connectedApps.length} apps with integration tokens` : 'No apps connected — enable integrations',
+                href: '/admin/dashboard/apps',
+              },
+              {
+                label: 'Heartbeat Endpoint',
+                status: 'ready',
+                detail: 'POST /api/integrations/heartbeat active',
+                href: '/admin/dashboard/integrations',
+              },
+              {
+                label: 'Orchestration Engine',
+                status: 'ready',
+                detail: 'Multi-model routing via orchestrator.ts',
+                href: '/admin/dashboard/brain-chat',
+              },
+            ].map((item, i) => {
+              const statusColors = {
+                ready:   { dot: 'bg-emerald-400', text: 'text-emerald-400', label: 'Ready' },
+                partial: { dot: 'bg-amber-400',   text: 'text-amber-400',   label: 'Partial' },
+                missing: { dot: 'bg-red-400',      text: 'text-red-400',     label: 'Missing' },
+              }
+              const sc = statusColors[item.status as keyof typeof statusColors]
+              return (
+                <Link
+                  key={i}
+                  href={item.href}
+                  className="p-4 rounded-xl border border-white/5 bg-white/3 hover:border-white/10 hover:bg-white/5 transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${sc.dot}`} />
+                      <span className="text-sm font-medium text-white">{item.label}</span>
+                    </div>
+                    <span className={`text-[10px] font-mono ${sc.text}`}>{sc.label}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">{item.detail}</p>
+                </Link>
+              )
+            })}
+          </div>
+        </SectionCard>
+      </motion.div>
+
+      {/* Quick Links */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="glass rounded-2xl border border-white/5 p-5"
       >
         <div className="flex items-start gap-3">
-          <Info className="w-4 h-4 text-slate-600 flex-shrink-0 mt-0.5" />
+          <Shield className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Configuration is applied server-side via environment variables. Keys marked as
-              {' "'}Pending{'" '} are referenced in code but require deployment-time environment variables to activate.
-              Keys marked {'"'}Not configured{'" '} are reserved integration slots for future backend phases.
-            </p>
-            <p className="text-xs text-slate-600">
-              AI provider keys are stored encrypted in the database and managed from the{' '}
-              <Link href="/admin/dashboard/ai-providers" className="text-violet-400 hover:text-violet-300">
-                AI Providers vault
-              </Link>.
+            <p className="text-xs text-slate-400 font-medium">Connection Reference</p>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Apps connect via: <code className="text-slate-400 font-mono text-[11px]">POST /api/brain/request</code> with{' '}
+              <code className="text-slate-400 font-mono text-[11px]">appId</code> + <code className="text-slate-400 font-mono text-[11px]">appSecret</code> from the App Registry.
+              Heartbeats via: <code className="text-slate-400 font-mono text-[11px]">POST /api/integrations/heartbeat</code>.
+              Provider keys managed in{' '}
+              <Link href="/admin/dashboard/ai-providers" className="text-violet-400 hover:text-violet-300">AI Providers</Link>.
+              Apps managed in{' '}
+              <Link href="/admin/dashboard/apps" className="text-cyan-400 hover:text-cyan-300">App Registry</Link>.
             </p>
           </div>
         </div>
