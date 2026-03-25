@@ -94,7 +94,7 @@ export default function Header() {
               </div>
               <div className="flex flex-col -space-y-0.5">
                 <span className="font-bold text-base leading-tight tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-                  <span className="gradient-text-blue-cyan">Amarktai</span>
+                  <span className="text-white">Amarkt</span><span className="text-blue-400">AI</span>
                   <span className="text-slate-300 ml-1.5 font-light">Network</span>
                 </span>
 
