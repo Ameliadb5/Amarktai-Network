@@ -1,14 +1,15 @@
 'use client'
 
+import '@fontsource-variable/inter'
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, Package, Key, Plug, Mail, Users, LogOut,
+  LayoutDashboard, Key, Plug, Mail, Users, LogOut,
   Menu, X, ChevronRight, Server, Activity, Shield,
-  Brain, MessageSquare, Bell, FileText, Settings, AppWindow,
+  Brain, MessageSquare, Bell, FileText, AppWindow,
 } from 'lucide-react'
 
 interface NavItem {
@@ -29,16 +30,15 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard, color: 'text-blue-400' },
       { href: '/admin/dashboard/apps', label: 'App Registry', icon: AppWindow, color: 'text-cyan-400' },
-      { href: '/admin/dashboard/integrations', label: 'Integrations', icon: Plug, color: 'text-emerald-400' },
-      { href: '/admin/dashboard/products', label: 'Products (Legacy)', icon: Package, color: 'text-slate-500' },
+      { href: '/admin/dashboard/integrations', label: 'App Integrations', icon: Plug, color: 'text-emerald-400' },
     ],
   },
   {
-    label: 'AI & Intelligence',
+    label: 'AI Execution',
     items: [
       { href: '/admin/dashboard/ai-providers', label: 'AI Providers', icon: Brain, color: 'text-violet-400' },
       { href: '/admin/dashboard/ai-usage', label: 'AI Usage', icon: Activity, color: 'text-blue-400' },
-      { href: '/admin/dashboard/brain-chat', label: 'Brain Chat', icon: MessageSquare, color: 'text-cyan-400' },
+      { href: '/admin/dashboard/brain-chat', label: 'Gateway Test', icon: MessageSquare, color: 'text-cyan-400' },
     ],
   },
   {
@@ -50,9 +50,8 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Administration',
+    label: 'Admin',
     items: [
-      { href: '/admin/dashboard/config', label: 'Execution Config', icon: Settings, color: 'text-amber-400' },
       { href: '/admin/dashboard/api-keys', label: 'API Keys', icon: Key, color: 'text-violet-400' },
       { href: '/admin/dashboard/contacts', label: 'Contacts', icon: Mail, color: 'text-pink-400' },
       { href: '/admin/dashboard/waitlist', label: 'Waitlist', icon: Users, color: 'text-indigo-400' },
@@ -87,7 +86,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 blur-lg opacity-20 group-hover:opacity-40 transition-opacity" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white font-heading">
+            <p className="text-sm font-bold text-white">
               <span className="text-white">Amarkt</span><span className="text-blue-400">AI</span>
             </p>
             <p className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">Network</p>
@@ -170,7 +169,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const currentPage = allNavItems.find((n) => n.href === pathname)
 
   return (
-    <div className="min-h-screen bg-[#050816] flex">
+    <div
+      className="min-h-screen bg-[#050816] flex"
+      style={{ fontFamily: "'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif" }}
+    >
       {/* Subtle background */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-0 w-96 h-96 bg-blue-600/3 rounded-full blur-[120px]" />
@@ -226,7 +228,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {currentPage && (
               <>
                 <currentPage.icon className={`w-4 h-4 ${currentPage.color}`} />
-                <span className="text-sm font-medium text-white font-heading">{currentPage.label}</span>
+                <span className="text-sm font-semibold text-white">{currentPage.label}</span>
               </>
             )}
           </div>

@@ -1,16 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Activity, AlertCircle, BrainCircuit, MessageSquare,
-  MonitorDot, ArrowRight, Brain, Shield, WifiOff,
-  CheckCircle2, XCircle, Clock, Zap,
+  CheckCircle, AlertCircle, AlertTriangle, WifiOff, Clock,
+  RefreshCw, ArrowRight, Zap, Activity, Shield,
 } from 'lucide-react'
-import { format, formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
+import { formatDistanceToNow } from 'date-fns'
 
-// ── Types ────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────
 interface DashboardData {
   metrics: {
     totalProducts: number
@@ -18,13 +17,6 @@ interface DashboardData {
     totalWaitlist: number
     totalIntegrations: number
   }
-  recentContacts: Array<{
-    id: number
-    name: string
-    email: string
-    createdAt: string
-    companyOrProject: string
-  }>
   recentEvents: Array<{
     id: number
     eventType: string
@@ -37,10 +29,7 @@ interface DashboardData {
     id: number
     name: string
     status: string
-    integration: {
-      healthStatus: string
-      lastHeartbeatAt: string | null
-    } | null
+    integration: { healthStatus: string; lastHeartbeatAt: string | null } | null
   }>
   brainStats: {
     totalRequests: number
@@ -50,411 +39,360 @@ interface DashboardData {
   } | null
 }
 
-interface _VpsSnapshot {
-  cpuPercent: number
-  ramPercent: number
-  diskPercent: number
-  netInKbps: number
-  netOutKbps: number
-  timestamp: string
-}
-
-interface _VpsProduct {
+// ── Provider summary from /api/admin/providers ─────────────────
+interface ProviderSummary {
   id: number
-  name: string
-  slug: string
-  status: string
-  hostingScope: string
-  hostedHere: boolean
-  integration: { healthStatus: string; lastHeartbeatAt: string | null; uptime: number | null } | null
-  vpsSnapshots: _VpsSnapshot[]
+  providerKey: string
+  displayName: string
+  enabled: boolean
+  maskedPreview: string
+  healthStatus: string
+  healthMessage: string
+  lastCheckedAt: string | null
 }
 
-// ── Derived types ────────────────────────────────────────────────
-type SystemStatus = 'Active' | 'Ready' | 'Standby'
-
-// ── Helpers ──────────────────────────────────────────────────────
-function HealthDot({ status }: { status: string }) {
-  if (status === 'healthy') {
-    return (
-      <span className="relative flex h-2 w-2">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-      </span>
-    )
-  }
-  if (status === 'unhealthy') return <span className="inline-flex h-2 w-2 rounded-full bg-red-400" />
-  return <span className="inline-flex h-2 w-2 rounded-full bg-slate-600" />
-}
-
-function SeverityDot({ severity }: { severity: string }) {
-  const cls =
-    severity === 'critical' ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.7)]' :
-    severity === 'error'    ? 'bg-red-400' :
-    severity === 'warning'  ? 'bg-amber-400' : 'bg-blue-400'
-  return <span className={`inline-flex h-1.5 w-1.5 rounded-full flex-shrink-0 ${cls}`} />
-}
-
-function getSeverityStyles(severity: string): { ring: string; text: string } {
-  if (severity === 'critical') return { ring: 'border-red-500/60 bg-red-500/10',    text: 'text-red-400'    }
-  if (severity === 'error')    return { ring: 'border-red-400/40 bg-red-400/5',     text: 'text-red-300'    }
-  if (severity === 'warning')  return { ring: 'border-amber-400/40 bg-amber-400/5', text: 'text-amber-300'  }
-  return                              { ring: 'border-blue-400/30 bg-blue-400/5',   text: 'text-blue-300'   }
-}
-
-function deriveSystemStatus(data: DashboardData | null): SystemStatus {
-  if (!data) return 'Standby'
-  if ((data.brainStats?.totalRequests ?? 0) > 0) return 'Active'
-  if (data.productStats.some(p => p.integration?.healthStatus === 'healthy')) return 'Ready'
-  return 'Standby'
-}
-
-const STATUS_STYLES: Record<SystemStatus, { pill: string; dot: string }> = {
-  Active:  { pill: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300', dot: 'bg-emerald-400' },
-  Ready:   { pill: 'border-blue-500/30 bg-blue-500/10 text-blue-300',          dot: 'bg-blue-400' },
-  Standby: { pill: 'border-slate-500/30 bg-slate-500/10 text-slate-400',       dot: 'bg-slate-500' },
+// ── Health config ──────────────────────────────────────────────
+const H = {
+  healthy:      { label: 'Healthy',      color: 'text-emerald-400', dot: 'bg-emerald-400', icon: CheckCircle },
+  configured:   { label: 'Key Set',      color: 'text-amber-400',   dot: 'bg-amber-400',   icon: Clock },
+  degraded:     { label: 'Degraded',     color: 'text-amber-400',   dot: 'bg-amber-400',   icon: AlertTriangle },
+  error:        { label: 'Error',        color: 'text-red-400',     dot: 'bg-red-400',     icon: AlertCircle },
+  unconfigured: { label: 'Not Set',      color: 'text-slate-500',   dot: 'bg-slate-600',   icon: WifiOff },
+  disabled:     { label: 'Disabled',     color: 'text-slate-500',   dot: 'bg-slate-600',   icon: WifiOff },
 } as const
 
-// ── Skeleton ─────────────────────────────────────────────────────
-function LoadingSkeleton() {
+const SEV = {
+  critical: 'text-red-400',
+  error:    'text-red-400',
+  warning:  'text-amber-400',
+  info:     'text-blue-400',
+} as const
+
+// ── Card wrapper ───────────────────────────────────────────────
+function Card({ title, action, children, className = '' }: {
+  title: string
+  action?: { label: string; href: string }
+  children: React.ReactNode
+  className?: string
+}) {
   return (
-    <div className="space-y-5 max-w-7xl">
-      <div className="h-20 bg-white/[0.04] rounded-2xl animate-pulse" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="h-72 bg-white/[0.04] rounded-2xl animate-pulse lg:col-span-2" />
-        <div className="h-72 bg-white/[0.04] rounded-2xl animate-pulse" />
+    <div className={`bg-[#0A1020] border border-white/8 rounded-xl overflow-hidden ${className}`}>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+        <h2 className="text-sm font-semibold text-white">{title}</h2>
+        {action && (
+          <Link href={action.href} className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+            {action.label} <ArrowRight className="w-3 h-3" />
+          </Link>
+        )}
       </div>
-      <div className="h-48 bg-white/[0.04] rounded-2xl animate-pulse" />
-      <div className="h-10 bg-white/[0.04] rounded-xl animate-pulse" />
+      <div className="p-4">{children}</div>
     </div>
   )
 }
 
-// ── Main Component ────────────────────────────────────────────────
-export default function DashboardPage() {
+// ── Stat tile ──────────────────────────────────────────────────
+function StatTile({ label, value, sub, accent = false }: {
+  label: string
+  value: string | number
+  sub?: string
+  accent?: boolean
+}) {
+  return (
+    <div className="bg-[#0A1020] border border-white/8 rounded-xl p-4">
+      <p className="text-xs text-slate-500 mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${accent ? 'text-blue-400' : 'text-white'}`}>{value}</p>
+      {sub && <p className="text-xs text-slate-600 mt-1">{sub}</p>}
+    </div>
+  )
+}
+
+// ── Main ──────────────────────────────────────────────────────
+export default function DashboardOverview() {
   const [data, setData] = useState<DashboardData | null>(null)
+  const [providers, setProviders] = useState<ProviderSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [now, setNow] = useState(new Date())
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    fetch('/api/admin/dashboard')
-      .then((r) => r.json())
-      .then((dash: DashboardData) => {
-        setData(dash)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
+    try {
+      const [dashRes, provRes] = await Promise.all([
+        fetch('/api/admin/dashboard'),
+        fetch('/api/admin/providers'),
+      ])
+      if (dashRes.ok) setData(await dashRes.json())
+      if (provRes.ok) setProviders(await provRes.json())
+    } catch {
+      // silently fail — data stays as-is
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
   }, [])
 
-  // Tick every minute for timestamp display
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60_000)
-    return () => clearInterval(id)
-  }, [])
+  useEffect(() => { load() }, [load])
 
-  if (loading) return <LoadingSkeleton />
+  // ── Derived ────────────────────────────────────────────────
+  const healthyProviders  = providers.filter(p => p.healthStatus === 'healthy')
+  const enabledProviders  = providers.filter(p => p.enabled)
+  const connectedApps     = data?.productStats.filter(a => a.integration !== null) ?? []
+  const totalApps         = data?.productStats.length ?? 0
+  const alertCount        = data?.recentEvents.filter(e => ['critical','error'].includes(e.severity)).length ?? 0
+  // Setup score: 50 pts = healthy provider, 25 pts = enabled provider (not yet tested),
+  // 30 pts = app with integration, 20 pts = any brain requests made
+  const setupScore        = Math.round(
+    ((healthyProviders.length > 0 ? 50 : enabledProviders.length > 0 ? 25 : 0) +
+     (connectedApps.length > 0 ? 30 : 0) +
+     ((data?.brainStats?.totalRequests ?? 0) > 0 ? 20 : 0))
+  )
 
-  const systemStatus = deriveSystemStatus(data)
-  const statusStyle = STATUS_STYLES[systemStatus]
-
-  const totalRequests = data?.brainStats?.totalRequests ?? 0
-  const successCount  = data?.brainStats?.successCount  ?? 0
-  const errorCount    = data?.brainStats?.errorCount    ?? 0
-  const avgLatencyMs  = data?.brainStats?.avgLatencyMs  ?? null
-  const successRate   = totalRequests > 0 ? ((successCount / totalRequests) * 100).toFixed(1) : '—'
-  const errorRate     = totalRequests > 0 ? ((errorCount / totalRequests) * 100).toFixed(1)   : '—'
-
-  const recentEvents  = data?.recentEvents ?? []
-  const productStats  = data?.productStats ?? []
-  const flowEvents    = recentEvents.slice(0, 5)
+  if (loading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-white/4 rounded-xl" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => <div key={i} className="h-48 bg-white/4 rounded-xl" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => <div key={i} className="h-40 bg-white/4 rounded-xl" />)}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-5 max-w-7xl">
-
-      {/* ── HEADER: AmarktAI Status ──────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: -6 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-2xl px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-4"
-      >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1.5">
-            <h1 className="text-2xl font-bold font-heading tracking-tight"><span className="text-white">Amarkt</span><span className="text-blue-400">AI</span> Status</h1>
-            {/* System status pill */}
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold font-mono ${statusStyle.pill}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}`} />
-              {systemStatus}
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 font-mono">
-            Live system interface
-            <span className="mx-1.5 text-slate-700">·</span>
-            {format(now, 'MMM d, HH:mm')}
-            <span className="mx-1.5 text-slate-700">·</span>
-            {totalRequests.toLocaleString()} executions
-          </p>
-        </div>
-
-        {/* Live indicator */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 self-start sm:self-auto">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
-          </span>
-          <span className="text-[10px] text-emerald-400 font-mono tracking-widest">LIVE</span>
-        </div>
-      </motion.div>
-
-      {/* ── MAIN ROW: Live Activity + System State ───────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-        {/* Panel 1 — Live Activity */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08 }}
-          className="glass rounded-2xl overflow-hidden lg:col-span-2"
+    <div className="space-y-4 max-w-7xl">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-white">AmarktAI Status</h1>
+        <button
+          onClick={() => load(true)}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
         >
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-            <div className="flex items-center gap-2">
-              <BrainCircuit className="w-4 h-4 text-violet-400" />
-              <h2 className="text-sm font-semibold text-white font-heading">Live Activity</h2>
-            </div>
-            <Link href="/admin/dashboard/ai-usage" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-              Full trace →
-            </Link>
-          </div>
-
-          <div className="p-5 space-y-5">
-            {/* 2×2 metric tiles */}
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                {
-                  label: 'Total Executions',
-                  value: totalRequests > 0 ? totalRequests.toLocaleString() : '—',
-                  icon: <Brain className="w-4 h-4 text-violet-400" />,
-                  color: 'text-white',
-                },
-                {
-                  label: 'Success Rate',
-                  value: successRate !== '—' ? `${successRate}%` : '—',
-                  icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
-                  color: 'text-emerald-400',
-                },
-                {
-                  label: 'Error Rate',
-                  value: errorRate !== '—' ? `${errorRate}%` : '—',
-                  icon: <XCircle className="w-4 h-4 text-red-400" />,
-                  color: errorCount > 0 ? 'text-red-400' : 'text-slate-500',
-                },
-                {
-                  label: 'Avg Latency',
-                  value: avgLatencyMs !== null ? `${avgLatencyMs.toFixed(0)}ms` : '—',
-                  icon: <Clock className="w-4 h-4 text-cyan-400" />,
-                  color: 'text-cyan-400',
-                },
-              ].map((tile) => (
-                <div key={tile.label} className="glass-card rounded-xl p-4 flex items-start gap-3">
-                  <div className="p-1.5 rounded-lg bg-white/[0.04] mt-0.5">{tile.icon}</div>
-                  <div>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-mono mb-1">{tile.label}</p>
-                    <p className={`text-xl font-bold font-heading ${tile.color}`}>{tile.value}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Recent Executions list */}
-            <div>
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-mono mb-3">Recent Executions</p>
-              {recentEvents.length > 0 ? (
-                <div className="space-y-0">
-                  {recentEvents.slice(0, 5).map((event) => (
-                    <div
-                      key={event.id}
-                      className="flex items-center gap-3 py-2.5 border-b border-white/[0.04] last:border-0"
-                    >
-                      <SeverityDot severity={event.severity} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-200 truncate leading-tight">{event.title}</p>
-                        <p className="text-[10px] text-slate-600 font-mono mt-0.5">
-                          {event.product.name}
-                          <span className="mx-1 text-slate-700">·</span>
-                          {event.eventType}
-                        </p>
-                      </div>
-                      <span className="text-[10px] text-slate-600 font-mono flex-shrink-0">
-                        {format(new Date(event.timestamp), 'HH:mm')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center py-6 text-center">
-                  <Activity className="w-7 h-7 text-slate-700 mb-2" />
-                  <p className="text-xs text-slate-500">No executions yet</p>
-                  <p className="text-[10px] text-slate-600 mt-0.5">Activity appears once AI requests are made.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Panel 2 — System State */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.14 }}
-          className="glass rounded-2xl overflow-hidden"
-        >
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-            <div className="flex items-center gap-2">
-              <MonitorDot className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-sm font-semibold text-white font-heading">System State</h2>
-            </div>
-            <Link href="/admin/dashboard/apps" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-              Manage →
-            </Link>
-          </div>
-
-          <div className="p-5">
-            {productStats.length > 0 ? (
-              <div className="space-y-1">
-                {productStats.map((product) => {
-                  const health = product.integration?.healthStatus ?? 'unknown'
-                  const heartbeat = product.integration?.lastHeartbeatAt
-                  const healthLabel =
-                    health === 'healthy'   ? 'Healthy' :
-                    health === 'unhealthy' ? 'Unhealthy' : 'Unknown'
-                  const healthColor =
-                    health === 'healthy'   ? 'text-emerald-400' :
-                    health === 'unhealthy' ? 'text-red-400' : 'text-slate-500'
-
-                  return (
-                    <div
-                      key={product.id}
-                      className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/[0.03] transition-colors"
-                    >
-                      <HealthDot status={health} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-200 truncate leading-tight">{product.name}</p>
-                        {heartbeat ? (
-                          <p className="text-[10px] text-slate-600 font-mono mt-0.5">
-                            {formatDistanceToNow(new Date(heartbeat), { addSuffix: true })}
-                          </p>
-                        ) : (
-                          <p className="text-[10px] text-slate-700 font-mono mt-0.5">no heartbeat</p>
-                        )}
-                      </div>
-                      <span className={`text-[10px] font-mono font-semibold ${healthColor}`}>{healthLabel}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <WifiOff className="w-8 h-8 text-slate-700 mb-2" />
-                <p className="text-sm text-slate-500 font-medium">No systems connected</p>
-                <Link href="/admin/dashboard/apps" className="text-xs text-blue-400 mt-2 hover:text-blue-300 transition-colors">
-                  Connect a system →
-                </Link>
-              </div>
-            )}
-          </div>
-        </motion.div>
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
-      {/* ── EXECUTION FLOW ───────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="terminal rounded-2xl overflow-hidden"
-      >
-        <div className="terminal-header flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-semibold text-white font-heading">Execution Flow</span>
-          </div>
-          <Link href="/admin/dashboard/events" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-            All events →
-          </Link>
-        </div>
+      {/* ROW 1 — Top-level status */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatTile
+          label="AmarktAI Status"
+          value={(data?.brainStats?.totalRequests ?? 0) > 0 ? 'Active' : connectedApps.length > 0 ? 'Ready' : 'Standby'}
+          sub={(data?.brainStats?.totalRequests ?? 0) > 0 ? `${data?.brainStats?.totalRequests} total requests` : 'No requests yet'}
+          accent
+        />
+        <StatTile
+          label="Setup Completeness"
+          value={`${setupScore}%`}
+          sub={healthyProviders.length > 0 ? `${healthyProviders.length} provider${healthyProviders.length > 1 ? 's' : ''} healthy` : 'No providers healthy yet'}
+        />
+        <StatTile
+          label="Connected Apps"
+          value={`${connectedApps.length} / ${totalApps}`}
+          sub={connectedApps.length > 0 ? 'Integration active' : 'No app connections yet'}
+        />
+        <StatTile
+          label="Active Alerts"
+          value={alertCount}
+          sub={alertCount > 0 ? 'Errors or criticals in events' : 'No recent alerts'}
+        />
+      </div>
 
-        <div className="p-5">
-          {flowEvents.length > 0 ? (
-            <div className="flex items-start gap-0 overflow-x-auto pb-2">
-              {flowEvents.map((event, idx) => {
-                const { ring: severityRing, text: severityText } = getSeverityStyles(event.severity)
+      {/* ROW 2 — Execution + Connections + Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
+        {/* Execution Layer Setup */}
+        <Card title="Execution Layer" action={{ label: 'Configure', href: '/admin/dashboard/ai-providers' }}>
+          {providers.length === 0 ? (
+            <div className="text-center py-6">
+              <WifiOff className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+              <p className="text-sm text-slate-500">No providers configured</p>
+              <Link href="/admin/dashboard/ai-providers" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300">
+                Set up AI providers →
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {providers.map(p => {
+                const cfg = H[p.healthStatus as keyof typeof H] ?? H.unconfigured
+                const Icon = cfg.icon
                 return (
-                  <div key={event.id} className="flex items-center flex-shrink-0">
-                    {/* Step node */}
-                    <div className="flex flex-col items-center w-36">
-                      <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center mb-2 ${severityRing}`}>
-                        <span className="text-[10px] font-bold font-mono text-slate-400">{idx + 1}</span>
-                      </div>
-                      <p className={`text-[10px] font-mono font-semibold text-center truncate w-full px-1 ${severityText}`}>
-                        {event.eventType}
-                      </p>
-                      <p className="text-[10px] text-slate-500 text-center truncate w-full px-1 mt-0.5">
-                        {event.product.name}
-                      </p>
-                      <p className="text-[10px] text-slate-700 font-mono text-center mt-1">
-                        {format(new Date(event.timestamp), 'HH:mm')}
-                      </p>
+                  <div key={p.id} className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                      <span className="text-sm text-white truncate">{p.displayName}</span>
+                      {!p.enabled && <span className="text-[10px] text-slate-600 font-mono ml-1">off</span>}
                     </div>
-
-                    {/* Connector line */}
-                    {idx < flowEvents.length - 1 && (
-                      <div className="w-8 flex-shrink-0 flex items-center justify-center mb-6">
-                        <div className="h-px w-full bg-gradient-to-r from-white/10 to-white/5" />
-                        <ArrowRight className="w-3 h-3 text-slate-700 -ml-1.5 flex-shrink-0" />
-                      </div>
-                    )}
+                    <span className={`flex items-center gap-1 text-xs flex-shrink-0 ml-2 ${cfg.color}`}>
+                      <Icon className="w-3 h-3" />
+                      {cfg.label}
+                    </span>
                   </div>
                 )
               })}
             </div>
+          )}
+        </Card>
+
+        {/* App Connections */}
+        <Card title="App Connections" action={{ label: 'Manage', href: '/admin/dashboard/apps' }}>
+          {totalApps === 0 ? (
+            <div className="text-center py-6">
+              <Shield className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+              <p className="text-sm text-slate-500">No apps registered</p>
+              <Link href="/admin/dashboard/apps" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300">
+                Register an app →
+              </Link>
+            </div>
           ) : (
-            <div className="flex flex-col items-center py-6 text-center">
-              <Zap className="w-7 h-7 text-slate-700 mb-2" />
-              <p className="text-xs text-slate-500">No execution data yet</p>
-              <p className="text-[10px] text-slate-600 mt-0.5">The flow will visualize as events come in.</p>
+            <div className="space-y-0">
+              {data?.productStats.map(app => {
+                const health = app.integration?.healthStatus ?? 'no_integration'
+                const dot =
+                  health === 'healthy'  ? 'bg-emerald-400' :
+                  health === 'degraded' ? 'bg-amber-400' :
+                  health === 'error'    ? 'bg-red-400' :
+                  health === 'no_integration' ? 'bg-slate-700' : 'bg-slate-500'
+                return (
+                  <div key={app.id} className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
+                      <span className="text-sm text-white truncate">{app.name}</span>
+                    </div>
+                    <span className="text-xs text-slate-500 flex-shrink-0 ml-2">
+                      {app.integration
+                        ? (app.integration.lastHeartbeatAt
+                            ? formatDistanceToNow(new Date(app.integration.lastHeartbeatAt), { addSuffix: true })
+                            : 'Connected')
+                        : 'No integration'}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           )}
-        </div>
-      </motion.div>
+        </Card>
 
-      {/* ── QUICK LINKS STRIP ────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.28 }}
-        className="flex flex-wrap gap-2"
-      >
+        {/* Recent Activity (Brain stats) */}
+        <Card title="Recent Activity" action={{ label: 'View Events', href: '/admin/dashboard/events' }}>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white/[0.03] rounded-lg p-3">
+                <p className="text-xs text-slate-500">Total Requests</p>
+                <p className="text-xl font-bold text-white mt-0.5">{data?.brainStats?.totalRequests ?? 0}</p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-3">
+                <p className="text-xs text-slate-500">Success Rate</p>
+                <p className="text-xl font-bold text-white mt-0.5">
+                  {data?.brainStats && data.brainStats.totalRequests > 0
+                    ? `${Math.round((data.brainStats.successCount / data.brainStats.totalRequests) * 100)}%`
+                    : '—'}
+                </p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-3">
+                <p className="text-xs text-slate-500">Avg Latency</p>
+                <p className="text-xl font-bold text-white mt-0.5">
+                  {data?.brainStats?.avgLatencyMs ? `${data.brainStats.avgLatencyMs}ms` : '—'}
+                </p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-3">
+                <p className="text-xs text-slate-500">Errors</p>
+                <p className={`text-xl font-bold mt-0.5 ${(data?.brainStats?.errorCount ?? 0) > 0 ? 'text-red-400' : 'text-white'}`}>
+                  {data?.brainStats?.errorCount ?? 0}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* ROW 3 — Events + Readiness + Links */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Recent Events */}
+        <Card title="Recent Events" action={{ label: 'All Events', href: '/admin/dashboard/events' }} className="lg:col-span-2">
+          {(data?.recentEvents.length ?? 0) === 0 ? (
+            <p className="text-sm text-slate-500 py-2 text-center">No events logged yet</p>
+          ) : (
+            <div className="space-y-0">
+              {data?.recentEvents.slice(0, 6).map(ev => {
+                const color = SEV[ev.severity as keyof typeof SEV] ?? 'text-slate-400'
+                return (
+                  <div key={ev.id} className="flex items-start gap-3 py-2.5 border-b border-white/5 last:border-0">
+                    <span className={`text-xs font-medium capitalize flex-shrink-0 pt-0.5 w-14 ${color}`}>
+                      {ev.severity}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{ev.title}</p>
+                      <p className="text-xs text-slate-600">{ev.product?.name ?? '—'}</p>
+                    </div>
+                    <span className="text-xs text-slate-600 flex-shrink-0">
+                      {formatDistanceToNow(new Date(ev.timestamp), { addSuffix: true })}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+
+        {/* System Readiness */}
+        <Card title="System Readiness">
+          <div className="space-y-3">
+            {[
+              { label: 'AI provider configured', ok: enabledProviders.length > 0 },
+              { label: 'Provider health-checked', ok: healthyProviders.length > 0 },
+              { label: 'App registered', ok: totalApps > 0 },
+              { label: 'App integration active', ok: connectedApps.length > 0 },
+              { label: 'Brain requests made', ok: (data?.brainStats?.totalRequests ?? 0) > 0 },
+            ].map(item => (
+              <div key={item.label} className="flex items-center justify-between">
+                <span className="text-sm text-slate-400">{item.label}</span>
+                {item.ok
+                  ? <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  : <AlertCircle className="w-4 h-4 text-slate-600 flex-shrink-0" />}
+              </div>
+            ))}
+            <div className="pt-3 border-t border-white/5">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs text-slate-500">Setup progress</span>
+                <span className="text-xs text-white font-semibold">{setupScore}%</span>
+              </div>
+              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${setupScore}%` }}
+                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full"
+                />
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Quick nav row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { href: '/admin/dashboard/brain-chat',   label: 'Brain Chat',   icon: <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />, sub: 'Test the AI' },
-          { href: '/admin/dashboard/ai-providers', label: 'AI Providers', icon: <BrainCircuit   className="w-3.5 h-3.5 text-violet-400" />, sub: 'Configure models' },
-          { href: '/admin/dashboard/config',       label: 'Setup',        icon: <Shield         className="w-3.5 h-3.5 text-amber-400"  />, sub: 'Execution config' },
-          { href: '/admin/dashboard/events',       label: 'All Events',   icon: <Activity       className="w-3.5 h-3.5 text-blue-400"   />, sub: 'Full event log' },
-          { href: '/admin/dashboard/alerts',       label: 'Alerts',       icon: <AlertCircle    className="w-3.5 h-3.5 text-red-400"    />, sub: 'Active alerts' },
-        ].map((item) => (
+          { label: 'Configure Providers', href: '/admin/dashboard/ai-providers', icon: Zap },
+          { label: 'App Registry', href: '/admin/dashboard/apps', icon: Shield },
+          { label: 'Events & Logs', href: '/admin/dashboard/events', icon: Activity },
+          { label: 'Brain Chat', href: '/admin/dashboard/brain-chat', icon: Activity },
+        ].map(item => (
           <Link
             key={item.href}
             href={item.href}
-            className="flex items-center gap-2.5 px-4 py-2.5 glass rounded-xl hover:bg-white/5 transition-colors group"
+            className="flex items-center gap-2 px-3 py-2.5 bg-white/[0.03] border border-white/8 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-white/[0.06] hover:border-white/15 transition-all group"
           >
-            <div className="p-1 rounded-lg bg-white/[0.04]">{item.icon}</div>
-            <div>
-              <p className="text-xs font-medium text-slate-300 group-hover:text-white transition-colors leading-tight">{item.label}</p>
-              <p className="text-[10px] text-slate-600">{item.sub}</p>
-            </div>
-            <ArrowRight className="w-3 h-3 text-slate-700 group-hover:text-slate-400 transition-colors ml-1" />
+            <item.icon className="w-3.5 h-3.5 flex-shrink-0 group-hover:text-blue-400" />
+            {item.label}
           </Link>
         ))}
-      </motion.div>
-
+      </div>
     </div>
   )
 }
