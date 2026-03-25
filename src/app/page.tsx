@@ -48,7 +48,7 @@ function SystemArchitecture() {
           <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
           <div className="w-3 h-3 rounded-full bg-green-500/70" />
           <span className="ml-4 text-xs text-blue-400/50 font-mono flex items-center gap-2">
-            amarktai-superbrain
+            amarktai-cns
             <span className="inline-flex items-center gap-1 text-cyan-400/70">
               <Radio size={10} />
               <span className="text-[10px]">architecture</span>
@@ -157,9 +157,9 @@ const differentiators = [
   },
   {
     icon: Globe,
-    title: 'Africa → World',
+    title: 'Global Reach',
     description:
-      'Built in Africa, engineered for the world. We solve real, hard problems for real people — and export that intelligence globally.',
+      'Built for the world. We solve real, hard problems for real people — and export that intelligence globally.',
     color: 'text-cyan-400',
     borderColor: 'border-cyan-500/25',
     glowColor: 'rgba(34,211,238,0.06)',
@@ -277,8 +277,6 @@ const itemVariants = {
 
 /* ─── Page Component ────────────────────────────────────────── */
 export default function HomePage() {
-  const appCount = getAppCount()
-
   /* Parallax */
   const heroRef = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({
@@ -362,7 +360,7 @@ export default function HomePage() {
               transition={{ duration: 1.8, repeat: Infinity }}
             />
             <span className="text-sm font-medium text-blue-200 tracking-wide">
-              One Brain. {appCount} Connected Apps.
+              One CNS. A Growing Network of Connected Apps.
             </span>
             <Sparkles size={13} className="text-cyan-400" />
           </motion.div>
@@ -387,8 +385,8 @@ export default function HomePage() {
             className="max-w-2xl mx-auto text-base md:text-lg text-blue-100/60 mb-10 leading-relaxed"
           >
             Amarktai Network is the AI operating layer that powers an entire ecosystem of
-            connected apps. Self-learning. Self-healing. One brain shared across multiple
-            machines — built in Africa, engineered for the world.
+            connected apps. Self-learning. Self-healing. A shared intelligence layer routing
+            all AI tasks through one central nervous system.
           </motion.p>
 
           {/* CTAs */}
@@ -644,8 +642,8 @@ export default function HomePage() {
               variants={itemVariants}
               className="text-4xl md:text-6xl font-black mb-5 tracking-tight"
             >
-              Five Apps.{' '}
-              <span className="gradient-text-aurora">One Brain.</span>
+              Connected Apps.{' '}
+              <span className="gradient-text-aurora">One CNS.</span>
             </motion.h2>
 
             <motion.p variants={itemVariants} className="text-blue-100/45 text-lg max-w-xl mx-auto">
@@ -724,7 +722,7 @@ export default function HomePage() {
             className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight leading-tight mb-8"
           >
             <span className="block text-white/90">One Network.</span>
-            <span className="block gradient-text-blue-cyan py-2">One Brain.</span>
+            <span className="block gradient-text-blue-cyan py-2">One CNS.</span>
           </motion.h2>
 
           {/* Supporting copy */}
@@ -734,14 +732,14 @@ export default function HomePage() {
           >
             Every application in the Amarktai ecosystem is a node connected to a single,
             evolving intelligence layer. AI routing, shared memory, unified orchestration,
-            and centralized control — one brain, multiple apps, compounding intelligence.
+            and centralized control — one CNS, many machines, compounding intelligence.
           </motion.p>
 
           <motion.p
             variants={itemVariants}
             className="text-base text-blue-100/40 max-w-xl mx-auto leading-relaxed mb-14"
           >
-            Marketing, travel, commerce, identity — {appCount} live apps,
+            Marketing, travel, commerce, identity — a growing set of apps,
             all wired to one evolving, self-learning intelligence layer.
           </motion.p>
 

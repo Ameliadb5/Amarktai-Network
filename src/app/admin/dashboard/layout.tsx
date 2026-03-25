@@ -85,7 +85,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             <p className="text-sm font-bold text-white font-heading">
               <span className="gradient-text-blue-cyan">Amarktai</span>
             </p>
-            <p className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">Super Brain</p>
+            <p className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">CNS</p>
           </div>
         </Link>
       </div>
@@ -96,7 +96,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
         </span>
-        <span className="text-xs text-emerald-400 font-mono">BRAIN NETWORK ACTIVE</span>
+        <span className="text-xs text-emerald-400 font-mono">CNS NETWORK ACTIVE</span>
         <div className="ml-auto flex gap-0.5 items-end">
           {[8, 12, 6, 10, 7].map((h, b) => (
             <div key={b} className="w-1 bg-emerald-500/70 rounded-sm" style={{ height: `${h}px` }} />

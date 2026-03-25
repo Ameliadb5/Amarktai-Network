@@ -5,31 +5,28 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { Brain, Target, Globe, Zap, Shield, Users, ArrowRight, Network, Cpu, Layers, Sparkles } from 'lucide-react'
 import Link from 'next/link'
-import { getAppCount } from '@/lib/apps'
 
 const values = [
   { icon: Brain, title: 'Intelligence First', description: 'AI is not an afterthought. Every system, product, and platform we build has intelligence embedded at its core architecture.', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
   { icon: Target, title: 'Precision Engineering', description: 'We obsess over the details. From database schemas to pixel-perfect UIs, precision defines everything we ship.', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
-  { icon: Globe, title: 'African Innovation', description: 'Proudly building from Africa for the world. We believe the continent\'s next great technology companies are being built today.', color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' },
+  { icon: Globe, title: 'Global Precision', description: 'Engineered to a premium global standard. We solve hard, real problems and export that intelligence globally.', color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' },
   { icon: Zap, title: 'Speed & Scale', description: 'We move fast without breaking things. Our architecture is designed for rapid iteration and infinite scale.', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
   { icon: Shield, title: 'Security by Default', description: 'Privacy and security are not features — they are foundational principles baked into every system we design.', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
   { icon: Users, title: 'Community Impact', description: 'Technology should uplift communities. Every product we build is designed to create meaningful impact at scale.', color: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/20' },
 ]
 
 const milestones = [
-  { year: '2022', title: 'Foundation', description: 'Amarktai Network conceived as a vision to build Africa\'s premier AI technology ecosystem.', icon: Sparkles, color: 'from-blue-500 to-cyan-500' },
+  { year: '2022', title: 'Foundation', description: 'Amarktai Network conceived as a vision to build a world-class AI technology ecosystem.', icon: Sparkles, color: 'from-blue-500 to-cyan-500' },
   { year: '2023', title: 'Architecture Phase', description: 'Deep research phase. Designing the intelligence layer, system architecture, and product roadmap.', icon: Brain, color: 'from-cyan-500 to-violet-500' },
   { year: '2024', title: 'Development Sprint', description: 'Full-scale development begins. Crypto and Forex enter closed beta. Core platform built.', icon: Cpu, color: 'from-violet-500 to-purple-500' },
   { year: '2025', title: 'Platform Operational', description: 'Core platform architecture operational. First connected apps going live.', icon: Zap, color: 'from-purple-500 to-blue-500' },
-  { year: '2026', title: 'Super Brain Phase', description: 'AI orchestration, multi-model routing, and shared intelligence layer in active development.', icon: Network, color: 'from-blue-500 to-cyan-500' },
+  { year: '2026', title: 'CNS Phase', description: 'AI orchestration, multi-model routing, and shared intelligence layer in active development.', icon: Network, color: 'from-blue-500 to-cyan-500' },
 ]
 
 export default function AboutPage() {
-  const appCount = getAppCount()
-
   const pillars = [
     { icon: Cpu, title: 'AI Orchestration Layer', desc: 'Multi-model orchestration, shared memory, real-time monitoring, and automation — the shared intelligence layer powering every connected app.' },
-    { icon: Network, title: 'Connected Ecosystem', desc: `${appCount} connected apps, one unified intelligence layer — each platform feeds data and context back into the network brain.` },
+    { icon: Network, title: 'Connected Ecosystem', desc: `A growing network of connected apps, all sharing one intelligence layer — each platform feeds data and context back into the CNS.` },
     { icon: Layers, title: 'Full-Stack Ownership', desc: 'We own every layer: from model routing to UI polish. No handoffs. No compromises.' },
   ]
 
@@ -93,14 +90,14 @@ export default function AboutPage() {
               </div>
               <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-6" style={{ fontFamily: 'Space Grotesk' }}>
                 The{' '}
-                <span className="gradient-text-blue-cyan">Super Brain</span>{' '}
-                Behind the Ecosystem
+                <span className="gradient-text-blue-cyan">Central Nervous System</span>{' '}
+                of the Ecosystem
               </h2>
               <p className="text-slate-400 leading-relaxed mb-5">
                 Amarktai Network is the central nervous system for AI operations across every connected app in our ecosystem. We handle multi-model orchestration, shared memory, real-time monitoring, and intelligent automation — so each app operates with the full power of the network behind it.
               </p>
               <p className="text-slate-400 leading-relaxed mb-8">
-                Built from Africa, engineered to a premium global standard. We are not building another AI wrapper — we are building the operations platform that makes an entire constellation of {appCount} intelligent apps think, learn, and act as one.
+                Engineered to a premium global standard. We are not building another AI wrapper — we are building the operations platform that makes a growing constellation of intelligent apps think, learn, and act as one.
               </p>
               <Link href="/apps" className="btn-primary group inline-flex">
                 View the Ecosystem

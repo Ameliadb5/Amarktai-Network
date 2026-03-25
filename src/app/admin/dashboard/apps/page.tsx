@@ -409,7 +409,7 @@ function OnboardingWizard({ initial, onClose, onSaved }: WizardProps) {
                   <Toggle checked={form.connectedToBrain} onChange={v => set({ connectedToBrain: v })} />
                   <div>
                     <p className="text-sm text-white">Connected to Amarktai Brain</p>
-                    <p className="text-xs text-slate-500">Routes intelligence through the Super Brain</p>
+                    <p className="text-xs text-slate-500">Routes AI tasks through the CNS</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

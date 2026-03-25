@@ -181,7 +181,7 @@ export default function BrainChatPage() {
             </div>
             <div>
               <h1 className="text-sm font-semibold text-white font-heading">
-                Super Brain Gateway
+                CNS Gateway
               </h1>
               <div className="flex items-center gap-1.5">
                 {gatewayReady ? (
@@ -217,7 +217,7 @@ export default function BrainChatPage() {
                 <Brain className="w-7 h-7 text-slate-600" />
               </div>
               <p className="text-sm text-slate-400 max-w-sm leading-relaxed">
-                Amarktai Super Brain is connected. Send a message to test the gateway.
+                Amarktai CNS is connected. Send a message to test the gateway.
               </p>
               <p className="text-xs text-slate-600 mt-2">
                 Uses routing policy → provider vault → normalised response
@@ -277,7 +277,7 @@ export default function BrainChatPage() {
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Send a message to test the Super Brain…"
+                placeholder="Send a message to test the CNS gateway…"
                 className="flex-1 bg-transparent text-sm text-white placeholder-slate-600 outline-none"
               />
             </div>

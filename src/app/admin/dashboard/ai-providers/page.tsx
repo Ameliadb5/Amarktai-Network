@@ -435,7 +435,7 @@ export default function AIProvidersPage() {
             AI Provider Vault
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Central AI provider configuration for the Amarktai Super Brain
+            Central AI provider configuration for the Amarktai CNS
           </p>
         </div>
         <button

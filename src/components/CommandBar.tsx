@@ -18,7 +18,7 @@ const WELCOME_MSG = `Hello! I'm the Amarktai AI assistant.\n\nType **help** for 
 
 const COMMANDS: Record<string, string> = {
   help: `Available commands:\n• **show admin** — access the control panel\n• **status** — system status\n• **apps** — view the ecosystem`,
-  status: `◈ Amarktai Super Brain — operational shell ready\n◈ ${getAppCount()} apps in ecosystem\n◈ Network: ONLINE\n◈ AI orchestration: awaiting backend configuration`,
+  status: `◈ Amarktai CNS — operational shell ready\n◈ ${getAppCount()} apps in ecosystem\n◈ Network: ONLINE\n◈ AI orchestration: awaiting backend configuration`,
   apps: `__navigate:/apps__`,
 }
 

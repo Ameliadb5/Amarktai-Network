@@ -1,5 +1,5 @@
 /**
- * Amarktai Super Brain — Orchestration Layer
+ * Amarktai Network — CNS Orchestration Layer
  *
  * Single source of truth for:
  *   - Task classification (complexity, execution mode, validation flags)
