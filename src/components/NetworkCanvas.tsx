@@ -66,9 +66,12 @@ const ACTIVE_NODES_BY_STEP: Record<number, string[]> = {
 }
 
 const BASE_SPEED = 0.00035
+const BIDIR_OFFSET = 1.5 // perpendicular pixel offset for bidirectional edge lanes
 
 function nodeById(id: string): Node {
-  return NODES.find(n => n.id === id)!
+  const node = NODES.find(n => n.id === id)
+  if (!node) throw new Error(`Unknown node id: "${id}"`)
+  return node
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -153,8 +156,9 @@ export default function NetworkCanvas({
       const activeNodes = ACTIVE_NODES_BY_STEP[step] ?? []
 
       // Canvas CSS size (ResizeObserver keeps pixel size in sync)
-      const w = canvas!.width / devicePixelRatio
-      const h = canvas!.height / devicePixelRatio
+      const dpr = devicePixelRatio
+      const w = canvas!.width / dpr
+      const h = canvas!.height / dpr
       const showLabels = w >= 500
 
       ctx!.clearRect(0, 0, canvas!.width, canvas!.height)
@@ -214,13 +218,13 @@ export default function NetworkCanvas({
           const ey2 = a.y + ny * (nodeRadius + 4)
 
           ctx!.beginPath()
-          ctx!.moveTo(sx2 - ny * 1.5, sy2 + nx * 1.5)
-          ctx!.lineTo(ex2 - ny * 1.5, ey2 + nx * 1.5)
+          ctx!.moveTo(sx2 - ny * BIDIR_OFFSET, sy2 + nx * BIDIR_OFFSET)
+          ctx!.lineTo(ex2 - ny * BIDIR_OFFSET, ey2 + nx * BIDIR_OFFSET)
           ctx!.strokeStyle = rgbStr(fromNode.glowColor, edgeAlpha * 0.7, bright)
           ctx!.lineWidth = 0.7
           ctx!.stroke()
 
-          drawArrowhead(ctx!, ex2 - ny * 1.5, ey2 + nx * 1.5, angle + Math.PI, arrowSize * 0.85, rgbStr(fromNode.glowColor, edgeAlpha * 1.2, bright))
+          drawArrowhead(ctx!, ex2 - ny * BIDIR_OFFSET, ey2 + nx * BIDIR_OFFSET, angle + Math.PI, arrowSize * 0.85, rgbStr(fromNode.glowColor, edgeAlpha * 1.2, bright))
         }
       }
 
@@ -253,8 +257,8 @@ export default function NetworkCanvas({
         const ny = dy / dist
 
         // Offset the reverse pulse slightly so it doesn't overlap the forward one
-        const offX = pulse.reverse ? -ny * 1.5 : 0
-        const offY = pulse.reverse ?  nx * 1.5 : 0
+        const offX = pulse.reverse ? -ny * BIDIR_OFFSET : 0
+        const offY = pulse.reverse ?  nx * BIDIR_OFFSET : 0
 
         const fx = pulse.reverse ? (b.x - nx * nodeRadius + offX) : (a.x + nx * nodeRadius + offX)
         const fy = pulse.reverse ? (b.y - ny * nodeRadius + offY) : (a.y + ny * nodeRadius + offY)
