@@ -221,7 +221,7 @@ export default function AIChatWidget() {
                     <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#07091A]" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-white" style={{ fontFamily: 'Space Grotesk' }}>Amarkt<span className="text-blue-400">AI</span></p>
+                    <p className="font-heading text-xs font-semibold text-white">Amarkt<span className="text-blue-400">AI</span></p>
                     <div className="flex items-center gap-1.5">
                       <span className="w-1 h-1 rounded-full bg-emerald-400" />
                       <p className="text-[10px] text-emerald-400 font-mono">online · ai assistant</p>

@@ -100,13 +100,17 @@ export async function PATCH(
 
     // If enabling and key exists, set to configured if still unconfigured
     if (data.enabled === true) {
-      const existing = await prisma.aiProvider.findUnique({ where: { id: parseInt(id) }, select: { apiKey: true, healthStatus: true } })
-      if (existing?.apiKey && existing.healthStatus === 'disabled') {
-        updateData.healthStatus = 'configured'
-        updateData.healthMessage = 'Key configured · run a health check to validate'
-      } else if (!existing?.apiKey) {
-        updateData.healthStatus = 'unconfigured'
-        updateData.healthMessage = 'No API key configured'
+      // Only check DB if we are NOT also providing a new API key in this request
+      // (if apiKey is provided, the key-update block above already set the correct health status)
+      if (data.apiKey === undefined) {
+        const existing = await prisma.aiProvider.findUnique({ where: { id: parseInt(id) }, select: { apiKey: true, healthStatus: true } })
+        if (existing?.apiKey && existing.healthStatus === 'disabled') {
+          updateData.healthStatus = 'configured'
+          updateData.healthMessage = 'Key configured · run a health check to validate'
+        } else if (!existing?.apiKey) {
+          updateData.healthStatus = 'unconfigured'
+          updateData.healthMessage = 'No API key configured'
+        }
       }
     }
 

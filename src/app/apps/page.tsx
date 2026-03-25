@@ -137,8 +137,7 @@ function AppCard({ app, index }: { app: AmarktaiApp; index: number }) {
 
         {/* Name */}
         <h3
-          className="relative z-10 text-xl font-extrabold text-white leading-tight mb-1"
-          style={{ fontFamily: 'Space Grotesk' }}
+          className="font-heading relative z-10 text-xl font-extrabold text-white leading-tight mb-1"
         >
           {app.name}
         </h3>
@@ -398,8 +397,7 @@ export default function AppsPage() {
             initial={{ opacity: 0, y: 48 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.9, ease: [0.21, 0.47, 0.32, 0.98] }}
-            className="text-6xl sm:text-7xl lg:text-8xl font-extrabold leading-[1.0] mb-6 tracking-tight"
-            style={{ fontFamily: 'Space Grotesk' }}
+            className="font-heading text-6xl sm:text-7xl lg:text-8xl font-extrabold leading-[1.0] mb-6 tracking-tight"
           >
             <span className="text-white">The</span>
             <br />
@@ -541,8 +539,7 @@ export default function AppsPage() {
                 <Brain className="w-6 h-6 text-white" />
               </div>
               <h2
-                className="text-3xl sm:text-4xl font-extrabold text-white mb-4"
-                style={{ fontFamily: 'Space Grotesk' }}
+                className="font-heading text-3xl sm:text-4xl font-extrabold text-white mb-4"
               >
                 Why Apps Connect Through{' '}
                 <span className="text-white">Amarkt</span><span className="text-blue-400">AI</span>
@@ -575,8 +572,7 @@ export default function AppsPage() {
                 <Lock className="w-6 h-6 text-white" />
               </div>
               <h2
-                className="text-4xl font-extrabold text-white mb-4"
-                style={{ fontFamily: 'Space Grotesk' }}
+                className="font-heading text-4xl font-extrabold text-white mb-4"
               >
                 Ready to join
                 <br />

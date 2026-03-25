@@ -55,8 +55,7 @@ export default function AboutPage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] mb-6 tracking-tight"
-            style={{ fontFamily: 'Space Grotesk' }}
+            className="font-heading text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] mb-6 tracking-tight"
           >
             <span className="text-white">We Build</span>
             <br />
@@ -88,7 +87,7 @@ export default function AboutPage() {
                 <Globe className="w-3 h-3" />
                 Who We Are
               </div>
-              <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-6" style={{ fontFamily: 'Space Grotesk' }}>
+              <h2 className="font-heading text-4xl lg:text-5xl font-extrabold text-white mb-6">
                 The{' '}
                 <span className="gradient-text-blue-cyan">Intelligence Layer</span>{' '}
                 of the Ecosystem
@@ -124,7 +123,7 @@ export default function AboutPage() {
                     <p.icon className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-white mb-1" style={{ fontFamily: 'Space Grotesk' }}>{p.title}</h4>
+                    <h4 className="font-heading font-semibold text-white mb-1">{p.title}</h4>
                     <p className="text-sm text-slate-400 leading-relaxed">{p.desc}</p>
                   </div>
                 </motion.div>
@@ -148,7 +147,7 @@ export default function AboutPage() {
               <Target className="w-3 h-3" />
               Our Journey
             </div>
-            <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-4" style={{ fontFamily: 'Space Grotesk' }}>
+            <h2 className="font-heading text-4xl lg:text-5xl font-extrabold text-white mb-4">
               How We Got <span className="gradient-text-violet">Here</span>
             </h2>
           </motion.div>
@@ -176,7 +175,7 @@ export default function AboutPage() {
                       <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gradient-to-r ${m.color} opacity-90 text-white text-xs font-bold mb-3`}>
                         {m.year}
                       </div>
-                      <h3 className="text-xl font-bold text-white mb-2" style={{ fontFamily: 'Space Grotesk' }}>{m.title}</h3>
+                      <h3 className="font-heading text-xl font-bold text-white mb-2">{m.title}</h3>
                       <p className="text-sm text-slate-400 leading-relaxed">{m.description}</p>
                     </div>
                   </div>
@@ -200,7 +199,7 @@ export default function AboutPage() {
               <Brain className="w-3 h-3" />
               How We Think
             </div>
-            <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-4" style={{ fontFamily: 'Space Grotesk' }}>
+            <h2 className="font-heading text-4xl lg:text-5xl font-extrabold text-white mb-4">
               Our <span className="gradient-text">Core Values</span>
             </h2>
             <p className="text-slate-400 max-w-xl mx-auto">
@@ -222,7 +221,7 @@ export default function AboutPage() {
                 <div className={`w-11 h-11 rounded-xl ${v.bg} flex items-center justify-center mb-4 ${v.color}`}>
                   <v.icon className="w-5 h-5" />
                 </div>
-                <h3 className="font-semibold text-white mb-2" style={{ fontFamily: 'Space Grotesk' }}>{v.title}</h3>
+                <h3 className="font-heading font-semibold text-white mb-2">{v.title}</h3>
                 <p className="text-sm text-slate-400 leading-relaxed">{v.description}</p>
               </motion.div>
             ))}
@@ -242,7 +241,7 @@ export default function AboutPage() {
             <div className="absolute inset-0 bg-gradient-to-br from-blue-600/8 to-violet-600/8" />
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
             <div className="relative z-10">
-              <h2 className="text-4xl font-extrabold text-white mb-4" style={{ fontFamily: 'Space Grotesk' }}>
+              <h2 className="font-heading text-4xl font-extrabold text-white mb-4">
                 Join the Network
               </h2>
               <p className="text-slate-400 mb-8">

@@ -15,6 +15,8 @@ import {
   TrendingUp,
   Split,
   ChevronRight,
+  Shield,
+  Cpu,
 } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -36,8 +38,8 @@ const HOW_IT_WORKS = [
 const DIFFERENTIATORS = [
   {
     icon: Split,
-    title: 'Multi-Layer Execution',
-    body: "When a connected app sends a task, AmarktAI doesn't rely on a single model. It fans out across multiple intelligence layers simultaneously, then synthesizes the strongest output.",
+    title: 'Multi-Model Orchestration',
+    body: "When a connected app sends a task, AmarktAI doesn't rely on a single model. It orchestrates across multiple AI providers simultaneously, synthesises the strongest result, and discards weaker outputs — automatically.",
     accent: 'from-blue-500/20 to-cyan-500/10',
     glow: 'hover:shadow-blue-500/10',
     border: 'hover:border-blue-500/30',
@@ -46,8 +48,8 @@ const DIFFERENTIATORS = [
   },
   {
     icon: GitBranch,
-    title: 'Adaptive Execution Routing',
-    body: 'AmarktAI selects which layers to activate based on task complexity. Simple requests route fast. Complex tasks trigger full multi-layer orchestration for maximum output quality.',
+    title: 'App-Aware Intelligence',
+    body: 'Every connected app has its own profile, context, and instructions inside AmarktAI. The system knows which app is sending each request and adapts execution — routing, model selection, and output format — accordingly.',
     accent: 'from-violet-500/20 to-purple-500/10',
     glow: 'hover:shadow-violet-500/10',
     border: 'hover:border-violet-500/30',
@@ -55,9 +57,19 @@ const DIFFERENTIATORS = [
     iconBg: 'bg-violet-500/10',
   },
   {
+    icon: Cpu,
+    title: 'Centralised AI Control',
+    body: 'One dashboard. Every provider, every model, every app request — monitored and controlled from a single pane. No fragmented API keys scattered across apps. One intelligence layer, centralised authority.',
+    accent: 'from-cyan-500/20 to-teal-500/10',
+    glow: 'hover:shadow-cyan-500/10',
+    border: 'hover:border-cyan-500/30',
+    iconColor: 'text-cyan-400',
+    iconBg: 'bg-cyan-500/10',
+  },
+  {
     icon: TrendingUp,
-    title: 'Continuous Improvement',
-    body: 'Every execution updates the shared context layer. AmarktAI grows more precise with each interaction across the entire ecosystem of connected apps.',
+    title: 'Self-Improving Execution',
+    body: 'Every execution feeds back into the shared context layer. Confidence scores, execution paths, and outcome signals accumulate — AmarktAI grows more precise with each request across every connected app.',
     accent: 'from-teal-500/20 to-cyan-500/10',
     glow: 'hover:shadow-teal-500/10',
     border: 'hover:border-teal-500/30',
@@ -65,9 +77,19 @@ const DIFFERENTIATORS = [
     iconBg: 'bg-teal-500/10',
   },
   {
+    icon: Shield,
+    title: 'Self-Healing Architecture',
+    body: 'If a provider goes down or degrades, AmarktAI detects it, reroutes automatically, and continues execution without disruption. No manual failover. The system corrects itself.',
+    accent: 'from-emerald-500/20 to-teal-500/10',
+    glow: 'hover:shadow-emerald-500/10',
+    border: 'hover:border-emerald-500/30',
+    iconColor: 'text-emerald-400',
+    iconBg: 'bg-emerald-500/10',
+  },
+  {
     icon: Network,
-    title: 'Ecosystem Intelligence',
-    body: "Intelligence doesn't stay in one app. Insights and context flow across the entire connected ecosystem — every app gets smarter as the network grows.",
+    title: 'Ecosystem-Wide Intelligence',
+    body: "Intelligence doesn't stay siloed in one app. Context, patterns, and knowledge propagate across every connected app in the ecosystem — each new app makes the entire network smarter.",
     accent: 'from-purple-500/20 to-violet-500/10',
     glow: 'hover:shadow-purple-500/10',
     border: 'hover:border-purple-500/30',
@@ -195,7 +217,7 @@ export default function HomePage() {
               className="flex flex-wrap items-center justify-center gap-6 pt-4"
             >
               {[
-                { value: '6', label: 'AI Providers' },
+                { value: 'Multi-Model', label: 'Orchestration' },
                 { value: '5+', label: 'Connected Apps' },
                 { value: '∞', label: 'Execution Paths' },
               ].map((stat) => (
@@ -237,7 +259,7 @@ export default function HomePage() {
                 How <span className="text-white">Amarkt</span><span className="text-blue-400">AI</span> Works
               </h2>
               <p className="text-slate-400 mt-4 max-w-xl mx-auto text-sm leading-relaxed">
-                Every connected app sends tasks to AmarktAI. The system analyzes, routes, executes, and returns the best possible result — automatically.
+                Every connected app sends tasks to AmarktAI. The system analyzes, routes, executes across multiple models, and returns the best possible result — automatically.
               </p>
             </FadeUp>
 
@@ -247,10 +269,18 @@ export default function HomePage() {
                 <div key={step.label} className="flex flex-col md:flex-row items-center gap-3 md:gap-0">
                   <FadeUp delay={i * 0.1} className="flex flex-col items-center">
                     {/* Step card */}
-                    <div className={`relative flex flex-col items-center gap-3 p-5 rounded-2xl glass-card ring-1 ${step.ring} w-[140px]`}>
-                      <div className={`p-3 rounded-xl ${step.bg}`}>
+                    <motion.div
+                      whileHover={{ scale: 1.06, y: -4 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      className={`relative flex flex-col items-center gap-3 p-6 rounded-2xl glass-card ring-1 ${step.ring} w-[160px]`}
+                    >
+                      <motion.div
+                        animate={{ scale: [1, 1.08, 1] }}
+                        transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.4, ease: 'easeInOut' }}
+                        className={`p-3.5 rounded-xl ${step.bg}`}
+                      >
                         <step.icon className={`w-6 h-6 ${step.color}`} strokeWidth={1.5} />
-                      </div>
+                      </motion.div>
                       <p className="text-xs text-center text-slate-300 leading-snug font-medium">
                         {step.label}
                       </p>
@@ -258,7 +288,7 @@ export default function HomePage() {
                       <span className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-[#050816] border border-slate-700 text-[10px] text-slate-500 font-mono flex items-center justify-center">
                         {i + 1}
                       </span>
-                    </div>
+                    </motion.div>
                   </FadeUp>
 
                   {/* Arrow between steps */}
@@ -275,6 +305,20 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+
+            {/* Supporting quote */}
+            <FadeUp delay={0.6} className="mt-20 text-center">
+              <blockquote className="max-w-2xl mx-auto">
+                <p className="text-lg md:text-xl text-slate-300 font-heading leading-relaxed italic">
+                  &ldquo;AmarktAI doesn&apos;t just answer questions. It routes, validates, synthesises, and delivers — across every layer of intelligence, for every connected app.&rdquo;
+                </p>
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <span className="w-8 h-px bg-blue-500/50" />
+                  <span className="text-xs text-slate-500 font-mono tracking-widest uppercase">Multi-Model · Adaptive · Always On</span>
+                  <span className="w-8 h-px bg-blue-500/50" />
+                </div>
+              </blockquote>
+            </FadeUp>
           </div>
         </section>
 
@@ -295,9 +339,9 @@ export default function HomePage() {
               </h2>
             </FadeUp>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {DIFFERENTIATORS.map((card, i) => (
-                <FadeUp key={card.title} delay={i * 0.12}>
+                <FadeUp key={card.title} delay={i * 0.08}>
                   <div
                     className={`relative h-full glass-card rounded-2xl p-8 border border-slate-700/40 ${card.border} shadow-xl ${card.glow} hover:shadow-2xl transition-all duration-400 group overflow-hidden`}
                   >

@@ -87,6 +87,21 @@ export default function ApiKeysPage() {
         </button>
       </div>
 
+      {/* Clarifying note */}
+      <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl px-5 py-4 flex items-start gap-3">
+        <Key className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm text-violet-300 font-medium">This page is for third-party service credentials</p>
+          <p className="text-xs text-slate-500 mt-1">
+            Store credentials for external services used by the platform (e.g. Resend, Stripe, SendGrid, Twilio).
+            For <strong className="text-slate-400">AI provider keys</strong> (OpenAI, Gemini, Grok, etc.), go to{' '}
+            <a href="/admin/dashboard/ai-providers" className="text-violet-400 hover:text-violet-300 underline underline-offset-2">
+              AI Providers
+            </a>.
+          </p>
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex justify-center h-40 items-center">
           <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />

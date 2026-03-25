@@ -27,7 +27,7 @@ export default function MetricCard({ label, value, change, icon, className, suff
       </div>
       <div className="flex items-end justify-between relative z-10">
         <div>
-          <span className="text-2xl font-bold text-white" style={{ fontFamily: 'Space Grotesk' }}>
+          <span className="font-heading text-2xl font-bold text-white">
             {value}
           </span>
           {suffix && <span className="text-sm text-slate-400 ml-1">{suffix}</span>}

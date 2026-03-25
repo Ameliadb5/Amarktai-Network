@@ -100,8 +100,7 @@ export default function ContactPage() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08 }}
-            className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] mb-5 tracking-tight"
-            style={{ fontFamily: 'Space Grotesk' }}
+            className="font-heading text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] mb-5 tracking-tight"
           >
             <span className="text-white">Start the</span>{' '}
             <span className="gradient-text">Conversation</span>
@@ -135,7 +134,7 @@ export default function ContactPage() {
                 <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto mb-6">
                   <CheckCircle className="w-8 h-8 text-emerald-400" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: 'Space Grotesk' }}>
+                <h2 className="font-heading text-2xl font-bold text-white mb-3">
                   {isWaitlist ? "You're on the List" : "Message Sent"}
                 </h2>
                 <p className="text-slate-400 mb-8">
@@ -156,7 +155,7 @@ export default function ContactPage() {
                 <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-violet-500/20 to-transparent" />
 
                 <div className="mb-8">
-                  <h2 className="text-xl font-bold text-white mb-1" style={{ fontFamily: 'Space Grotesk' }}>Send us a message</h2>
+                  <h2 className="font-heading text-xl font-bold text-white mb-1">Send us a message</h2>
                   <p className="text-sm text-slate-500">We respond to every enquiry within 24 hours.</p>
                 </div>
 

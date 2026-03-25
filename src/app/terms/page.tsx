@@ -132,7 +132,7 @@ export default function TermsPage() {
             <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
             <span className="text-[11px] font-bold text-violet-400 uppercase tracking-[0.18em]">Legal</span>
           </div>
-          <h1 className="text-5xl md:text-6xl font-black mb-5 tracking-tight" style={{ fontFamily: 'Space Grotesk' }}>
+          <h1 className="font-heading text-5xl md:text-6xl font-black mb-5 tracking-tight">
             Terms of <span className="gradient-text">Service</span>
           </h1>
           <p className="text-blue-100/50 text-lg leading-relaxed mb-4">
@@ -162,7 +162,7 @@ export default function TermsPage() {
                 key={section.title}
                 className="glass-card rounded-2xl border border-white/[0.07] p-8 hover:border-violet-500/15 transition-colors duration-300"
               >
-                <h2 className="text-lg font-bold text-white mb-4" style={{ fontFamily: 'Space Grotesk' }}>
+                <h2 className="font-heading text-lg font-bold text-white mb-4">
                   {section.title}
                 </h2>
                 <div className="text-blue-100/55 text-sm leading-relaxed whitespace-pre-line">

@@ -238,7 +238,7 @@ export default function Header() {
                   <Lock className="w-4 h-4 text-violet-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white" style={{ fontFamily: 'Space Grotesk' }}>
+                  <p className="font-heading text-sm font-semibold text-white">
                     Access path revealed
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">Administrative portal is now visible in navigation.</p>

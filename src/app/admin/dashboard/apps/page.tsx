@@ -245,6 +245,9 @@ function AddAppDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
             <label className="block text-xs text-slate-400 mb-1.5">Slug *</label>
             <input value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))} placeholder="e.g. amarktai-marketing"
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 font-mono" />
+            <p className="text-[11px] text-slate-600 mt-1">
+              A slug is a unique, URL-safe identifier for this app (lowercase, hyphens only). AmarktAI uses the slug to route requests and tag events to the correct app. Example: <span className="font-mono text-slate-500">amarktai-marketing</span>
+            </p>
           </div>
           <div>
             <label className="block text-xs text-slate-400 mb-1.5">Category</label>
