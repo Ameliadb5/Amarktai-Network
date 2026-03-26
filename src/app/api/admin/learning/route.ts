@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import {
+  getLearningStatus,
+  getProviderPerformance,
+  generateInsights,
+  getEcosystemLearningState,
+} from '@/lib/learning-engine'
 
 /**
  * GET /api/admin/learning
  *
- * Returns paginated memory entries for the "What AmarktAI Learned" dashboard.
+ * Returns paginated memory entries + learning engine status.
  * Query params:
- *   page  (default 1)
- *   limit (default 20, max 100)
- *   type  (optional — filter by memoryType)
- *   app   (optional — filter by appSlug)
+ *   page    (default 1)
+ *   limit   (default 20, max 100)
+ *   type    (optional — filter by memoryType)
+ *   app     (optional — filter by appSlug)
+ *   view    (optional — 'status' | 'insights' | 'performance' | 'ecosystem')
  */
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -19,6 +26,28 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url)
+  const view = searchParams.get('view')
+
+  // Specialised views from the learning engine
+  if (view === 'status') {
+    const status = await getLearningStatus()
+    return NextResponse.json(status)
+  }
+  if (view === 'insights') {
+    const insights = await generateInsights()
+    return NextResponse.json({ insights })
+  }
+  if (view === 'performance') {
+    const provider = searchParams.get('provider') ?? undefined
+    const performance = await getProviderPerformance(provider)
+    return NextResponse.json({ performance })
+  }
+  if (view === 'ecosystem') {
+    const ecosystem = await getEcosystemLearningState()
+    return NextResponse.json(ecosystem)
+  }
+
+  // Default: paginated memory entries (backwards-compatible)
   const page  = Math.max(1, parseInt(searchParams.get('page')  ?? '1'))
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20')))
   const type  = searchParams.get('type') ?? undefined

@@ -7,7 +7,9 @@ import {
   type BrainResponse,
 } from '@/lib/brain'
 import { orchestrate } from '@/lib/orchestrator'
-import { saveMemory, retrieveMemory } from '@/lib/memory'
+import { saveMemory } from '@/lib/memory'
+import { retrieve } from '@/lib/retrieval-engine'
+import { logRouteOutcome } from '@/lib/learning-engine'
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -92,17 +94,27 @@ export async function POST(request: NextRequest) {
 
   const { app } = auth
 
-  // ── Retrieve relevant memory context ─────────────────────────────────
-  const memoryEntries = await retrieveMemory(app.slug, 5)
-  const memoryUsed = memoryEntries.length > 0
-
-  // Build context prefix if memories exist
-  const memoryContext = memoryEntries.length > 0
-    ? `[Context from previous interactions with ${app.name}]\n${memoryEntries.map(m => `- ${m.content}`).join('\n')}\n\n`
-    : ''
+  // ── Retrieve relevant memory context via retrieval-engine ──────────
+  let memoryUsed = false
+  let memoryContext = ''
+  try {
+    const retrievalResult = await retrieve({
+      appSlug: app.slug,
+      query: body.message,
+      maxResults: 5,
+      includeGlobal: true,
+    })
+    memoryUsed = retrievalResult.entries.length > 0
+    if (retrievalResult.entries.length > 0) {
+      memoryContext = `[Context from previous interactions with ${app.name}]\n${retrievalResult.entries.map(m => `- ${m.content}`).join('\n')}\n\n`
+    }
+  } catch {
+    // Retrieval engine unavailable — proceed without context
+  }
 
   // ── Orchestrate ───────────────────────────────────────────────────────
   const result = await orchestrate({
+    appSlug: app.slug,
     appCategory: app.category,
     taskType: body.taskType,
     message: memoryContext + body.message,
@@ -150,6 +162,20 @@ export async function POST(request: NextRequest) {
       ttlDays:    90,
     })
   }
+
+  // ── Log route outcome for learning engine ─────────────────────────────
+  await logRouteOutcome({
+    appSlug: app.slug,
+    taskType: body.taskType,
+    executionMode: result.executionMode,
+    providerKey: result.routedProvider ?? 'none',
+    model: result.routedModel ?? 'none',
+    success,
+    latencyMs,
+    confidenceScore: result.confidenceScore,
+    fallbackUsed: result.fallbackUsed,
+    validationPassed: result.validationUsed ? !result.warnings.some(w => w.includes('Validator flagged')) : null,
+  })
 
   const response: BrainResponse = {
     success,

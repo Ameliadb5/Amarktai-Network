@@ -4,11 +4,24 @@
  * Single source of truth for:
  *   - Task classification (complexity, execution mode, validation flags)
  *   - Specialist profile mapping (per app category)
- *   - Decision engine (which mode, provider, model; confidence scoring)
- *   - Execution engine (direct / specialist / review / consensus)
+ *   - Unified execution engine (delegates to routing-engine, agent-runtime,
+ *     retrieval-engine, multimodal-router)
+ *   - Confidence scoring
  *
  * Called exclusively by the Brain Gateway (/api/brain/request).
  * Server-side only. Never import from client components.
+ *
+ * ROUTING FLOW (unified):
+ *   classifyTask() → routing-engine.routeRequest() → mode-specific execution
+ *
+ * Supported modes:
+ *   - direct / specialist  → single model call
+ *   - review               → primary + validator
+ *   - consensus             → two independent generations
+ *   - retrieval_chain       → retrieval-engine → model
+ *   - agent_chain           → agent-runtime → model(s)
+ *   - multimodal_chain      → multimodal-router
+ *   - premium_escalation    → escalated model call
  *
  * CONFIDENCE SCORING LOGIC (heuristic, truthful, explainable):
  *   - Base: 0.70 for any routed provider
@@ -22,6 +35,11 @@
 
 import { callProvider, type ProviderCallResult } from '@/lib/brain'
 import { prisma } from '@/lib/prisma'
+import { getDefaultModelForProvider } from '@/lib/model-registry'
+import { routeRequest, type RoutingDecision } from '@/lib/routing-engine'
+import { createAgentTask, executeAgent, handoffTask, isAgentPermitted } from '@/lib/agent-runtime'
+import { retrieve, type RetrievalResult } from '@/lib/retrieval-engine'
+import { generateContent, type MultimodalResult } from '@/lib/multimodal-router'
 
 // Consensus synthesizer: prefer longer response if it exceeds primary by this ratio
 const CONSENSUS_LENGTH_RATIO_THRESHOLD = 1.2
@@ -31,7 +49,15 @@ const CONSENSUS_LENGTH_DIFF_THRESHOLD = 200
 // ── Classification ────────────────────────────────────────────────────────────
 
 export type TaskComplexity = 'simple' | 'moderate' | 'complex'
-export type ExecutionMode = 'direct' | 'specialist' | 'review' | 'consensus'
+export type ExecutionMode =
+  | 'direct'
+  | 'specialist'
+  | 'review'
+  | 'consensus'
+  | 'retrieval_chain'
+  | 'agent_chain'
+  | 'multimodal_chain'
+  | 'premium_escalation'
 
 export interface ClassificationResult {
   taskComplexity: TaskComplexity
@@ -157,21 +183,21 @@ interface AvailableProvider {
   isHealthy: boolean
 }
 
+/**
+ * Resolve the default model for a provider.
+ *
+ * Delegates to the canonical model registry to avoid duplicate
+ * switch-statements scattered across the codebase.
+ */
 function defaultModelFor(providerKey: string): string {
-  switch (providerKey) {
-    case 'openai':      return 'gpt-4o-mini'
-    case 'groq':        return 'llama-3.3-70b-versatile'
-    case 'deepseek':    return 'deepseek-chat'
-    case 'openrouter':  return 'openai/gpt-4o-mini'
-    case 'together':    return 'meta-llama/Llama-3-70b-chat-hf'
-    case 'gemini':      return 'gemini-1.5-flash'
-    case 'grok':        return 'grok-2-latest'
-    case 'huggingface': return 'meta-llama/Llama-3-8b-chat-hf'
-    case 'nvidia':      return 'nvidia/llama-3.1-nemotron-70b-instruct'
-    default:            return 'unknown'
-  }
+  return getDefaultModelForProvider(providerKey)
 }
 
+/**
+ * Load available providers from the DB for fallback/validation use.
+ * Used only as a secondary source when the routing engine's model-based
+ * decisions need to be verified against actual DB state.
+ */
 async function loadAvailableProviders(): Promise<AvailableProvider[]> {
   const providers = await prisma.aiProvider.findMany({
     where: { enabled: true, healthStatus: { notIn: ['disabled', 'error'] } },
@@ -189,25 +215,7 @@ async function loadAvailableProviders(): Promise<AvailableProvider[]> {
     }))
 }
 
-function buildPreferenceOrder(appCategory: string): string[] {
-  const cat = (appCategory ?? '').toLowerCase()
-  // Financial/trading: prefer low-latency and reasoning-strong providers
-  if (cat.includes('crypto') || cat.includes('finance') || cat.includes('forex') || cat.includes('trading')) {
-    return ['openai', 'groq', 'deepseek', 'grok', 'gemini', 'openrouter', 'together', 'huggingface', 'nvidia']
-  }
-  // Family/equine: prefer general-purpose + fast providers
-  if (cat.includes('equine') || cat.includes('horse') || cat.includes('family')) {
-    return ['openai', 'groq', 'gemini', 'grok', 'together', 'huggingface', 'openrouter', 'nvidia', 'deepseek']
-  }
-  // Marketing/content: prefer creative-strong providers
-  if (cat.includes('marketing') || cat.includes('content')) {
-    return ['gemini', 'openai', 'groq', 'grok', 'openrouter', 'together', 'huggingface', 'nvidia', 'deepseek']
-  }
-  // Default: OpenAI first, then fast/cheap alternatives
-  return ['openai', 'groq', 'deepseek', 'gemini', 'grok', 'openrouter', 'together', 'huggingface', 'nvidia']
-}
-
-// ── Decision Engine ───────────────────────────────────────────────────────────
+// ── Decision Engine (delegates to routing-engine) ─────────────────────────────
 
 export interface DecisionResult {
   executionMode: ExecutionMode
@@ -217,23 +225,114 @@ export interface DecisionResult {
   fallbackUsed: boolean
   reason: string
   warnings: string[]
+  /** The raw routing-engine decision (for traceability). */
+  routingDecision?: RoutingDecision
 }
 
 /**
- * Decision engine: given classification + available providers, decide:
- * - which execution mode to use
- * - which primary provider/model
- * - which secondary provider (for review/consensus)
- * - whether fallback is eligible
- *
- * May downgrade executionMode if insufficient providers are available.
+ * Detect whether the task has multimodal markers (creative, marketing, etc.).
  */
-export function decideExecution(
+function detectMultimodal(appCategory: string, taskType: string): boolean {
+  const cat = appCategory.toLowerCase()
+  const task = taskType.toLowerCase()
+  // Marketing / content creation categories
+  if (cat.includes('marketing') || cat.includes('content') || cat.includes('creative')) {
+    if (task.includes('campaign') || task.includes('ad') || task.includes('image') ||
+        task.includes('video') || task.includes('reel') || task.includes('brand') ||
+        task.includes('calendar') || task.includes('social') || task.includes('caption')) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Detect whether the task may benefit from retrieval-augmented generation.
+ */
+function detectRetrieval(taskType: string, message: string): boolean {
+  const task = taskType.toLowerCase()
+  // Explicit retrieval signals
+  if (task.includes('recall') || task.includes('history') || task.includes('context') ||
+      task.includes('previous') || task.includes('retrieval') || task.includes('memory')) {
+    return true
+  }
+  // Message-based heuristic: "remember", "last time", "previously"
+  const msg = message.toLowerCase()
+  if (msg.includes('remember') || msg.includes('last time') || msg.includes('previously') ||
+      msg.includes('recall') || msg.includes('past conversation')) {
+    return true
+  }
+  return false
+}
+
+/**
+ * Decision engine: given classification + context, uses the routing-engine
+ * as the single source of truth for model/provider selection.
+ *
+ * Falls back to DB-based provider lookup when the routing engine has no models.
+ */
+export async function decideExecution(
   classification: ClassificationResult,
   available: AvailableProvider[],
-): DecisionResult {
+  appSlug?: string,
+): Promise<DecisionResult> {
   const warnings: string[] = []
 
+  // Use the routing engine to make the model selection decision
+  const routingCtx = {
+    appSlug: appSlug ?? 'unknown',
+    appCategory: classification.appCategory,
+    taskType: classification.taskType,
+    taskComplexity: classification.taskComplexity,
+    message: '',
+    requiresRetrieval: false,
+    requiresMultimodal: false,
+  }
+  const routingDecision = routeRequest(routingCtx)
+
+  if (routingDecision.primaryModel) {
+    // Convert routing-engine's ModelEntry to AvailableProvider format
+    const primary: AvailableProvider = {
+      providerKey: routingDecision.primaryModel.provider,
+      model: routingDecision.primaryModel.model_id,
+      healthStatus: routingDecision.primaryModel.health_status,
+      isHealthy: routingDecision.primaryModel.health_status === 'healthy' || routingDecision.primaryModel.health_status === 'configured',
+    }
+    const secondary = routingDecision.secondaryModel
+      ? {
+          providerKey: routingDecision.secondaryModel.provider,
+          model: routingDecision.secondaryModel.model_id,
+          healthStatus: routingDecision.secondaryModel.health_status,
+          isHealthy: routingDecision.secondaryModel.health_status === 'healthy' || routingDecision.secondaryModel.health_status === 'configured',
+        }
+      : null
+
+    // Map routing mode to execution mode
+    let executionMode: ExecutionMode = routingDecision.mode as ExecutionMode
+
+    // Validate secondary provider availability for review/consensus
+    if ((executionMode === 'review' || executionMode === 'consensus') && !secondary) {
+      executionMode = 'specialist'
+      warnings.push(
+        `${routingDecision.mode} mode requires 2 providers — only 1 available; downgraded to specialist mode`,
+      )
+    }
+
+    warnings.push(...routingDecision.warnings)
+
+    return {
+      executionMode,
+      primaryProvider: primary,
+      secondaryProvider: secondary,
+      fallbackEligible: routingDecision.fallbackModels.length > 0,
+      fallbackUsed: false,
+      reason: routingDecision.reason,
+      warnings,
+      routingDecision,
+    }
+  }
+
+  // Fallback: routing engine had no models — use DB-loaded providers
   if (available.length === 0) {
     return {
       executionMode: 'direct',
@@ -246,29 +345,15 @@ export function decideExecution(
     }
   }
 
-  const preferenceOrder = buildPreferenceOrder(classification.appCategory)
-  const preferred = preferenceOrder
-    .map(key => available.find(p => p.providerKey === key))
-    .filter((p): p is AvailableProvider => p !== undefined)
+  warnings.push('Routing engine returned no eligible models — falling back to DB provider list')
 
-  const orderedProviders = preferred.length > 0 ? preferred : available
-
-  const primaryProvider = orderedProviders[0]
-  const isFirstChoice = primaryProvider.providerKey === preferenceOrder[0]
-  const fallbackUsed = !isFirstChoice
-
-  if (fallbackUsed) {
-    warnings.push(`Primary provider unavailable — routed via fallback (${primaryProvider.providerKey})`)
-  }
-
-  // Determine if a second provider is available for review/consensus
+  const primaryProvider = available[0]
   let secondaryProvider: AvailableProvider | null = null
-  let executionMode = classification.executionMode
+  let executionMode: ExecutionMode = classification.executionMode
 
   if (executionMode === 'review' || executionMode === 'consensus') {
-    secondaryProvider = orderedProviders.find(p => p.providerKey !== primaryProvider.providerKey) ?? null
+    secondaryProvider = available.find(p => p.providerKey !== primaryProvider.providerKey) ?? null
     if (!secondaryProvider) {
-      // Downgrade: can't do multi-provider without a second provider
       executionMode = 'specialist'
       warnings.push(
         `${classification.executionMode} mode requires 2 providers — only 1 available; downgraded to specialist mode`,
@@ -276,17 +361,13 @@ export function decideExecution(
     }
   }
 
-  const reason = fallbackUsed
-    ? `Fallback to ${primaryProvider.providerKey} — preferred providers unavailable`
-    : `Routed via ${classification.appCategory || 'generic'} policy → ${primaryProvider.providerKey}`
-
   return {
     executionMode,
     primaryProvider,
     secondaryProvider,
     fallbackEligible: available.length > 1,
-    fallbackUsed,
-    reason,
+    fallbackUsed: false,
+    reason: `Fallback to DB providers — routed via ${primaryProvider.providerKey}`,
     warnings,
   }
 }
@@ -337,30 +418,61 @@ export interface OrchestrationResult {
 
 /**
  * Main orchestration entry point.
- * Classifies the task, runs the decision engine, executes in the decided mode.
+ *
+ * Classifies the task, delegates to the routing-engine for model selection,
+ * then executes in the decided mode — including new modes for agent chains,
+ * retrieval chains, multimodal chains, and premium escalation.
  */
 export async function orchestrate(opts: {
+  appSlug?: string
   appCategory: string
   taskType: string
   message: string
 }): Promise<OrchestrationResult> {
   const start = Date.now()
-  const { appCategory, taskType, message } = opts
+  const { appSlug, appCategory, taskType, message } = opts
 
   // 1. Classify
   const classification = classifyTask(appCategory, taskType, message)
 
-  // 2. Load providers
+  // 2. Build routing context with signal detection
+  const isMultimodal = detectMultimodal(appCategory, taskType)
+  const isRetrieval = detectRetrieval(taskType, message)
+
+  const routingCtx = {
+    appSlug: appSlug ?? 'unknown',
+    appCategory: classification.appCategory,
+    taskType: classification.taskType,
+    taskComplexity: classification.taskComplexity,
+    message,
+    requiresRetrieval: isRetrieval,
+    requiresMultimodal: isMultimodal,
+  }
+
+  // 3. Route via the routing-engine (single source of truth)
+  const routingDecision = routeRequest(routingCtx)
+
+  // 4. Also load DB providers for fallback
   const available = await loadAvailableProviders()
 
-  // 3. Decide
-  const decision = decideExecution(classification, available)
+  // 5. Build decision from routing-engine result
+  const decision = await decideExecution(classification, available, appSlug)
 
-  // 4. No providers at all
+  // Override the execution mode with the routing engine's mode when it returns valid models
+  let effectiveMode: ExecutionMode = decision.executionMode
+  if (routingDecision.primaryModel) {
+    effectiveMode = routingDecision.mode as ExecutionMode
+    // But still respect downgrade for review/consensus without secondary
+    if ((effectiveMode === 'review' || effectiveMode === 'consensus') && !decision.secondaryProvider) {
+      effectiveMode = 'specialist'
+    }
+  }
+
+  // 6. No providers at all
   if (!decision.primaryProvider) {
     return {
       output: null,
-      executionMode: decision.executionMode,
+      executionMode: effectiveMode,
       routedProvider: null,
       routedModel: null,
       confidenceScore: null,
@@ -375,17 +487,117 @@ export async function orchestrate(opts: {
     }
   }
 
-  // 5. Build specialist prompt
+  // 7. Build specialist prompt
   const systemProfile = getSpecialistProfile(classification.appCategory)
-  const specialistMessage = decision.executionMode === 'direct'
+  const specialistMessage = effectiveMode === 'direct'
     ? message
     : `${systemProfile}\n\n---\n\n${message}`
 
-  // 6. Execute
+  // 8. Execute based on the resolved mode
   const warnings = [...decision.warnings]
   const errors: string[] = []
 
-  switch (decision.executionMode) {
+  switch (effectiveMode) {
+    // ── Agent Chain ─────────────────────────────────────────────────────
+    case 'agent_chain': {
+      return await executeAgentChain({
+        appSlug: appSlug ?? 'unknown',
+        message,
+        start,
+        classification,
+        decision,
+        warnings,
+      })
+    }
+
+    // ── Retrieval Chain ─────────────────────────────────────────────────
+    case 'retrieval_chain': {
+      return await executeRetrievalChain({
+        appSlug: appSlug ?? 'unknown',
+        message,
+        specialistMessage,
+        start,
+        classification,
+        decision,
+        warnings,
+      })
+    }
+
+    // ── Multimodal Chain ────────────────────────────────────────────────
+    case 'multimodal_chain': {
+      return await executeMultimodalChain({
+        appSlug: appSlug ?? 'unknown',
+        appCategory,
+        taskType,
+        message,
+        start,
+        classification,
+        decision,
+        warnings,
+      })
+    }
+
+    // ── Premium Escalation ──────────────────────────────────────────────
+    case 'premium_escalation': {
+      const result = await callProvider(
+        decision.primaryProvider.providerKey,
+        decision.primaryProvider.model,
+        specialistMessage,
+      )
+      if (!result.ok) {
+        errors.push(result.error ?? 'Premium escalation provider call failed')
+        // Try fallback from routing decision
+        if (routingDecision.fallbackModels.length > 0) {
+          const fb = routingDecision.fallbackModels[0]
+          warnings.push(`Premium escalation failed — attempting fallback to ${fb.provider}/${fb.model_id}`)
+          const fallback = await callProvider(fb.provider, fb.model_id, specialistMessage)
+          if (fallback.ok) {
+            const confidence = computeConfidenceScore({
+              primaryProvider: { ...decision.primaryProvider, providerKey: fb.provider, isHealthy: true, healthStatus: 'configured', model: fb.model_id },
+              fallbackUsed: true,
+              validationPassed: null,
+              warnings,
+            })
+            return {
+              output: fallback.output,
+              executionMode: 'premium_escalation',
+              routedProvider: fallback.providerKey,
+              routedModel: fallback.model,
+              confidenceScore: confidence,
+              validationUsed: false,
+              consensusUsed: false,
+              fallbackUsed: true,
+              memoryUsed: false,
+              warnings,
+              errors,
+              latencyMs: Date.now() - start,
+              classification,
+            }
+          }
+          errors.push(fallback.error ?? 'Fallback also failed')
+        }
+      }
+      const confidence = result.ok
+        ? computeConfidenceScore({ primaryProvider: decision.primaryProvider, fallbackUsed: false, validationPassed: null, warnings })
+        : null
+      return {
+        output: result.output,
+        executionMode: 'premium_escalation',
+        routedProvider: result.providerKey,
+        routedModel: result.model,
+        confidenceScore: confidence,
+        validationUsed: false,
+        consensusUsed: false,
+        fallbackUsed: false,
+        memoryUsed: false,
+        warnings,
+        errors,
+        latencyMs: Date.now() - start,
+        classification,
+      }
+    }
+
+    // ── Direct / Specialist ─────────────────────────────────────────────
     case 'direct':
     case 'specialist': {
       const result = await callProvider(
@@ -624,7 +836,7 @@ export async function orchestrate(opts: {
     default:
       return {
         output: null,
-        executionMode: classification.executionMode,
+        executionMode: classification.executionMode as ExecutionMode,
         routedProvider: null,
         routedModel: null,
         confidenceScore: null,
@@ -638,4 +850,361 @@ export async function orchestrate(opts: {
         classification,
       }
   }
+}
+
+// ── Agent Chain Execution ─────────────────────────────────────────────────────
+
+async function executeAgentChain(opts: {
+  appSlug: string
+  message: string
+  start: number
+  classification: ClassificationResult
+  decision: DecisionResult
+  warnings: string[]
+}): Promise<OrchestrationResult> {
+  const { appSlug, message, start, classification, decision, warnings } = opts
+  const errors: string[] = []
+
+  try {
+    // Step 1: Planner agent decomposes the task
+    if (!isAgentPermitted('planner', appSlug)) {
+      warnings.push('App does not have planner agent permission — falling back to specialist mode')
+      // Fallback to specialist execution
+      const result = await callProvider(
+        decision.primaryProvider!.providerKey,
+        decision.primaryProvider!.model,
+        message,
+      )
+      return {
+        output: result.output,
+        executionMode: 'agent_chain',
+        routedProvider: result.providerKey,
+        routedModel: result.model,
+        confidenceScore: result.ok ? 0.60 : null,
+        validationUsed: false,
+        consensusUsed: false,
+        fallbackUsed: false,
+        memoryUsed: false,
+        warnings,
+        errors: result.ok ? [] : [result.error ?? 'Provider call failed'],
+        latencyMs: Date.now() - start,
+        classification,
+      }
+    }
+
+    // Execute the planner agent
+    const plannerTask = createAgentTask('planner', appSlug, {
+      message: `Plan the following task: ${message}`,
+      context: { taskType: classification.taskType, complexity: classification.taskComplexity },
+    })
+    const plannerResult = await executeAgent(plannerTask)
+
+    if (plannerResult.status === 'failed') {
+      errors.push(`Planner agent failed: ${plannerResult.error}`)
+      // Fallback: use direct provider call instead
+      warnings.push('Agent chain planner failed — falling back to direct provider call')
+      const result = await callProvider(
+        decision.primaryProvider!.providerKey,
+        decision.primaryProvider!.model,
+        message,
+      )
+      return {
+        output: result.output,
+        executionMode: 'agent_chain',
+        routedProvider: result.providerKey,
+        routedModel: result.model,
+        confidenceScore: result.ok ? 0.50 : null,
+        validationUsed: false,
+        consensusUsed: false,
+        fallbackUsed: true,
+        memoryUsed: false,
+        warnings,
+        errors,
+        latencyMs: Date.now() - start,
+        classification,
+      }
+    }
+
+    // Step 2: Execute the task with planner output as context
+    const plannerOutput = plannerResult.output ?? message
+    const result = await callProvider(
+      decision.primaryProvider!.providerKey,
+      decision.primaryProvider!.model,
+      `[Agent Plan]\n${plannerOutput}\n\n[Execute the plan for this request]\n${message}`,
+    )
+
+    // Step 3: Validate if permitted
+    let validationPassed: boolean | null = null
+    if (isAgentPermitted('validator', appSlug) && result.ok) {
+      try {
+        // Hand off from planner to router (tracks lineage)
+        const routerTask = handoffTask(plannerTask, 'router')
+        await executeAgent(routerTask)
+
+        // Create and execute a validator task
+        const valTask = createAgentTask('validator', appSlug, {
+          message: `Validate the following response for quality and accuracy:\n\nOriginal request: ${message}\n\nResponse: ${result.output}`,
+          context: { parentOutput: plannerOutput },
+        })
+        const valResult = await executeAgent(valTask)
+        if (valResult.status === 'completed' && valResult.output) {
+          validationPassed = valResult.output.toUpperCase().includes('VALID')
+          if (!validationPassed) {
+            warnings.push('Agent validator flagged response quality — review recommended')
+          }
+        }
+      } catch {
+        warnings.push('Agent validation step failed — returning unvalidated response')
+      }
+    }
+
+    const confidence = result.ok
+      ? computeConfidenceScore({
+          primaryProvider: decision.primaryProvider!,
+          fallbackUsed: false,
+          validationPassed,
+          warnings,
+        })
+      : null
+
+    return {
+      output: result.output,
+      executionMode: 'agent_chain',
+      routedProvider: result.providerKey,
+      routedModel: result.model,
+      confidenceScore: confidence,
+      validationUsed: validationPassed !== null,
+      consensusUsed: false,
+      fallbackUsed: false,
+      memoryUsed: false,
+      warnings,
+      errors: result.ok ? errors : [...errors, result.error ?? 'Provider call failed'],
+      latencyMs: Date.now() - start,
+      classification,
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    errors.push(`Agent chain error: ${msg}`)
+    return {
+      output: null,
+      executionMode: 'agent_chain',
+      routedProvider: null,
+      routedModel: null,
+      confidenceScore: null,
+      validationUsed: false,
+      consensusUsed: false,
+      fallbackUsed: false,
+      memoryUsed: false,
+      warnings,
+      errors,
+      latencyMs: Date.now() - start,
+      classification,
+    }
+  }
+}
+
+// ── Retrieval Chain Execution ─────────────────────────────────────────────────
+
+async function executeRetrievalChain(opts: {
+  appSlug: string
+  message: string
+  specialistMessage: string
+  start: number
+  classification: ClassificationResult
+  decision: DecisionResult
+  warnings: string[]
+}): Promise<OrchestrationResult> {
+  const { appSlug, message, specialistMessage, start, classification, decision, warnings } = opts
+  const errors: string[] = []
+
+  try {
+    // Step 1: Retrieve relevant context using the retrieval engine
+    const retrievalResult: RetrievalResult = await retrieve({
+      appSlug,
+      query: message,
+      maxResults: 5,
+      includeGlobal: true,
+    })
+
+    const memoryUsed = retrievalResult.entries.length > 0
+
+    // Step 2: Build augmented message with retrieved context
+    let augmentedMessage = specialistMessage
+    if (retrievalResult.entries.length > 0) {
+      const contextBlock = retrievalResult.entries
+        .map(e => `[${e.source}/${e.memoryType}] (score: ${e.finalScore.toFixed(2)}) ${e.content}`)
+        .join('\n')
+      augmentedMessage = `[Retrieved Context — ${retrievalResult.entries.length} entries, ${retrievalResult.retrievalLatencyMs}ms]\n${contextBlock}\n\n---\n\n${specialistMessage}`
+    } else {
+      warnings.push('Retrieval chain: no relevant memories found — proceeding without augmentation')
+    }
+
+    // Step 3: Call the primary model with augmented context
+    const result = await callProvider(
+      decision.primaryProvider!.providerKey,
+      decision.primaryProvider!.model,
+      augmentedMessage,
+    )
+
+    if (!result.ok) {
+      errors.push(result.error ?? 'Retrieval chain provider call failed')
+    }
+
+    const confidence = result.ok
+      ? computeConfidenceScore({
+          primaryProvider: decision.primaryProvider!,
+          fallbackUsed: false,
+          validationPassed: null,
+          warnings,
+        })
+      : null
+
+    return {
+      output: result.output,
+      executionMode: 'retrieval_chain',
+      routedProvider: result.providerKey,
+      routedModel: result.model,
+      confidenceScore: confidence,
+      validationUsed: false,
+      consensusUsed: false,
+      fallbackUsed: false,
+      memoryUsed,
+      warnings,
+      errors,
+      latencyMs: Date.now() - start,
+      classification,
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    errors.push(`Retrieval chain error: ${msg}`)
+    // Fallback to non-retrieval call
+    warnings.push('Retrieval chain failed — falling back to direct call')
+    const result = await callProvider(
+      decision.primaryProvider!.providerKey,
+      decision.primaryProvider!.model,
+      specialistMessage,
+    )
+    return {
+      output: result.output,
+      executionMode: 'retrieval_chain',
+      routedProvider: result.providerKey,
+      routedModel: result.model,
+      confidenceScore: result.ok ? 0.55 : null,
+      validationUsed: false,
+      consensusUsed: false,
+      fallbackUsed: true,
+      memoryUsed: false,
+      warnings,
+      errors,
+      latencyMs: Date.now() - start,
+      classification,
+    }
+  }
+}
+
+// ── Multimodal Chain Execution ────────────────────────────────────────────────
+
+async function executeMultimodalChain(opts: {
+  appSlug: string
+  appCategory: string
+  taskType: string
+  message: string
+  start: number
+  classification: ClassificationResult
+  decision: DecisionResult
+  warnings: string[]
+}): Promise<OrchestrationResult> {
+  const { appSlug, taskType, message, start, classification, decision, warnings } = opts
+  const errors: string[] = []
+
+  try {
+    // Map task type to content type
+    const contentType = detectContentType(taskType)
+
+    const multimodalResult: MultimodalResult = await generateContent({
+      appSlug,
+      contentType,
+      prompt: message,
+      outputFormat: 'markdown',
+    })
+
+    if (!multimodalResult.success) {
+      errors.push(...multimodalResult.errors)
+      // Fallback to regular provider call
+      warnings.push('Multimodal chain failed — falling back to specialist call')
+      const result = await callProvider(
+        decision.primaryProvider!.providerKey,
+        decision.primaryProvider!.model,
+        message,
+      )
+      return {
+        output: result.output,
+        executionMode: 'multimodal_chain',
+        routedProvider: result.providerKey,
+        routedModel: result.model,
+        confidenceScore: result.ok ? 0.55 : null,
+        validationUsed: false,
+        consensusUsed: false,
+        fallbackUsed: true,
+        memoryUsed: multimodalResult.metadata.usedBrandMemory || multimodalResult.metadata.usedCampaignMemory,
+        warnings: [...warnings, ...multimodalResult.warnings],
+        errors,
+        latencyMs: Date.now() - start,
+        classification,
+      }
+    }
+
+    warnings.push(...multimodalResult.warnings)
+
+    return {
+      output: multimodalResult.output,
+      executionMode: 'multimodal_chain',
+      routedProvider: multimodalResult.metadata.providerUsed,
+      routedModel: multimodalResult.metadata.modelUsed,
+      confidenceScore: 0.80,
+      validationUsed: false,
+      consensusUsed: false,
+      fallbackUsed: false,
+      memoryUsed: multimodalResult.metadata.usedBrandMemory || multimodalResult.metadata.usedCampaignMemory,
+      warnings,
+      errors,
+      latencyMs: Date.now() - start,
+      classification,
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    errors.push(`Multimodal chain error: ${msg}`)
+    return {
+      output: null,
+      executionMode: 'multimodal_chain',
+      routedProvider: null,
+      routedModel: null,
+      confidenceScore: null,
+      validationUsed: false,
+      consensusUsed: false,
+      fallbackUsed: false,
+      memoryUsed: false,
+      warnings,
+      errors,
+      latencyMs: Date.now() - start,
+      classification,
+    }
+  }
+}
+
+/**
+ * Map a task type string to the most appropriate multimodal content type.
+ */
+function detectContentType(taskType: string): import('@/lib/multimodal-router').ContentType {
+  const t = taskType.toLowerCase()
+  if (t.includes('campaign')) return 'campaign_plan'
+  if (t.includes('ad') || t.includes('advert')) return 'ad_concept'
+  if (t.includes('image') || t.includes('visual')) return 'image_prompt'
+  if (t.includes('video')) return 'video_concept'
+  if (t.includes('reel') || t.includes('short')) return 'reel_concept'
+  if (t.includes('calendar') || t.includes('schedule')) return 'content_calendar'
+  if (t.includes('social') || t.includes('post')) return 'social_post'
+  if (t.includes('caption')) return 'caption'
+  if (t.includes('brand') || t.includes('voice')) return 'brand_voice'
+  return 'text'
 }

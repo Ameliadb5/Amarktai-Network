@@ -13,6 +13,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { timingSafeEqual } from 'crypto'
+import { getDefaultModelForProvider } from '@/lib/model-registry'
 
 // ── Request / Response Contracts ─────────────────────────────────────────────
 
@@ -115,19 +116,14 @@ export async function authenticateApp(appId: string, appSecret: string): Promise
 
 // ── Provider Abstraction ──────────────────────────────────────────────────────
 
+/**
+ * Resolve the default model for a provider.
+ *
+ * Delegates to the canonical model registry to avoid duplicate
+ * switch-statements scattered across the codebase.
+ */
 function defaultModelFor(providerKey: string): string {
-  switch (providerKey) {
-    case 'openai':      return 'gpt-4o-mini'
-    case 'groq':        return 'llama-3.3-70b-versatile'
-    case 'deepseek':    return 'deepseek-chat'
-    case 'openrouter':  return 'openai/gpt-4o-mini'
-    case 'together':    return 'meta-llama/Llama-3-70b-chat-hf'
-    case 'gemini':      return 'gemini-1.5-flash'
-    case 'grok':        return 'grok-2-latest'
-    case 'huggingface': return 'meta-llama/Llama-3-8b-chat-hf'
-    case 'nvidia':      return 'nvidia/llama-3.1-nemotron-70b-instruct'
-    default:            return 'unknown'
-  }
+  return getDefaultModelForProvider(providerKey)
 }
 
 export interface ProviderCallResult {

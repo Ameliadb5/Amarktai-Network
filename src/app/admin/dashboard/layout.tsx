@@ -10,6 +10,7 @@ import {
   LayoutDashboard, Key, Plug, Mail, Users, LogOut,
   Menu, X, ChevronRight, Server, Activity, Shield,
   Brain, MessageSquare, Bell, FileText, AppWindow, BookOpen,
+  Route, Zap, Database, Palette, CheckCircle, Layers,
 } from 'lucide-react'
 
 interface NavItem {
@@ -40,6 +41,17 @@ const navGroups: NavGroup[] = [
       { href: '/admin/dashboard/ai-usage', label: 'AI Usage', icon: Activity, color: 'text-blue-400' },
       { href: '/admin/dashboard/brain-chat', label: 'Gateway Test', icon: MessageSquare, color: 'text-cyan-400' },
       { href: '/admin/dashboard/learning', label: 'Learning', icon: BookOpen, color: 'text-emerald-400' },
+      { href: '/admin/dashboard/models', label: 'Model Registry', icon: Layers, color: 'text-orange-400' },
+      { href: '/admin/dashboard/routing', label: 'Routing Policies', icon: Route, color: 'text-pink-400' },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { href: '/admin/dashboard/agents', label: 'Agent Activity', icon: Zap, color: 'text-yellow-400' },
+      { href: '/admin/dashboard/memory', label: 'Memory & Retrieval', icon: Database, color: 'text-green-400' },
+      { href: '/admin/dashboard/multimodal', label: 'Multimodal Services', icon: Palette, color: 'text-rose-400' },
+      { href: '/admin/dashboard/readiness', label: 'Go-Live Readiness', icon: CheckCircle, color: 'text-lime-400' },
     ],
   },
   {
