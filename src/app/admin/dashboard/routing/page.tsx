@@ -49,6 +49,8 @@ const SAMPLE_CONTEXTS: { label: string; body: Partial<RoutingContext> }[] = [
   },
 ]
 
+const DEFAULT_MODE_COLOR = 'text-slate-400 bg-slate-500/10 border-slate-500/20'
+
 const MODE_COLORS: Record<string, string> = {
   direct: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
   specialist: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
@@ -142,7 +144,7 @@ export default function RoutingPage() {
             <div className="flex items-center gap-3 mb-3">
               <Route className="w-5 h-5 text-pink-400" />
               <h2 className="text-sm font-bold text-white">Routing Decision</h2>
-              <span className={`ml-auto text-xs font-medium uppercase px-2.5 py-1 rounded-full border ${MODE_COLORS[decision.mode] ?? 'text-slate-400 bg-slate-500/10 border-slate-500/20'}`}>
+              <span className={`ml-auto text-xs font-medium uppercase px-2.5 py-1 rounded-full border ${MODE_COLORS[decision.mode] ?? DEFAULT_MODE_COLOR}`}>
                 {decision.mode}
               </span>
             </div>
