@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   FlaskConical, Plus, Trash2, FolderOpen, FileText, Clock, Tag,
-  ChevronRight, RefreshCw, Archive, Zap,
+  ChevronRight, RefreshCw, Archive,
 } from 'lucide-react'
 
 interface PlaygroundProject {

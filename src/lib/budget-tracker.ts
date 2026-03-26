@@ -115,7 +115,7 @@ export async function getBudgetSummary(): Promise<BudgetSummary> {
     enabled: boolean
   }> = []
 
-  let budgetSettings: Map<string, {
+  const budgetSettings: Map<string, {
     monthlyBudgetUsd: number | null
     warningThresholdPct: number
     criticalThresholdPct: number

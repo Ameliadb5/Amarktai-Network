@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   FolderOpen, RefreshCw, Plus, FileText, Clock, MessageSquare,
-  Github, Upload, Save, ChevronLeft, Trash2, Tag,
+  Github, Upload, Save, Trash2, Tag,
 } from 'lucide-react'
 
 interface PromptEntry {
@@ -52,6 +52,14 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 export default function ProjectsPage() {
+  return (
+    <Suspense>
+      <ProjectsPageInner />
+    </Suspense>
+  )
+}
+
+function ProjectsPageInner() {
   const searchParams = useSearchParams()
   const selectedId = searchParams.get('id') ? parseInt(searchParams.get('id')!, 10) : null
 
@@ -269,7 +277,7 @@ export default function ProjectsPage() {
                     <div className="p-6 rounded-xl bg-white/3 border border-white/8 text-center text-slate-600 text-sm">
                       No prompt history yet. Use Gateway Test or Playground to generate prompts.
                     </div>
-                  ) : selected.promptHistory.slice(0, 20).map((ph, i) => (
+                  ) : selected.promptHistory.slice(0, 20).map((ph) => (
                     <div key={ph.id} className="p-3 rounded-xl bg-white/3 border border-white/8 text-sm">
                       <div className="flex items-center gap-2 mb-1 text-xs text-slate-500">
                         <MessageSquare className="w-3 h-3" />
