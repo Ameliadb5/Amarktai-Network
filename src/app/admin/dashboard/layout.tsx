@@ -7,10 +7,11 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, Key, Plug, Mail, Users, LogOut,
+  LayoutDashboard, Plug, Mail, Users, LogOut,
   Menu, X, ChevronRight, Server, Activity, Shield,
   Brain, MessageSquare, Bell, FileText, AppWindow, BookOpen,
   Route, Zap, Database, Palette, CheckCircle, Layers,
+  FlaskConical, Github, FolderOpen, DollarSign, ShieldAlert, Bot,
 } from 'lucide-react'
 
 interface NavItem {
@@ -38,25 +39,36 @@ const navGroups: NavGroup[] = [
     label: 'AI Execution',
     items: [
       { href: '/admin/dashboard/ai-providers', label: 'AI Providers', icon: Brain, color: 'text-violet-400' },
-      { href: '/admin/dashboard/ai-usage', label: 'AI Usage', icon: Activity, color: 'text-blue-400' },
-      { href: '/admin/dashboard/brain-chat', label: 'Gateway Test', icon: MessageSquare, color: 'text-cyan-400' },
-      { href: '/admin/dashboard/learning', label: 'Learning', icon: BookOpen, color: 'text-emerald-400' },
+      { href: '/admin/dashboard/budgets', label: 'Budgets', icon: DollarSign, color: 'text-amber-400' },
       { href: '/admin/dashboard/models', label: 'Model Registry', icon: Layers, color: 'text-orange-400' },
       { href: '/admin/dashboard/routing', label: 'Routing Policies', icon: Route, color: 'text-pink-400' },
+      { href: '/admin/dashboard/ai-usage', label: 'AI Usage', icon: Activity, color: 'text-blue-400' },
+      { href: '/admin/dashboard/brain-chat', label: 'Gateway Test', icon: MessageSquare, color: 'text-cyan-400' },
     ],
   },
   {
     label: 'Intelligence',
     items: [
-      { href: '/admin/dashboard/agents', label: 'Agent Activity', icon: Zap, color: 'text-yellow-400' },
+      { href: '/admin/dashboard/agent-workspace', label: 'Agent Workspace', icon: Bot, color: 'text-yellow-400' },
+      { href: '/admin/dashboard/agents', label: 'Agent Activity', icon: Zap, color: 'text-orange-400' },
       { href: '/admin/dashboard/memory', label: 'Memory & Retrieval', icon: Database, color: 'text-green-400' },
       { href: '/admin/dashboard/multimodal', label: 'Multimodal Services', icon: Palette, color: 'text-rose-400' },
-      { href: '/admin/dashboard/readiness', label: 'Go-Live Readiness', icon: CheckCircle, color: 'text-lime-400' },
+      { href: '/admin/dashboard/learning', label: 'Learning', icon: BookOpen, color: 'text-emerald-400' },
+    ],
+  },
+  {
+    label: 'Developer',
+    items: [
+      { href: '/admin/dashboard/playground', label: 'Playground', icon: FlaskConical, color: 'text-purple-400' },
+      { href: '/admin/dashboard/projects', label: 'Projects', icon: FolderOpen, color: 'text-blue-400' },
+      { href: '/admin/dashboard/dev-workspace', label: 'Dev Workspace', icon: Github, color: 'text-slate-300' },
     ],
   },
   {
     label: 'Monitoring',
     items: [
+      { href: '/admin/dashboard/healing', label: 'Self-Healing', icon: ShieldAlert, color: 'text-lime-400' },
+      { href: '/admin/dashboard/readiness', label: 'Go-Live Readiness', icon: CheckCircle, color: 'text-emerald-400' },
       { href: '/admin/dashboard/vps', label: 'VPS Monitoring', icon: Server, color: 'text-amber-400' },
       { href: '/admin/dashboard/alerts', label: 'Alerts', icon: Bell, color: 'text-red-400' },
       { href: '/admin/dashboard/events', label: 'Events & Logs', icon: FileText, color: 'text-slate-400' },
@@ -65,7 +77,6 @@ const navGroups: NavGroup[] = [
   {
     label: 'Admin',
     items: [
-      { href: '/admin/dashboard/api-keys', label: 'API Keys', icon: Key, color: 'text-violet-400' },
       { href: '/admin/dashboard/contacts', label: 'Contacts', icon: Mail, color: 'text-pink-400' },
       { href: '/admin/dashboard/waitlist', label: 'Waitlist', icon: Users, color: 'text-indigo-400' },
     ],

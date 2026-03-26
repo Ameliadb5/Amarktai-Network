@@ -249,3 +249,76 @@ model MemoryEntry {
   @@index([memoryType])
   @@map("memory_entries")
 }
+
+/// Per-provider monthly budget configuration and spend tracking.
+model ProviderBudget {
+  id                  Int      @id @default(autoincrement())
+  providerKey         String   @unique @map("provider_key")
+  monthlyBudgetUsd    Float?   @map("monthly_budget_usd")   // null = unlimited
+  currentSpendUsd     Float    @default(0) @map("current_spend_usd")
+  warningThresholdPct Float    @default(75) @map("warning_threshold_pct")
+  criticalThresholdPct Float   @default(90) @map("critical_threshold_pct")
+  notes               String   @default("")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@map("provider_budgets")
+}
+
+/// Playground/Developer Workspace project storage.
+model PlaygroundProject {
+  id                Int       @id @default(autoincrement())
+  name              String
+  type              String    @default("general")       // prompt_test|agent_prototype|workflow|code_assistant|comparison|general
+  status            String    @default("draft")          // draft|active|archived
+  description       String    @default("")
+  promptHistoryJson String    @default("[]") @map("prompt_history_json")
+  filesJson         String    @default("[]") @map("files_json")
+  agentConfigsJson  String    @default("[]") @map("agent_configs_json")
+  workflowsJson     String    @default("[]") @map("workflows_json")
+  tagsJson          String    @default("[]") @map("tags_json")
+  githubRepo        String?   @map("github_repo")
+  githubBranch      String?   @map("github_branch")
+  lastPushedAt      DateTime? @map("last_pushed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  pushLogs          GitHubPushLog[]
+
+  @@index([status])
+  @@index([type])
+  @@map("playground_projects")
+}
+
+/// GitHub integration configuration (single-admin PAT-based).
+model GitHubConfig {
+  id              Int       @id @default(autoincrement())
+  username        String    @default("")
+  accessToken     String    @default("") @map("access_token")
+  defaultOwner    String    @default("") @map("default_owner")
+  lastValidatedAt DateTime? @map("last_validated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("github_configs")
+}
+
+/// Audit log for all GitHub push actions from the developer workspace.
+model GitHubPushLog {
+  id             Int       @id @default(autoincrement())
+  projectId      Int       @map("project_id")
+  repoFullName   String    @map("repo_full_name")
+  branch         String
+  commitSha      String?   @map("commit_sha")
+  commitMessage  String    @map("commit_message")
+  filesChanged   Int       @default(0) @map("files_changed")
+  success        Boolean   @default(false)
+  error          String?
+  pushedAt       DateTime  @default(now()) @map("pushed_at")
+
+  project        PlaygroundProject @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([pushedAt])
+  @@map("github_push_logs")
+}
