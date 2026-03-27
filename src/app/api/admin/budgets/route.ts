@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server'
 import { getSession } from '@/lib/session'
 import { getBudgetSummary } from '@/lib/budget-tracker'
 import { prisma } from '@/lib/prisma'
+import { validateConfig, classifyDbError, configErrorResponse } from '@/lib/config-validator'
 
 /** GET /api/admin/budgets — return budget summary for all providers */
 export async function GET() {
@@ -10,14 +11,15 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const cfg = validateConfig()
+  if (!cfg.valid) return NextResponse.json({ ...configErrorResponse(cfg) }, { status: 503 })
+
   try {
     const summary = await getBudgetSummary()
     return NextResponse.json(summary)
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Failed to load budgets' },
-      { status: 500 },
-    )
+    const { category, message } = classifyDbError(e)
+    return NextResponse.json({ error: message, category }, { status: category === 'config_invalid' ? 503 : 500 })
   }
 }
 
@@ -27,6 +29,9 @@ export async function POST(req: NextRequest) {
   if (!session.isLoggedIn) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const cfg = validateConfig()
+  if (!cfg.valid) return NextResponse.json({ ...configErrorResponse(cfg) }, { status: 503 })
 
   try {
     const body = await req.json()
@@ -55,9 +60,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(budget)
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Failed to save budget' },
-      { status: 500 },
-    )
+    const { category, message } = classifyDbError(e)
+    return NextResponse.json({ error: message, category }, { status: category === 'config_invalid' ? 503 : 500 })
   }
 }

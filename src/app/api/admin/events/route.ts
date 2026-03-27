@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { safeParseJson } from '@/lib/utils'
+import { validateConfig, classifyDbError, configErrorResponse } from '@/lib/config-validator'
 
 /**
  * GET /api/admin/events
@@ -14,6 +15,9 @@ export async function GET(request: Request) {
   const session = await getSession()
   if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const cfg = validateConfig()
+  if (!cfg.valid) return NextResponse.json({ ...configErrorResponse(cfg), events: [], total: 0 }, { status: 503 })
+
   const { searchParams } = new URL(request.url)
   const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10) || 50))
   const appSlug = searchParams.get('appSlug') ?? undefined
@@ -24,6 +28,7 @@ export async function GET(request: Request) {
     ...(executionMode ? { executionMode } : {}),
   }
 
+  try {
   const [events, total] = await Promise.all([
     prisma.brainEvent.findMany({
       where,
@@ -60,4 +65,8 @@ export async function GET(request: Request) {
   }))
 
   return NextResponse.json({ events: enriched, total, limit })
+  } catch (error) {
+    const { category, message } = classifyDbError(error)
+    return NextResponse.json({ events: [], total: 0, limit, error: message, category }, { status: category === 'config_invalid' ? 503 : 500 })
+  }
 }

@@ -7,6 +7,7 @@ import {
   generateInsights,
   getEcosystemLearningState,
 } from '@/lib/learning-engine'
+import { validateConfig, classifyDbError, configErrorResponse } from '@/lib/config-validator'
 
 /**
  * GET /api/admin/learning
@@ -23,6 +24,11 @@ export async function GET(request: NextRequest) {
   const session = await getSession()
   if (!session.isLoggedIn) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const cfg = validateConfig()
+  if (!cfg.valid) {
+    return NextResponse.json({ ...configErrorResponse(cfg), entries: [], total: 0, page: 1, limit: 20, totalPages: 0 }, { status: 503 })
   }
 
   const { searchParams } = new URL(request.url)
@@ -91,14 +97,16 @@ export async function GET(request: NextRequest) {
       totalPages: Math.ceil(total / limit),
     })
   } catch (err) {
-    console.error('[learning] GET error:', err)
+    const { category, message } = classifyDbError(err)
+    console.error('[learning] GET error:', category, message)
     return NextResponse.json({
       entries: [],
       total: 0,
       page,
       limit,
       totalPages: 0,
-      error: 'Memory table unavailable — run database migration',
+      error: message,
+      category,
     })
   }
 }

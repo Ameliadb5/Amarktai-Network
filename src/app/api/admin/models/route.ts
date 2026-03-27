@@ -51,7 +51,12 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    models,
+    models: Array.from(models).map((m) => ({
+      ...m,
+      display_name: m.model_name,
+      roles: [m.primary_role, ...m.secondary_roles],
+      health: m.health_status,
+    })),
     total: models.length,
     registrySize: getModelRegistry().length,
   })

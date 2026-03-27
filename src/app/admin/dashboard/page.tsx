@@ -122,9 +122,11 @@ export default function DashboardOverview() {
   const [memory, setMemory] = useState<MemoryStatusData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [dbError, setDbError] = useState<string | null>(null)
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
+    setDbError(null)
     try {
       const [dashRes, provRes, memRes] = await Promise.all([
         fetch('/api/admin/dashboard'),
@@ -132,7 +134,18 @@ export default function DashboardOverview() {
         fetch('/api/admin/memory'),
       ])
       if (dashRes.ok) setData(await dashRes.json())
-      if (provRes.ok) setProviders(await provRes.json())
+      if (provRes.ok) {
+        const body = await provRes.json()
+        // If response is an array it's a provider list; otherwise it's an error body
+        if (Array.isArray(body)) {
+          setProviders(body)
+        } else if (body.error) {
+          setDbError(body.error)
+        }
+      } else {
+        const body = await provRes.json().catch(() => ({}))
+        if (body.error) setDbError(body.error)
+      }
       if (memRes.ok) setMemory(await memRes.json())
     } catch {
       // silently fail — data stays as-is
@@ -190,6 +203,21 @@ export default function DashboardOverview() {
           Refresh
         </button>
       </div>
+
+      {/* DB / config error banner */}
+      {dbError && (
+        <div className="bg-red-500/8 border border-red-500/20 rounded-xl px-5 py-4 flex items-start gap-3">
+          <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-red-400">Database unavailable — some data may not load</p>
+            <p className="text-xs text-red-400/80 mt-0.5">{dbError}</p>
+            <p className="text-xs text-slate-500 mt-1.5">
+              Set a real <code className="text-slate-400 font-mono">DATABASE_URL</code> and ensure the database is reachable.
+              Visit the <a href="/admin/dashboard/readiness" className="text-blue-400 hover:text-blue-300 underline" aria-label="Go to Go-Live Readiness diagnostic page">Go-Live Readiness</a> page for a full diagnostic.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ROW 1 — Top-level status */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

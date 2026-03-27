@@ -344,13 +344,23 @@ function ProviderCard({ catalogue, record, onSaved, onTested }: {
 export default function AiProvidersPage() {
   const [providers, setProviders] = useState<AiProvider[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    setLoadError(null)
     try {
       const res = await fetch('/api/admin/providers')
-      if (res.ok) setProviders(await res.json())
-    } catch { /* silent */ }
-    finally { setLoading(false) }
+      if (res.ok) {
+        setProviders(await res.json())
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setLoadError(d.error ?? `Failed to load providers (HTTP ${res.status})`)
+      }
+    } catch {
+      setLoadError('Network error — could not reach the backend')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -389,8 +399,20 @@ export default function AiProvidersPage() {
         </div>
       </div>
 
+      {/* Backend error banner */}
+      {loadError && (
+        <div className="bg-red-500/8 border border-red-500/20 rounded-xl px-5 py-4 flex items-start gap-3">
+          <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-red-400">Provider data unavailable</p>
+            <p className="text-xs text-red-400/80 mt-0.5">{loadError}</p>
+            <p className="text-xs text-slate-500 mt-1">Ensure the database is configured and reachable before saving provider changes.</p>
+          </div>
+        </div>
+      )}
+
       {/* Summary bar */}
-      {!loading && (
+      {!loading && !loadError && (
         <div className="bg-[#0A1020] border border-white/8 rounded-xl px-5 py-3 flex items-center gap-4 flex-wrap text-xs text-slate-500">
           <span className="font-medium text-white">Execution layers:</span>
           {PROVIDER_CATALOGUE.map(cat => {

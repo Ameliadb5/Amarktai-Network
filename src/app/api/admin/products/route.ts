@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { z } from 'zod'
 import { randomBytes } from 'crypto'
+import { validateConfig, classifyDbError, configErrorResponse } from '@/lib/config-validator'
 
 const productSchema = z.object({
   name: z.string().min(1).max(200),
@@ -37,11 +38,19 @@ export async function GET() {
   const session = await getSession()
   if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const products = await prisma.product.findMany({
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    include: { integration: true },
-  })
-  return NextResponse.json(products)
+  const cfg = validateConfig()
+  if (!cfg.valid) return NextResponse.json({ ...configErrorResponse(cfg), products: [] }, { status: 503 })
+
+  try {
+    const products = await prisma.product.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      include: { integration: true },
+    })
+    return NextResponse.json(products)
+  } catch (error) {
+    const { category, message } = classifyDbError(error)
+    return NextResponse.json({ error: message, category }, { status: category === 'config_invalid' ? 503 : 500 })
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -63,7 +72,8 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
-    console.error('Create product error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('[products] POST error:', error)
+    const { category, message } = classifyDbError(error)
+    return NextResponse.json({ error: message, category }, { status: category === 'config_invalid' ? 503 : 500 })
   }
 }

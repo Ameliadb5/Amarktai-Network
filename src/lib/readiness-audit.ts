@@ -24,6 +24,7 @@ import { getLearningStatus } from '@/lib/learning-engine'
 import { getMultimodalStatus } from '@/lib/multimodal-router'
 import { routeRequest } from '@/lib/routing-engine'
 import { classifyTask, decideExecution } from '@/lib/orchestrator'
+import { validateConfig, validateConfigWithDb } from '@/lib/config-validator'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -107,6 +108,44 @@ async function queryProvider(
 /* ------------------------------------------------------------------ */
 /*  Individual audit checks                                            */
 /* ------------------------------------------------------------------ */
+
+/** Check that DATABASE_URL is configured and the database is reachable. */
+async function checkDbConfig(): Promise<AuditCheck> {
+  const result = await validateConfigWithDb()
+  if (result.dbReachable === true) {
+    return check(
+      'db_config',
+      'security',
+      'Database Configuration',
+      'DATABASE_URL is valid and the database is reachable.',
+      true,
+      'pass',
+      'Database connectivity confirmed.',
+    )
+  }
+  const cfgCheck = validateConfig()
+  const errorIssue = cfgCheck.issues.find((i) => i.key === 'DATABASE_URL' && i.severity === 'error')
+  if (errorIssue) {
+    return check(
+      'db_config',
+      'security',
+      'Database Configuration',
+      'DATABASE_URL must be a real PostgreSQL connection string.',
+      true,
+      'fail',
+      errorIssue.message,
+    )
+  }
+  return check(
+    'db_config',
+    'security',
+    'Database Configuration',
+    'DATABASE_URL must be reachable for all DB-backed features to work.',
+    true,
+    'fail',
+    result.dbError ?? 'Database is not reachable.',
+  )
+}
 
 /** Check that a named provider is configured, enabled, and has an API key. */
 async function checkProvider(
@@ -659,6 +698,7 @@ export function generateReadinessSummary(report: ReadinessReport): string {
 export async function runReadinessAudit(): Promise<ReadinessReport> {
   // Run independent checks in parallel for speed
   const [
+    dbConfig,
     openai,
     grok,
     nvidia,
@@ -674,6 +714,7 @@ export async function runReadinessAudit(): Promise<ReadinessReport> {
     securityAdmin,
     dashboardTruth,
   ] = await Promise.all([
+    checkDbConfig(),
     checkProvider('provider_openai', 'openai', 'OpenAI'),
     checkProvider('provider_grok', 'grok', 'Grok / xAI'),
     checkProvider('provider_nvidia', 'nvidia', 'NVIDIA'),
@@ -696,6 +737,7 @@ export async function runReadinessAudit(): Promise<ReadinessReport> {
   const executionModes = checkExecutionModes()
 
   const checks: AuditCheck[] = [
+    dbConfig,
     openai,
     grok,
     nvidia,

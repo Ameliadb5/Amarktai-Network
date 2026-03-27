@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { z } from 'zod'
 import { maskApiKey } from '@/lib/providers'
+import { validateConfig, classifyDbError, configErrorResponse } from '@/lib/config-validator'
 
 const patchSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
@@ -22,29 +23,36 @@ export async function GET(
 ) {
   const session = await getSession()
   if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const cfg = validateConfig()
+  if (!cfg.valid) return NextResponse.json({ ...configErrorResponse(cfg) }, { status: 503 })
   const { id } = await params
-  const provider = await prisma.aiProvider.findUnique({
-    where: { id: parseInt(id) },
-    select: {
-      id: true,
-      providerKey: true,
-      displayName: true,
-      enabled: true,
-      maskedPreview: true,
-      baseUrl: true,
-      defaultModel: true,
-      fallbackModel: true,
-      healthStatus: true,
-      healthMessage: true,
-      lastCheckedAt: true,
-      notes: true,
-      sortOrder: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  })
-  if (!provider) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json(provider)
+  try {
+    const provider = await prisma.aiProvider.findUnique({
+      where: { id: parseInt(id) },
+      select: {
+        id: true,
+        providerKey: true,
+        displayName: true,
+        enabled: true,
+        maskedPreview: true,
+        baseUrl: true,
+        defaultModel: true,
+        fallbackModel: true,
+        healthStatus: true,
+        healthMessage: true,
+        lastCheckedAt: true,
+        notes: true,
+        sortOrder: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+    if (!provider) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json(provider)
+  } catch (error) {
+    const { category, message } = classifyDbError(error)
+    return NextResponse.json({ error: message, category }, { status: category === 'config_invalid' ? 503 : 500 })
+  }
 }
 
 /** PATCH /api/admin/providers/[id] — update config; if apiKey present, overwrites securely */
@@ -54,6 +62,8 @@ export async function PATCH(
 ) {
   const session = await getSession()
   if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const cfg = validateConfig()
+  if (!cfg.valid) return NextResponse.json({ ...configErrorResponse(cfg) }, { status: 503 })
   const { id } = await params
 
   try {
@@ -139,7 +149,8 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
-    console.error('Update provider error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('[providers] PATCH failed:', error)
+    const { category, message } = classifyDbError(error)
+    return NextResponse.json({ error: message, category }, { status: category === 'config_invalid' ? 503 : 500 })
   }
 }
