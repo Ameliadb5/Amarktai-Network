@@ -16,9 +16,9 @@ import {
 
 describe('Agent Runtime', () => {
   describe('getAgentDefinitions', () => {
-    it('returns definitions for all 10 agents', () => {
+    it('returns definitions for all 16 agents', () => {
       const defs = getAgentDefinitions()
-      expect(defs.size).toBe(10)
+      expect(defs.size).toBe(16)
     })
 
     it('includes all required agent types', () => {
@@ -26,6 +26,7 @@ describe('Agent Runtime', () => {
       const expectedTypes: AgentType[] = [
         'planner', 'router', 'validator', 'memory', 'retrieval',
         'creative', 'campaign', 'trading_analyst', 'app_ops', 'learning',
+        'security', 'voice', 'travel_planner', 'developer', 'support_community', 'healing',
       ]
       for (const type of expectedTypes) {
         expect(defs.get(type), `Missing agent: ${type}`).toBeDefined()
@@ -81,7 +82,7 @@ describe('Agent Runtime', () => {
       const status = getAgentStatus()
       expect(status).toBeDefined()
       expect(typeof status.configuredAgents).toBe('number')
-      expect(status.configuredAgents).toBe(10)
+      expect(status.configuredAgents).toBe(16)
     })
   })
 
@@ -101,6 +102,48 @@ describe('Agent Runtime', () => {
     it('campaign can hand off to creative', () => {
       const campaign = getAgentDefinition('campaign')
       expect(campaign.canHandoff).toContain('creative')
+    })
+
+    it('voice agent can hand off to creative', () => {
+      const voice = getAgentDefinition('voice')
+      expect(voice.canHandoff).toContain('creative')
+    })
+
+    it('developer agent can hand off to validator', () => {
+      const developer = getAgentDefinition('developer')
+      expect(developer.canHandoff).toContain('validator')
+    })
+  })
+
+  describe('new agent types', () => {
+    it('security agent has anomaly detection capability', () => {
+      const security = getAgentDefinition('security')
+      expect(security.capabilities).toContain('anomaly_detection')
+    })
+
+    it('voice agent has tts script generation capability', () => {
+      const voice = getAgentDefinition('voice')
+      expect(voice.capabilities).toContain('tts_script_generation')
+    })
+
+    it('travel planner agent has itinerary generation capability', () => {
+      const travel = getAgentDefinition('travel_planner')
+      expect(travel.capabilities).toContain('itinerary_generation')
+    })
+
+    it('developer agent has code generation capability', () => {
+      const developer = getAgentDefinition('developer')
+      expect(developer.capabilities).toContain('code_generation')
+    })
+
+    it('support_community agent has support routing capability', () => {
+      const support = getAgentDefinition('support_community')
+      expect(support.capabilities).toContain('support_routing')
+    })
+
+    it('healing agent has failure detection capability', () => {
+      const healing = getAgentDefinition('healing')
+      expect(healing.capabilities).toContain('failure_detection')
     })
   })
 })

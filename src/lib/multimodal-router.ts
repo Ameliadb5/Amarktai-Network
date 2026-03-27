@@ -38,6 +38,10 @@ export type ContentType =
   | 'reel_concept'
   | 'video_concept'
   | 'brand_voice'
+  | 'voice_script'
+  | 'tts_brief'
+  | 'speech_workflow'
+  | 'voice_profile'
 
 /** Input for a multimodal generation request. */
 export interface MultimodalRequest {
@@ -93,6 +97,8 @@ export interface MultimodalStatus {
   videoConceptReady: boolean
   /** Campaign plan generation is available. */
   campaignPlanReady: boolean
+  /** Voice script / TTS brief generation is available. */
+  voiceReady: boolean
   /** Human-readable status label. */
   statusLabel: 'operational' | 'partial' | 'not_configured'
 }
@@ -111,6 +117,10 @@ const ALL_CONTENT_TYPES: ContentType[] = [
   'reel_concept',
   'video_concept',
   'brand_voice',
+  'voice_script',
+  'tts_brief',
+  'speech_workflow',
+  'voice_profile',
 ]
 
 /** Preferred provider order for creative generation. */
@@ -339,6 +349,59 @@ export function buildCreativePrompt(request: MultimodalRequest): string {
       )
       break
 
+    case 'voice_script':
+      parts.push(
+        'You are a professional scriptwriter for voice and audio content. Write a clean, natural-sounding voice script with:',
+        '1. **Speaker Notes** — character/voice description, tone, pacing',
+        '2. **Script** — natural dialogue formatted for text-to-speech delivery',
+        '3. **Pronunciation Guide** — flag any unusual words or acronyms',
+        '4. **Emotional Direction** — cues for tone shifts (warm, urgent, calm, etc)',
+        'Format the script for direct TTS input — avoid markdown symbols within the spoken text.',
+        `Brief: ${prompt}`,
+      )
+      break
+
+    case 'tts_brief':
+      parts.push(
+        'You are a voice production director. Generate a TTS production brief covering:',
+        '1. **Voice Profile** — gender, age range, accent, personality',
+        '2. **Tone & Pacing** — speaking rate, pauses, emphasis patterns',
+        '3. **Emotion Profile** — primary emotion and shifts',
+        '4. **Use Case** — where this voice will be used (app, ad, narrator, etc)',
+        '5. **Sample Phrases** — 3-5 example lines to test the voice profile',
+        '6. **Technical Notes** — output format preferences (mp3, wav), target duration',
+        `Brief: ${prompt}`,
+      )
+      break
+
+    case 'speech_workflow':
+      parts.push(
+        'You are a conversational AI architect. Design a speech interaction workflow with:',
+        '1. **Workflow Name & Purpose**',
+        '2. **Trigger** — how the speech interaction is initiated',
+        '3. **Dialogue Flow** — key conversation stages and branching logic',
+        '4. **Voice Persona** — the AI\'s speaking character for this workflow',
+        '5. **Fallback Handling** — what happens if the user doesn\'t respond or misunderstands',
+        '6. **Completion State** — how the interaction ends successfully',
+        '7. **Integration Notes** — how this workflow connects to app features or data',
+        `Brief: ${prompt}`,
+      )
+      break
+
+    case 'voice_profile':
+      parts.push(
+        'You are a voice casting and characterisation specialist. Define a complete voice profile including:',
+        '1. **Name & Identity** — character name and role',
+        '2. **Voice Characteristics** — pitch, timbre, accent, speaking rhythm',
+        '3. **Personality Traits** — how the voice reflects personality',
+        '4. **Emotional Range** — what emotions this voice can express and how',
+        '5. **Use Cases** — which app features or scenarios use this voice',
+        '6. **Sample Lines** — 5 representative lines that showcase the voice',
+        '7. **Voice Model Recommendation** — which TTS voice or model best matches this profile',
+        `Brief: ${prompt}`,
+      )
+      break
+
     default:
       parts.push(`Generate content for: ${prompt}`)
   }
@@ -491,9 +554,11 @@ export async function getMultimodalStatus(): Promise<MultimodalStatus> {
     const videoConceptReady = hasAnyProvider
     // Campaign plan uses text models
     const campaignPlanReady = hasAnyProvider
+    // Voice script / TTS brief generation uses text models; TTS audio needs OpenAI TTS
+    const voiceReady = hasAnyProvider
 
     let statusLabel: 'operational' | 'partial' | 'not_configured' = 'not_configured'
-    if (textReady && imagePromptReady) {
+    if (textReady && imagePromptReady && voiceReady) {
       statusLabel = 'operational'
     } else if (hasAnyProvider) {
       statusLabel = 'partial'
@@ -506,6 +571,7 @@ export async function getMultimodalStatus(): Promise<MultimodalStatus> {
       imagePromptReady: imagePromptReady,
       videoConceptReady: videoConceptReady,
       campaignPlanReady: campaignPlanReady,
+      voiceReady,
       statusLabel,
     }
   } catch (err) {
@@ -517,6 +583,7 @@ export async function getMultimodalStatus(): Promise<MultimodalStatus> {
       imagePromptReady: false,
       videoConceptReady: false,
       campaignPlanReady: false,
+      voiceReady: false,
       statusLabel: 'not_configured',
     }
   }

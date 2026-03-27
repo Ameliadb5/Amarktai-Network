@@ -124,9 +124,9 @@ describe('Integration Verification', () => {
   })
 
   describe('Agent Runtime Connectivity', () => {
-    it('all 10 agents have definitions', () => {
+    it('all 16 agents have definitions', () => {
       const defs = getAgentDefinitions()
-      expect(defs.size).toBe(10)
+      expect(defs.size).toBe(16)
     })
 
     it('network app has full agent permissions', () => {
