@@ -101,14 +101,6 @@ const ROUTING_STRATEGIES = [
   { value: 'speed_first', label: 'Speed First', icon: Timer, desc: 'Fastest response times' },
 ] as const
 
-const EXAMPLE_APPS = [
-  { name: 'Secure', slug: 'secure', category: 'security', status: 'live', icon: Shield },
-  { name: 'FaithHaven', slug: 'faithhaven', category: 'faith', status: 'live', icon: Heart },
-  { name: 'Friends', slug: 'friends', category: 'social', status: 'live', icon: Users },
-  { name: 'Marketing', slug: 'marketing', category: 'marketing', status: 'invite_only', icon: Megaphone },
-  { name: 'Travel', slug: 'travel', category: 'travel', status: 'in_development', icon: Plane },
-]
-
 const STEP_LABELS = ['Create App', 'Capabilities', 'Routing & Budget', 'Integration']
 
 // ── Wizard state ──────────────────────────────────────────────────
@@ -339,33 +331,38 @@ export default function AppOnboardingPage() {
         </button>
       </div>
 
-      {/* Ready Apps Examples */}
-      <div className="grid grid-cols-5 gap-3">
-        {EXAMPLE_APPS.map((app) => {
-          const Icon = app.icon
-          const existing = products.find((p) => p.slug === app.slug)
-          return (
-            <Card key={app.slug} className="p-4 group hover:border-white/[0.12] transition-colors cursor-pointer"
-              >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-9 h-9 rounded-xl bg-white/[0.05] flex items-center justify-center">
-                  <Icon className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
+      {/* Registered Apps (DB-backed) */}
+      {products.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {products.map((app) => {
+            const catDef = CATEGORIES.find(c => c.value === app.category)
+            const Icon = catDef?.icon ?? Layers
+            return (
+              <Card key={app.id} className="p-4 group hover:border-white/[0.12] transition-colors">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-9 h-9 rounded-xl bg-white/[0.05] flex items-center justify-center">
+                    <Icon className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-white">{app.name}</p>
+                    <p className="text-[10px] text-slate-500 capitalize">{app.category}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">{app.name}</p>
-                  <p className="text-[10px] text-slate-500 capitalize">{app.category}</p>
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${app.integration ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                  <span className="text-[11px] text-slate-500">
+                    {app.integration ? 'Integrated' : 'Not Integrated'}
+                  </span>
                 </div>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${existing ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                <span className="text-[11px] text-slate-500">
-                  {existing ? 'Onboarded' : 'Ready'}
-                </span>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
+              </Card>
+            )
+          })}
+        </div>
+      ) : (
+        <Card className="p-8 text-center">
+          <p className="text-sm text-slate-500">No apps registered yet. Use the wizard above to onboard your first app.</p>
+        </Card>
+      )}
 
       {/* Wizard Panel */}
       <AnimatePresence>

@@ -23,12 +23,12 @@ describe('isDatabaseUrlPlaceholder', () => {
     expect(isDatabaseUrlPlaceholder('postgresql://user:password@host:5432/amarktai_network')).toBe(true)
   })
 
-  it('returns true when host is "localhost"', () => {
-    expect(isDatabaseUrlPlaceholder('postgresql://myuser:mypass@localhost:5432/mydb')).toBe(true)
+  it('returns false when host is "localhost" with real credentials (VPS deployment)', () => {
+    expect(isDatabaseUrlPlaceholder('postgresql://myuser:mypass@localhost:5432/mydb')).toBe(false)
   })
 
-  it('returns true when host is "127.0.0.1"', () => {
-    expect(isDatabaseUrlPlaceholder('postgresql://myuser:mypass@127.0.0.1:5432/mydb')).toBe(true)
+  it('returns false when host is "127.0.0.1" with real credentials (VPS deployment)', () => {
+    expect(isDatabaseUrlPlaceholder('postgresql://myuser:mypass@127.0.0.1:5432/mydb')).toBe(false)
   })
 
   it('returns true when user is "user" and password is "password"', () => {
@@ -49,6 +49,22 @@ describe('isDatabaseUrlPlaceholder', () => {
         'postgresql://jane:securePass@ep-cool-dream-123456.us-east-2.aws.neon.tech/neondb?sslmode=require',
       ),
     ).toBe(false)
+  })
+
+  it('returns false for the real VPS production URL (amarktai_user@localhost)', () => {
+    expect(
+      isDatabaseUrlPlaceholder(
+        'postgresql://amarktai_user:RealSecurePass@localhost:5432/amarktai_network',
+      ),
+    ).toBe(false)
+  })
+
+  it('returns true when host is a known placeholder like "host"', () => {
+    expect(isDatabaseUrlPlaceholder('postgresql://realuser:realpass@host:5432/mydb')).toBe(true)
+  })
+
+  it('returns true for localhost with placeholder user+password combo', () => {
+    expect(isDatabaseUrlPlaceholder('postgresql://user:password@localhost:5432/mydb')).toBe(true)
   })
 
   it('returns true for unparsable URL', () => {

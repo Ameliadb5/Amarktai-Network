@@ -30,23 +30,29 @@ export interface ConfigValidationResult {
 /**
  * Known placeholder host fragments that indicate a default/example DATABASE_URL.
  * These values MUST NOT be treated as a real database.
+ *
+ * Note: 'localhost' and '127.0.0.1' are NOT included here because they are
+ * legitimate database hosts for self-hosted / VPS deployments.
  */
 const PLACEHOLDER_DB_HOSTS = [
   'host',
-  'localhost',
-  '127.0.0.1',
   'your-db-host',
   'your-hostname',
   'placeholder',
   'example.com',
 ];
 
-/** Placeholder usernames that indicate a default/example DATABASE_URL. */
+/**
+ * Placeholder usernames that indicate a default/example DATABASE_URL.
+ *
+ * Note: 'postgres' is NOT included here because it is the standard
+ * superuser name in PostgreSQL and is commonly used in real deployments.
+ * The user+password combo check below still catches 'postgres'+'password'.
+ */
 const PLACEHOLDER_DB_USERS = [
   'user',
   'username',
   'your-user',
-  'postgres',   // allowed only when host is non-placeholder in real setups
   'root',
   'admin',
 ];
@@ -69,11 +75,12 @@ const PLACEHOLDER_DB_PASSWORDS = [
  * Rules (in order):
  * 1. Empty or unparseable URL → placeholder
  * 2. Host matches a known placeholder list → placeholder
+ *    (localhost and 127.0.0.1 are NOT on this list — they are valid for VPS deployments)
  * 3. BOTH user AND password match known placeholder lists → placeholder
  *
- * Note: a username of 'postgres' with a real password on a real host is valid.
- * But if both user='postgres' AND password='password' it is treated as a
- * placeholder because that combination is the canonical Docker-default credential.
+ * A real local PostgreSQL URL like:
+ *   postgresql://amarktai_user:RealPass@localhost:5432/amarktai_network
+ * is accepted as valid.
  */
 export function isDatabaseUrlPlaceholder(url: string): boolean {
   if (!url || url.trim() === '') return true;
