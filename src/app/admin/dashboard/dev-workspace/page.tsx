@@ -125,7 +125,7 @@ export default function DevWorkspacePage() {
         <button
           onClick={() => { loadConfig(); loadPushLog() }}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white text-sm disabled:opacity-50 transition-all"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/10 text-slate-400 hover:text-white text-sm disabled:opacity-50 transition-all"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -139,7 +139,7 @@ export default function DevWorkspacePage() {
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-5 rounded-2xl bg-white/3 border border-white/8"
+        className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06]"
       >
         <div className="flex items-center gap-3 mb-4">
           <Github className="w-5 h-5 text-slate-300" />
@@ -220,7 +220,7 @@ export default function DevWorkspacePage() {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-5 rounded-2xl bg-white/3 border border-purple-500/20"
+          className="p-5 rounded-2xl bg-white/[0.03] border border-purple-500/20"
         >
           <h3 className="font-bold text-white mb-4">GitHub Credentials</h3>
           <form onSubmit={handleSave} className="space-y-3">
@@ -232,7 +232,7 @@ export default function DevWorkspacePage() {
                   placeholder="your-username"
                   value={form.username}
                   onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/50"
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/50"
                 />
               </div>
               <div>
@@ -242,7 +242,7 @@ export default function DevWorkspacePage() {
                   placeholder="your-org-or-username"
                   value={form.defaultOwner}
                   onChange={e => setForm(f => ({ ...f, defaultOwner: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/50"
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/50"
                 />
               </div>
             </div>
@@ -255,7 +255,7 @@ export default function DevWorkspacePage() {
                   placeholder="ghp_••••••••••••••••••••••••••••••"
                   value={form.accessToken}
                   onChange={e => setForm(f => ({ ...f, accessToken: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 pr-10 text-white text-sm focus:outline-none focus:border-purple-500/50 font-mono"
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 pr-10 text-white text-sm focus:outline-none focus:border-purple-500/50 font-mono"
                 />
                 <button
                   type="button"
@@ -300,7 +300,7 @@ export default function DevWorkspacePage() {
         </div>
 
         {pushLog.length === 0 ? (
-          <div className="p-6 rounded-xl bg-white/3 border border-white/8 text-center text-slate-600 text-sm">
+          <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center text-slate-600 text-sm">
             No push history yet. Use the Projects page to push a project to GitHub.
           </div>
         ) : (
@@ -313,7 +313,7 @@ export default function DevWorkspacePage() {
                 transition={{ delay: i * 0.03 }}
                 className={`p-3 rounded-xl border text-sm ${
                   entry.success
-                    ? 'bg-white/3 border-white/8'
+                    ? 'bg-white/[0.03] border-white/[0.06]'
                     : 'bg-red-500/5 border-red-500/15'
                 }`}
               >

@@ -77,7 +77,7 @@ export default function ReadinessPage() {
   })
 
   return (
-    <div className="max-w-5xl space-y-5">
+    <div className="max-w-6xl space-y-5">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Go-Live Readiness</h1>
@@ -88,7 +88,7 @@ export default function ReadinessPage() {
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Run Audit
@@ -98,18 +98,18 @@ export default function ReadinessPage() {
       {loading ? (
         <div className="space-y-3">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-20 bg-white/4 rounded-xl animate-pulse" />
+            <div key={i} className="h-20 bg-white/[0.03] rounded-xl animate-pulse" />
           ))}
         </div>
       ) : error ? (
-        <div className="bg-[#0A1020] border border-red-500/20 rounded-xl p-8 text-center">
+        <div className="bg-white/[0.03] border border-red-500/20 rounded-2xl p-8 text-center">
           <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
           <p className="text-sm text-red-400">{error}</p>
         </div>
       ) : report ? (
         <>
           {/* Hero score */}
-          <div className={`rounded-xl p-6 border ${report.overallReady ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
+          <div className={`rounded-2xl p-6 border ${report.overallReady ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-xl ${report.overallReady ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
                 <ShieldCheck className={`w-8 h-8 ${report.overallReady ? 'text-emerald-400' : 'text-red-400'}`} />
@@ -141,7 +141,7 @@ export default function ReadinessPage() {
               { label: 'Warnings', value: report.warnings, color: 'text-amber-400' },
               { label: 'Critical Failures', value: report.criticalFailures, color: 'text-red-400' },
             ].map(s => (
-              <div key={s.label} className="bg-[#0A1020] border border-white/8 rounded-xl p-4">
+              <div key={s.label} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
                 <p className="text-xs text-slate-500">{s.label}</p>
                 <p className={`text-xl font-bold mt-1 ${s.color}`}>{s.value}</p>
               </div>
@@ -150,7 +150,7 @@ export default function ReadinessPage() {
 
           {/* Critical failures callout */}
           {report.criticalFailures > 0 && (
-            <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
+            <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <XCircle className="w-4 h-4 text-red-400" />
                 <span className="text-sm font-bold text-red-400">Critical Failures</span>
@@ -171,7 +171,7 @@ export default function ReadinessPage() {
 
           {/* Checks by category */}
           {Object.entries(grouped).map(([category, checks]) => (
-            <div key={category} className="bg-[#0A1020] border border-white/8 rounded-xl overflow-hidden">
+            <div key={category} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
               <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
                 <span className="text-xs font-bold text-white uppercase tracking-wide">{category}</span>
                 <span className="text-[10px] text-slate-500">
@@ -215,7 +215,7 @@ export default function ReadinessPage() {
 
           {/* Summary text */}
           {report.summary && (
-            <div className="bg-[#0A1020] border border-white/8 rounded-xl p-5">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
               <h2 className="text-sm font-bold text-white mb-2">Summary</h2>
               <p className="text-sm text-slate-400 leading-relaxed whitespace-pre-line">{report.summary}</p>
             </div>

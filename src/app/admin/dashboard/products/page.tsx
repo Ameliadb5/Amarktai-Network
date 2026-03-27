@@ -205,7 +205,7 @@ export default function ProductsPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative bg-[#0B1020] border border-white/10 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            className="relative bg-[#0B1020] border border-white/[0.06] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-white font-heading">
@@ -223,7 +223,7 @@ export default function ProductsPage() {
                     required
                     value={form.name}
                     onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50"
+                    className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50"
                   />
                 </div>
                 <div>
@@ -232,7 +232,7 @@ export default function ProductsPage() {
                     required
                     value={form.slug}
                     onChange={(e) => setForm(p => ({ ...p, slug: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50"
+                    className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50"
                   />
                 </div>
               </div>
@@ -242,7 +242,7 @@ export default function ProductsPage() {
                   rows={2}
                   value={form.shortDescription}
                   onChange={(e) => setForm(p => ({ ...p, shortDescription: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50 resize-none"
+                  className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50 resize-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -251,7 +251,7 @@ export default function ProductsPage() {
                   <select
                     value={form.status}
                     onChange={(e) => setForm(p => ({ ...p, status: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-blue-500/50"
+                    className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-lg text-sm text-slate-300 focus:outline-none focus:border-blue-500/50"
                   >
                     <option value="live">Live</option>
                     <option value="invite_only">Invite Only</option>
@@ -265,7 +265,7 @@ export default function ProductsPage() {
                   <input
                     value={form.category}
                     onChange={(e) => setForm(p => ({ ...p, category: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50"
+                    className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/50"
                   />
                 </div>
               </div>

@@ -130,8 +130,8 @@ const HEALTH: Record<string, { label: string; color: string; bg: string; icon: t
   configured:   { label: 'Key Set',      color: 'text-amber-400',   bg: 'bg-amber-500/10 border border-amber-500/25',    icon: Clock },
   degraded:     { label: 'Degraded',     color: 'text-amber-400',   bg: 'bg-amber-500/10 border border-amber-500/25',    icon: AlertTriangle },
   error:        { label: 'Error',        color: 'text-red-400',     bg: 'bg-red-500/10 border border-red-500/25',        icon: AlertCircle },
-  unconfigured: { label: 'Not Set',      color: 'text-slate-500',   bg: 'bg-white/5 border border-white/10',             icon: WifiOff },
-  disabled:     { label: 'Disabled',     color: 'text-slate-500',   bg: 'bg-white/5 border border-white/10',             icon: WifiOff },
+  unconfigured: { label: 'Not Set',      color: 'text-slate-500',   bg: 'bg-white/[0.03] border border-white/[0.06]',             icon: WifiOff },
+  disabled:     { label: 'Disabled',     color: 'text-slate-500',   bg: 'bg-white/[0.03] border border-white/[0.06]',             icon: WifiOff },
 }
 
 // ── Provider Card ────────────────────────────────────────────────
@@ -214,7 +214,7 @@ function ProviderCard({ catalogue, record, onSaved, onTested }: {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-[#0A1020] border border-white/8 rounded-xl overflow-hidden"
+      className="bg-white/[0.03] border border-white/[0.06] rounded-xl overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-start justify-between px-5 py-4 border-b border-white/5">
@@ -235,7 +235,7 @@ function ProviderCard({ catalogue, record, onSaved, onTested }: {
               </span>
             )}
             {!record && (
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-white/5 border border-white/10 text-slate-500">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-white/[0.03] border border-white/[0.06] text-slate-500">
                 <WifiOff className="w-3 h-3" />
                 Not configured
               </span>
@@ -253,7 +253,7 @@ function ProviderCard({ catalogue, record, onSaved, onTested }: {
             className={`flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border transition-colors ${
               enabled
                 ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/20'
-                : 'bg-white/5 border-white/10 text-slate-500 hover:bg-white/10'
+                : 'bg-white/[0.03] border-white/10 text-slate-500 hover:bg-white/[0.06]'
             }`}
           >
             {enabled ? 'Enabled' : 'Disabled'}
@@ -273,7 +273,7 @@ function ProviderCard({ catalogue, record, onSaved, onTested }: {
                 value={apiKey}
                 onChange={e => setApiKey(e.target.value)}
                 placeholder={record?.maskedPreview ? `Current: ${record.maskedPreview}` : 'Enter API key…'}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 font-mono pr-9"
+                className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 font-mono pr-9"
               />
               <button
                 type="button"
@@ -302,7 +302,7 @@ function ProviderCard({ catalogue, record, onSaved, onTested }: {
           <button
             onClick={handleTest}
             disabled={testing || !record}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-40 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] disabled:opacity-40 text-slate-300 text-sm font-medium rounded-lg transition-colors"
           >
             {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             Test Connection
@@ -413,7 +413,7 @@ export default function AiProvidersPage() {
 
       {/* Summary bar */}
       {!loading && !loadError && (
-        <div className="bg-[#0A1020] border border-white/8 rounded-xl px-5 py-3 flex items-center gap-4 flex-wrap text-xs text-slate-500">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-5 py-3 flex items-center gap-4 flex-wrap text-xs text-slate-500">
           <span className="font-medium text-white">Execution layers:</span>
           {PROVIDER_CATALOGUE.map(cat => {
             const rec = byKey[cat.key]
@@ -437,7 +437,7 @@ export default function AiProvidersPage() {
       {loading ? (
         <div className="space-y-4">
           {PROVIDER_CATALOGUE.map(c => (
-            <div key={c.key} className="h-48 bg-white/4 rounded-xl animate-pulse" />
+            <div key={c.key} className="h-48 bg-white/[0.03] rounded-xl animate-pulse" />
           ))}
         </div>
       ) : (

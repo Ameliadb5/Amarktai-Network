@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   CheckCircle, AlertCircle, AlertTriangle, WifiOff, Clock,
-  RefreshCw, ArrowRight, Zap, Activity, Shield,
+  RefreshCw, Zap, Activity, Shield, Brain, Database, Server,
+  ArrowRight, CircleDot, Cpu, BarChart3, Gauge,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
@@ -39,7 +40,6 @@ interface DashboardData {
   } | null
 }
 
-// ── Provider summary from /api/admin/providers ─────────────────
 interface ProviderSummary {
   id: number
   providerKey: string
@@ -51,7 +51,6 @@ interface ProviderSummary {
   lastCheckedAt: string | null
 }
 
-// ── Memory status from /api/admin/memory ──────────────────────
 interface MemoryStatusData {
   available: boolean
   totalEntries: number
@@ -71,48 +70,20 @@ const H = {
 } as const
 
 const SEV = {
-  critical: 'text-red-400',
-  error:    'text-red-400',
-  warning:  'text-amber-400',
-  info:     'text-blue-400',
+  critical: { color: 'text-red-400',   bg: 'bg-red-400/10',   dot: 'bg-red-400' },
+  error:    { color: 'text-red-400',   bg: 'bg-red-400/10',   dot: 'bg-red-400' },
+  warning:  { color: 'text-amber-400', bg: 'bg-amber-400/10', dot: 'bg-amber-400' },
+  info:     { color: 'text-blue-400',  bg: 'bg-blue-400/10',  dot: 'bg-blue-400' },
 } as const
 
-// ── Card wrapper ───────────────────────────────────────────────
-function Card({ title, action, children, className = '' }: {
-  title: string
-  action?: { label: string; href: string }
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <div className={`bg-[#0A1020] border border-white/8 rounded-xl overflow-hidden ${className}`}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-        <h2 className="text-sm font-semibold text-white">{title}</h2>
-        {action && (
-          <Link href={action.href} className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
-            {action.label} <ArrowRight className="w-3 h-3" />
-          </Link>
-        )}
-      </div>
-      <div className="p-4">{children}</div>
-    </div>
-  )
+// ── Staggered entrance animation ──────────────────────────────
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
 }
-
-// ── Stat tile ──────────────────────────────────────────────────
-function StatTile({ label, value, sub, accent = false }: {
-  label: string
-  value: string | number
-  sub?: string
-  accent?: boolean
-}) {
-  return (
-    <div className="bg-[#0A1020] border border-white/8 rounded-xl p-4">
-      <p className="text-xs text-slate-500 mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${accent ? 'text-blue-400' : 'text-white'}`}>{value}</p>
-      {sub && <p className="text-xs text-slate-600 mt-1">{sub}</p>}
-    </div>
-  )
+const fadeUp = {
+  hidden: { opacity: 0, y: 12 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
 }
 
 // ── Main ──────────────────────────────────────────────────────
@@ -123,6 +94,7 @@ export default function DashboardOverview() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [dbError, setDbError] = useState<string | null>(null)
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -136,7 +108,6 @@ export default function DashboardOverview() {
       if (dashRes.ok) setData(await dashRes.json())
       if (provRes.ok) {
         const body = await provRes.json()
-        // If response is an array it's a provider list; otherwise it's an error body
         if (Array.isArray(body)) {
           setProviders(body)
         } else if (body.error) {
@@ -147,6 +118,7 @@ export default function DashboardOverview() {
         if (body.error) setDbError(body.error)
       }
       if (memRes.ok) setMemory(await memRes.json())
+      setLastRefreshed(new Date())
     } catch {
       // silently fail — data stays as-is
     } finally {
@@ -160,299 +132,427 @@ export default function DashboardOverview() {
   // ── Derived ────────────────────────────────────────────────
   const healthyProviders  = providers.filter(p => p.healthStatus === 'healthy')
   const enabledProviders  = providers.filter(p => p.enabled)
-  const connectedApps     = data?.productStats.filter(a => a.integration !== null) ?? []
   const totalApps         = data?.productStats.length ?? 0
-  const alertCount        = data?.recentEvents.filter(e => ['critical','error'].includes(e.severity)).length ?? 0
-  const memoryActive      = memory?.available === true && memory.totalEntries > 0
-  // Setup score: 50 pts = healthy provider, 25 pts = enabled provider (not yet tested),
-  // 30 pts = app with integration, 20 pts = any brain requests made, 10 pts = memory active
-  const setupScore        = Math.round(
-    ((healthyProviders.length > 0 ? 50 : enabledProviders.length > 0 ? 25 : 0) +
-     (connectedApps.length > 0 ? 30 : 0) +
-     ((data?.brainStats?.totalRequests ?? 0) > 0 ? 20 : 0) +
-     (memoryActive ? 10 : 0))
-  )
 
+  const totalReqs   = data?.brainStats?.totalRequests ?? 0
+  const successReqs = data?.brainStats?.successCount ?? 0
+  const errorReqs   = data?.brainStats?.errorCount ?? 0
+  const successRate = totalReqs > 0 ? Math.round((successReqs / totalReqs) * 100) : 100
+  const systemHealth = totalReqs > 0
+    ? Math.round(((successReqs / totalReqs) * 0.7 + (healthyProviders.length > 0 ? 0.3 : 0)) * 100)
+    : healthyProviders.length > 0 ? 85 : enabledProviders.length > 0 ? 50 : 0
+
+  const systemOnline = enabledProviders.length > 0 || totalApps > 0
+
+  // ── Loading state ──────────────────────────────────────────
   if (loading) {
     return (
-      <div className="space-y-4 animate-pulse">
+      <div className="space-y-6 animate-pulse">
+        <div className="h-20 bg-white/[0.03] rounded-2xl" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-white/4 rounded-xl" />)}
+          {[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-white/[0.03] rounded-2xl" />)}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-48 bg-white/4 rounded-xl" />)}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-40 bg-white/4 rounded-xl" />)}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-48 bg-white/[0.03] rounded-2xl" />)}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4 max-w-7xl">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-white">AmarktAI Status</h1>
-        <button
-          onClick={() => load(true)}
-          disabled={refreshing}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
+    <motion.div
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      className="space-y-6 max-w-7xl"
+    >
+      {/* ─── Header Section ──────────────────────────────────── */}
+      <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 text-transparent bg-clip-text">
+            AmarktAI Network
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">Command Center</p>
+        </div>
+        <div className="flex items-center gap-4">
+          {/* System status */}
+          <div className="flex items-center gap-2">
+            <span className={`relative flex h-2.5 w-2.5 ${systemOnline ? '' : ''}`}>
+              {systemOnline && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              )}
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${systemOnline ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+            </span>
+            <span className={`text-xs font-mono ${systemOnline ? 'text-emerald-400' : 'text-slate-500'}`}>
+              {systemOnline ? 'ONLINE' : 'OFFLINE'}
+            </span>
+          </div>
+          {/* Last refreshed */}
+          {lastRefreshed && (
+            <span className="text-xs text-slate-600 font-mono hidden sm:inline">
+              {formatDistanceToNow(lastRefreshed, { addSuffix: true })}
+            </span>
+          )}
+          {/* Refresh button */}
+          <button
+            onClick={() => load(true)}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </motion.div>
 
-      {/* DB / config error banner */}
+      {/* ─── DB Error Banner ─────────────────────────────────── */}
       {dbError && (
-        <div className="bg-red-500/8 border border-red-500/20 rounded-xl px-5 py-4 flex items-start gap-3">
-          <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+        <motion.div variants={fadeUp} className="bg-red-500/[0.06] border border-red-500/20 rounded-2xl px-5 py-4 flex items-start gap-3">
+          <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-red-400">Database unavailable — some data may not load</p>
-            <p className="text-xs text-red-400/80 mt-0.5">{dbError}</p>
+            <p className="text-sm font-semibold text-red-400">Database unavailable</p>
+            <p className="text-xs text-red-400/70 mt-0.5">{dbError}</p>
             <p className="text-xs text-slate-500 mt-1.5">
-              Set a real <code className="text-slate-400 font-mono">DATABASE_URL</code> and ensure the database is reachable.
-              Visit the <a href="/admin/dashboard/readiness" className="text-blue-400 hover:text-blue-300 underline" aria-label="Go to Go-Live Readiness diagnostic page">Go-Live Readiness</a> page for a full diagnostic.
+              Set a valid <code className="text-slate-400 font-mono text-[11px]">DATABASE_URL</code> and check the{' '}
+              <Link href="/admin/dashboard/readiness" className="text-blue-400 hover:text-blue-300 underline">Readiness</Link> page.
             </p>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* ROW 1 — Top-level status */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatTile
-          label="AmarktAI Status"
-          value={(data?.brainStats?.totalRequests ?? 0) > 0 ? 'Active' : connectedApps.length > 0 ? 'Ready' : 'Standby'}
-          sub={(data?.brainStats?.totalRequests ?? 0) > 0 ? `${data?.brainStats?.totalRequests} total requests` : 'No requests yet'}
-          accent
-        />
-        <StatTile
-          label="Setup Completeness"
-          value={`${setupScore}%`}
-          sub={healthyProviders.length > 0 ? `${healthyProviders.length} provider${healthyProviders.length > 1 ? 's' : ''} healthy` : 'No providers healthy yet'}
-        />
-        <StatTile
-          label="Connected Apps"
-          value={`${connectedApps.length} / ${totalApps}`}
-          sub={connectedApps.length > 0 ? 'Integration active' : 'No app connections yet'}
-        />
-        <StatTile
-          label="Active Alerts"
-          value={alertCount}
-          sub={alertCount > 0 ? 'Errors or criticals in events' : 'No recent alerts'}
-        />
-      </div>
-
-      {/* ROW 2 — Execution + Connections + Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-        {/* Execution Layer Setup */}
-        <Card title="Execution Layer" action={{ label: 'Configure', href: '/admin/dashboard/ai-providers' }}>
-          {providers.length === 0 ? (
-            <div className="text-center py-6">
-              <WifiOff className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">No providers configured</p>
-              <Link href="/admin/dashboard/ai-providers" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300">
-                Set up AI providers →
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-0">
-              {providers.map(p => {
-                const cfg = H[p.healthStatus as keyof typeof H] ?? H.unconfigured
-                const Icon = cfg.icon
-                return (
-                  <div key={p.id} className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
-                      <span className="text-sm text-white truncate">{p.displayName}</span>
-                      {!p.enabled && <span className="text-[10px] text-slate-600 font-mono ml-1">off</span>}
-                    </div>
-                    <span className={`flex items-center gap-1 text-xs flex-shrink-0 ml-2 ${cfg.color}`}>
-                      <Icon className="w-3 h-3" />
-                      {cfg.label}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* App Connections */}
-        <Card title="App Connections" action={{ label: 'Manage', href: '/admin/dashboard/apps' }}>
-          {totalApps === 0 ? (
-            <div className="text-center py-6">
-              <Shield className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">No apps registered</p>
-              <Link href="/admin/dashboard/apps" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300">
-                Register an app →
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-0">
-              {data?.productStats.map(app => {
-                const health = app.integration?.healthStatus ?? 'no_integration'
-                const dot =
-                  health === 'healthy'  ? 'bg-emerald-400' :
-                  health === 'degraded' ? 'bg-amber-400' :
-                  health === 'error'    ? 'bg-red-400' :
-                  health === 'no_integration' ? 'bg-slate-700' : 'bg-slate-500'
-                return (
-                  <div key={app.id} className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
-                      <span className="text-sm text-white truncate">{app.name}</span>
-                    </div>
-                    <span className="text-xs text-slate-500 flex-shrink-0 ml-2">
-                      {app.integration
-                        ? (app.integration.lastHeartbeatAt
-                            ? formatDistanceToNow(new Date(app.integration.lastHeartbeatAt), { addSuffix: true })
-                            : 'Connected')
-                        : 'No integration'}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* Recent Activity (Brain stats) */}
-        <Card title="Recent Activity" action={{ label: 'View Events', href: '/admin/dashboard/events' }}>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white/[0.03] rounded-lg p-3">
-                <p className="text-xs text-slate-500">Total Requests</p>
-                <p className="text-xl font-bold text-white mt-0.5">{data?.brainStats?.totalRequests ?? 0}</p>
+      {/* ─── Key Metrics Row ─────────────────────────────────── */}
+      <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          {
+            label: 'Total Apps',
+            value: data?.metrics.totalProducts ?? 0,
+            icon: Server,
+            gradient: 'from-blue-500/20 to-blue-500/5',
+            accent: 'text-blue-400',
+          },
+          {
+            label: 'Active Providers',
+            value: enabledProviders.length,
+            icon: Cpu,
+            gradient: 'from-violet-500/20 to-violet-500/5',
+            accent: 'text-violet-400',
+          },
+          {
+            label: 'Brain Requests',
+            value: totalReqs,
+            icon: Brain,
+            gradient: 'from-cyan-500/20 to-cyan-500/5',
+            accent: 'text-cyan-400',
+          },
+          {
+            label: 'System Health',
+            value: `${systemHealth}%`,
+            icon: Gauge,
+            gradient: 'from-emerald-500/20 to-emerald-500/5',
+            accent: systemHealth >= 70 ? 'text-emerald-400' : systemHealth >= 40 ? 'text-amber-400' : 'text-red-400',
+          },
+        ].map((m) => (
+          <div
+            key={m.label}
+            className="relative overflow-hidden bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5"
+          >
+            <div className={`absolute inset-0 bg-gradient-to-br ${m.gradient} pointer-events-none`} />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs text-slate-500 tracking-wide uppercase">{m.label}</span>
+                <m.icon className={`w-4 h-4 ${m.accent} opacity-60`} />
               </div>
-              <div className="bg-white/[0.03] rounded-lg p-3">
+              <p className={`text-3xl font-bold font-mono ${m.accent}`}>{m.value}</p>
+            </div>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* ─── Provider Status Grid ────────────────────────────── */}
+      <motion.div variants={fadeUp}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-white tracking-wide uppercase flex items-center gap-2">
+            <Zap className="w-4 h-4 text-blue-400" />
+            Provider Status
+          </h2>
+          <Link href="/admin/dashboard/ai-providers" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+            Manage <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+        {providers.length === 0 ? (
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 text-center">
+            <WifiOff className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+            <p className="text-sm text-slate-500">No providers configured</p>
+            <Link href="/admin/dashboard/ai-providers" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300">
+              Set up AI providers →
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {providers.map(p => {
+              const cfg = H[p.healthStatus as keyof typeof H] ?? H.unconfigured
+              const Icon = cfg.icon
+              return (
+                <div key={p.id} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    p.healthStatus === 'healthy' ? 'bg-emerald-400/10' :
+                    p.healthStatus === 'error' ? 'bg-red-400/10' :
+                    p.healthStatus === 'configured' || p.healthStatus === 'degraded' ? 'bg-amber-400/10' :
+                    'bg-white/[0.03]'
+                  }`}>
+                    <Icon className={`w-5 h-5 ${cfg.color}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white truncate">{p.displayName}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                      <span className={`text-xs font-mono ${cfg.color}`}>{cfg.label}</span>
+                      {!p.enabled && <span className="text-[10px] text-slate-600 font-mono ml-1">(disabled)</span>}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </motion.div>
+
+      {/* ─── System Subsections (2-column) ───────────────────── */}
+      <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Memory Status */}
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Database className="w-4 h-4 text-cyan-400" />
+              Memory Status
+            </h2>
+            <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+              memory?.statusLabel === 'saving' ? 'bg-emerald-400/10 text-emerald-400' :
+              memory?.statusLabel === 'empty' ? 'bg-amber-400/10 text-amber-400' :
+              'bg-slate-500/10 text-slate-500'
+            }`}>
+              {memory?.statusLabel === 'saving' ? 'ACTIVE' :
+               memory?.statusLabel === 'empty' ? 'EMPTY' : 'NOT CONFIGURED'}
+            </span>
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-slate-500 mb-1">Total Entries</p>
+                <p className="text-2xl font-bold font-mono text-white">{memory?.totalEntries ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-1">App Slugs</p>
+                <p className="text-2xl font-bold font-mono text-white">{memory?.appSlugs?.length ?? 0}</p>
+              </div>
+            </div>
+            {memory?.appSlugs && memory.appSlugs.length > 0 && (
+              <div>
+                <p className="text-xs text-slate-500 mb-2">Connected Apps</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {memory.appSlugs.map(slug => (
+                    <span key={slug} className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-white/[0.04] text-slate-400 border border-white/[0.06]">
+                      {slug}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {memory?.error && (
+              <p className="text-xs text-red-400/70 font-mono">{memory.error}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Brain Stats */}
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Brain className="w-4 h-4 text-violet-400" />
+              Brain Stats
+            </h2>
+            <Link href="/admin/dashboard/brain-chat" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+              Open Chat <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="p-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/[0.03] rounded-xl p-3.5">
                 <p className="text-xs text-slate-500">Success Rate</p>
-                <p className="text-xl font-bold text-white mt-0.5">
-                  {data?.brainStats && data.brainStats.totalRequests > 0
-                    ? `${Math.round((data.brainStats.successCount / data.brainStats.totalRequests) * 100)}%`
-                    : '—'}
+                <p className={`text-2xl font-bold font-mono mt-1 ${successRate >= 90 ? 'text-emerald-400' : successRate >= 70 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {totalReqs > 0 ? `${successRate}%` : '—'}
                 </p>
               </div>
-              <div className="bg-white/[0.03] rounded-lg p-3">
+              <div className="bg-white/[0.03] rounded-xl p-3.5">
                 <p className="text-xs text-slate-500">Avg Latency</p>
-                <p className="text-xl font-bold text-white mt-0.5">
+                <p className="text-2xl font-bold font-mono mt-1 text-white">
                   {data?.brainStats?.avgLatencyMs ? `${data.brainStats.avgLatencyMs}ms` : '—'}
                 </p>
               </div>
-              <div className="bg-white/[0.03] rounded-lg p-3">
+              <div className="bg-white/[0.03] rounded-xl p-3.5">
+                <p className="text-xs text-slate-500">Success</p>
+                <p className="text-2xl font-bold font-mono mt-1 text-emerald-400">{successReqs}</p>
+              </div>
+              <div className="bg-white/[0.03] rounded-xl p-3.5">
                 <p className="text-xs text-slate-500">Errors</p>
-                <p className={`text-xl font-bold mt-0.5 ${(data?.brainStats?.errorCount ?? 0) > 0 ? 'text-red-400' : 'text-white'}`}>
-                  {data?.brainStats?.errorCount ?? 0}
-                </p>
+                <p className={`text-2xl font-bold font-mono mt-1 ${errorReqs > 0 ? 'text-red-400' : 'text-white'}`}>{errorReqs}</p>
               </div>
             </div>
           </div>
-        </Card>
-      </div>
+        </div>
 
-      {/* ROW 3 — Events + Readiness + Links */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Quick Actions */}
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-white/[0.06]">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-400" />
+              Quick Actions
+            </h2>
+          </div>
+          <div className="p-4 grid grid-cols-2 gap-3">
+            {[
+              { label: 'Providers',   href: '/admin/dashboard/ai-providers', icon: Cpu,      desc: 'Manage AI keys' },
+              { label: 'Workspace',   href: '/admin/dashboard/apps',         icon: Server,   desc: 'App registry' },
+              { label: 'Readiness',   href: '/admin/dashboard/readiness',    icon: Shield,   desc: 'Go-live checks' },
+              { label: 'Events',      href: '/admin/dashboard/events',       icon: Activity, desc: 'Logs & alerts' },
+              { label: 'Brain Chat',  href: '/admin/dashboard/brain-chat',   icon: Brain,    desc: 'Test AI brain' },
+              { label: 'Analytics',   href: '/admin/dashboard/analytics',    icon: BarChart3, desc: 'Usage stats' },
+            ].map(item => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-3 px-3 py-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.1] transition-all group"
+              >
+                <item.icon className="w-4 h-4 text-slate-500 group-hover:text-blue-400 transition-colors shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm text-white truncate">{item.label}</p>
+                  <p className="text-[11px] text-slate-600 truncate">{item.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
 
         {/* Recent Events */}
-        <Card title="Recent Events" action={{ label: 'All Events', href: '/admin/dashboard/events' }} className="lg:col-span-2">
-          {(data?.recentEvents.length ?? 0) === 0 ? (
-            <p className="text-sm text-slate-500 py-2 text-center">No events logged yet</p>
-          ) : (
-            <div className="space-y-0">
-              {data?.recentEvents.slice(0, 6).map(ev => {
-                const color = SEV[ev.severity as keyof typeof SEV] ?? 'text-slate-400'
-                return (
-                  <div key={ev.id} className="flex items-start gap-3 py-2.5 border-b border-white/5 last:border-0">
-                    <span className={`text-xs font-medium capitalize flex-shrink-0 pt-0.5 w-14 ${color}`}>
-                      {ev.severity}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{ev.title}</p>
-                      <p className="text-xs text-slate-600">{ev.product?.name ?? '—'}</p>
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Activity className="w-4 h-4 text-blue-400" />
+              Recent Events
+            </h2>
+            <Link href="/admin/dashboard/events" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+              View All <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="p-4">
+            {(data?.recentEvents.length ?? 0) === 0 ? (
+              <p className="text-sm text-slate-500 py-4 text-center">No events logged yet</p>
+            ) : (
+              <div className="space-y-1">
+                {data?.recentEvents.slice(0, 5).map(ev => {
+                  const sev = SEV[ev.severity as keyof typeof SEV] ?? { color: 'text-slate-400', bg: 'bg-white/[0.03]', dot: 'bg-slate-500' }
+                  return (
+                    <div key={ev.id} className="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-white/[0.02] transition-colors">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${sev.dot}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white truncate">{ev.title}</p>
+                        <p className="text-[11px] text-slate-600">{ev.product?.name ?? '—'}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${sev.bg} ${sev.color}`}>
+                          {ev.severity}
+                        </span>
+                        <p className="text-[10px] text-slate-600 mt-0.5 font-mono">
+                          {formatDistanceToNow(new Date(ev.timestamp), { addSuffix: true })}
+                        </p>
+                      </div>
                     </div>
-                    <span className="text-xs text-slate-600 flex-shrink-0">
-                      {formatDistanceToNow(new Date(ev.timestamp), { addSuffix: true })}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </Card>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
 
-        {/* System Readiness */}
-        <Card title="System Readiness">
-          <div className="space-y-3">
-            {[
-              { label: 'AI provider configured', ok: enabledProviders.length > 0 },
-              { label: 'Provider health-checked', ok: healthyProviders.length > 0 },
-              { label: 'App registered', ok: totalApps > 0 },
-              { label: 'App integration active', ok: connectedApps.length > 0 },
-              { label: 'Brain requests made', ok: (data?.brainStats?.totalRequests ?? 0) > 0 },
-              { label: 'Memory layer active', ok: memoryActive },
-            ].map(item => (
-              <div key={item.label} className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">{item.label}</span>
-                {item.ok
-                  ? <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                  : <AlertCircle className="w-4 h-4 text-slate-600 flex-shrink-0" />}
-              </div>
-            ))}
-
-            {/* Memory status detail */}
-            <div className="pt-2 mt-1 border-t border-white/5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Memory status</span>
-                {memory === null ? (
-                  <span className="text-slate-600">Loading…</span>
-                ) : memory.statusLabel === 'saving' ? (
-                  <span className="text-emerald-400">Saving · {memory.totalEntries} entr{memory.totalEntries === 1 ? 'y' : 'ies'}</span>
-                ) : memory.statusLabel === 'empty' ? (
-                  <span className="text-amber-400">Table ready · no entries yet</span>
-                ) : (
-                  <span className="text-slate-500" title={memory.error ?? ''}>Migration required</span>
-                )}
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-white/5">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-slate-500">Setup progress</span>
-                <span className="text-xs text-white font-semibold">{setupScore}%</span>
-              </div>
-              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${setupScore}%` }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
-                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full"
-                />
-              </div>
+      {/* ─── Product Status Table ────────────────────────────── */}
+      <motion.div variants={fadeUp}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-white tracking-wide uppercase flex items-center gap-2">
+            <CircleDot className="w-4 h-4 text-cyan-400" />
+            Product Status
+          </h2>
+          <Link href="/admin/dashboard/apps" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+            Manage Apps <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+        {totalApps === 0 ? (
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 text-center">
+            <Shield className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+            <p className="text-sm text-slate-500">No apps registered</p>
+            <Link href="/admin/dashboard/apps" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300">
+              Register your first app →
+            </Link>
+          </div>
+        ) : (
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/[0.06]">
+                    <th className="text-left text-[11px] text-slate-500 font-medium uppercase tracking-wider px-5 py-3">App Name</th>
+                    <th className="text-left text-[11px] text-slate-500 font-medium uppercase tracking-wider px-5 py-3">Status</th>
+                    <th className="text-left text-[11px] text-slate-500 font-medium uppercase tracking-wider px-5 py-3">Health</th>
+                    <th className="text-right text-[11px] text-slate-500 font-medium uppercase tracking-wider px-5 py-3">Last Seen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data?.productStats.map(app => {
+                    const health = app.integration?.healthStatus ?? 'no_integration'
+                    const healthCfg = health === 'healthy'
+                      ? { label: 'Healthy', color: 'text-emerald-400', dot: 'bg-emerald-400' }
+                      : health === 'degraded'
+                      ? { label: 'Degraded', color: 'text-amber-400', dot: 'bg-amber-400' }
+                      : health === 'error'
+                      ? { label: 'Error', color: 'text-red-400', dot: 'bg-red-400' }
+                      : { label: 'No Integration', color: 'text-slate-500', dot: 'bg-slate-600' }
+                    return (
+                      <tr key={app.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
+                        <td className="px-5 py-3">
+                          <span className="text-sm text-white font-medium">{app.name}</span>
+                        </td>
+                        <td className="px-5 py-3">
+                          <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                            app.status === 'active' ? 'bg-emerald-400/10 text-emerald-400' :
+                            app.status === 'draft' ? 'bg-amber-400/10 text-amber-400' :
+                            'bg-white/[0.04] text-slate-500'
+                          }`}>
+                            {app.status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${healthCfg.dot}`} />
+                            <span className={`text-xs font-mono ${healthCfg.color}`}>{healthCfg.label}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <span className="text-xs text-slate-600 font-mono">
+                            {app.integration?.lastHeartbeatAt
+                              ? formatDistanceToNow(new Date(app.integration.lastHeartbeatAt), { addSuffix: true })
+                              : '—'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
-        </Card>
-      </div>
-
-      {/* Quick nav row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Configure Providers', href: '/admin/dashboard/ai-providers', icon: Zap },
-          { label: 'App Registry', href: '/admin/dashboard/apps', icon: Shield },
-          { label: 'Events & Logs', href: '/admin/dashboard/events', icon: Activity },
-          { label: 'Brain Chat', href: '/admin/dashboard/brain-chat', icon: Activity },
-        ].map(item => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="flex items-center gap-2 px-3 py-2.5 bg-white/[0.03] border border-white/8 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-white/[0.06] hover:border-white/15 transition-all group"
-          >
-            <item.icon className="w-3.5 h-3.5 flex-shrink-0 group-hover:text-blue-400" />
-            {item.label}
-          </Link>
-        ))}
-      </div>
-    </div>
+        )}
+      </motion.div>
+    </motion.div>
   )
 }

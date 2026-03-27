@@ -172,7 +172,7 @@ export default function BrainChatPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Chat panel */}
-        <div className="lg:col-span-3 bg-[#0A1020] border border-white/8 rounded-xl flex flex-col h-[520px]">
+        <div className="lg:col-span-3 bg-white/[0.03] border border-white/[0.06] rounded-xl flex flex-col h-[520px]">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 ? (
@@ -197,7 +197,7 @@ export default function BrainChatPage() {
                       ? 'bg-blue-600 text-white'
                       : msg.meta?.error
                         ? 'bg-red-500/10 border border-red-500/20 text-red-300'
-                        : 'bg-white/[0.06] border border-white/8 text-slate-200'
+                        : 'bg-white/[0.06] border border-white/[0.06] text-slate-200'
                   }`}>
                     {msg.content}
                   </div>
@@ -249,7 +249,7 @@ export default function BrainChatPage() {
         </div>
 
         {/* Recent events panel */}
-        <div className="lg:col-span-2 bg-[#0A1020] border border-white/8 rounded-xl flex flex-col h-[520px]">
+        <div className="lg:col-span-2 bg-white/[0.03] border border-white/[0.06] rounded-xl flex flex-col h-[520px]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
               <Activity className="w-3.5 h-3.5 text-blue-400" />

@@ -110,7 +110,7 @@ export default function EventsPage() {
         <button
           onClick={fetchEvents}
           disabled={loading}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-slate-300 hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-slate-300 hover:bg-white/[0.06] transition-colors disabled:opacity-50"
         >
           <RefreshCw
             className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`}
@@ -134,7 +134,7 @@ export default function EventsPage() {
             className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
               activeFilter === f
                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+                : 'bg-white/5 text-slate-400 border border-white/[0.06] hover:bg-white/[0.06]'
             }`}
           >
             {f}
@@ -162,7 +162,7 @@ export default function EventsPage() {
           <p className="text-sm text-red-400">{error}</p>
           <button
             onClick={fetchEvents}
-            className="mt-3 px-4 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:bg-white/10 transition-colors"
+            className="mt-3 px-4 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:bg-white/[0.06] transition-colors"
           >
             Try again
           </button>

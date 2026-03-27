@@ -73,27 +73,29 @@ export default function HealingPage() {
   useEffect(() => { load() }, [load])
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Self-Healing Engine</h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-lime-400 to-emerald-400 text-transparent bg-clip-text">
+            Self-Healing Engine
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
             Real-time detection of provider failures, broken routes, missing credentials, and degraded components.
           </p>
         </div>
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50 text-sm"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all disabled:opacity-50"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </button>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>
+        <div className="p-4 rounded-2xl bg-red-500/[0.06] border border-red-500/20 text-red-400 text-sm">{error}</div>
       )}
 
       {data && (
@@ -102,7 +104,7 @@ export default function HealingPage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-5 rounded-2xl bg-white/3 border border-white/8"
+            className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06]"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -138,7 +140,7 @@ export default function HealingPage() {
                 key={m.label}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="p-4 rounded-xl bg-white/3 border border-white/8 text-center"
+                className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-center"
               >
                 <p className={`text-2xl font-bold ${m.color}`}>{m.value}</p>
                 <p className="text-xs text-slate-500 mt-1">{m.label}</p>
@@ -148,7 +150,7 @@ export default function HealingPage() {
 
           {/* Issues List */}
           {data.recentIssues.length === 0 ? (
-            <div className="p-8 rounded-2xl bg-emerald-500/5 border border-emerald-500/15 text-center">
+            <div className="p-8 rounded-2xl bg-emerald-500/[0.04] border border-emerald-500/15 text-center">
               <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
               <p className="text-emerald-400 font-bold text-lg">No Issues Detected</p>
               <p className="text-slate-500 text-sm mt-1">All systems are operating normally.</p>

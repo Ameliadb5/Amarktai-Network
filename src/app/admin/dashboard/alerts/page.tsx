@@ -112,7 +112,7 @@ export default function AlertsPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 + i * 0.05 }}
-                className={`glass rounded-xl p-4 border ${item.borderColor}`}
+                className={`glass rounded-2xl p-4 border ${item.borderColor}`}
               >
                 <div className="flex items-center gap-2.5 mb-2">
                   <div
@@ -187,11 +187,11 @@ export default function AlertsPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 + i * 0.05 }}
-                className="glass rounded-xl p-4 border border-white/5"
+                className="glass rounded-2xl p-4 border border-white/5"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
                       <Icon className="w-4 h-4 text-slate-500" />
                     </div>
                     <div>

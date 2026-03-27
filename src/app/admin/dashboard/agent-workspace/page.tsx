@@ -111,7 +111,7 @@ export default function AgentWorkspacePage() {
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50 text-sm"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-slate-300 hover:text-white hover:bg-white/[0.06] transition-all disabled:opacity-50 text-sm"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -136,7 +136,7 @@ export default function AgentWorkspacePage() {
               key={m.label}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="p-3 rounded-xl bg-white/3 border border-white/8 text-center"
+              className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"
             >
               <p className={`text-xl font-bold ${m.color}`}>{m.value}</p>
               <p className="text-xs text-slate-500 mt-0.5">{m.label}</p>
@@ -151,7 +151,7 @@ export default function AgentWorkspacePage() {
           <RefreshCw className="w-7 h-7 text-yellow-400 animate-spin" />
         </div>
       ) : defs.length === 0 ? (
-        <div className="p-10 rounded-2xl bg-white/3 border border-white/8 text-center text-slate-500">
+        <div className="p-10 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-center text-slate-500">
           No agent definitions loaded.
         </div>
       ) : (
@@ -166,11 +166,11 @@ export default function AgentWorkspacePage() {
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
-                className="rounded-xl bg-white/3 border border-white/8 overflow-hidden"
+                className="rounded-xl bg-white/[0.03] border border-white/[0.06] overflow-hidden"
               >
                 <button
                   onClick={() => setExpanded(isOpen ? null : key)}
-                  className="w-full flex items-center gap-3 p-4 hover:bg-white/3 transition-colors"
+                  className="w-full flex items-center gap-3 p-4 hover:bg-white/[0.03] transition-colors"
                 >
                   <Icon className={`w-5 h-5 flex-shrink-0 ${color}`} />
                   <div className="flex-1 text-left">
@@ -193,7 +193,7 @@ export default function AgentWorkspacePage() {
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
-                    className="border-t border-white/8 p-4 grid sm:grid-cols-2 gap-4"
+                    className="border-t border-white/[0.06] p-4 grid sm:grid-cols-2 gap-4"
                   >
                     <div>
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Capabilities</p>

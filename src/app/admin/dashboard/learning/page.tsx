@@ -80,11 +80,13 @@ export default function LearningPage() {
   const totalPages = data?.totalPages ?? 0
 
   return (
-    <div className="max-w-5xl space-y-5">
+    <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white">What AmarktAI Learned</h1>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-300 text-transparent bg-clip-text">
+            What AmarktAI Learned
+          </h1>
           <p className="text-sm text-slate-500 mt-1">
             Real stored memory from brain executions — events, summaries, and context.
           </p>
@@ -92,7 +94,7 @@ export default function LearningPage() {
         <button
           onClick={() => load(page, typeFilter)}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -108,7 +110,7 @@ export default function LearningPage() {
             { label: 'Summaries', value: String(data?.entries.filter(e => e.memoryType === 'summary').length ?? 0), icon: Brain },
             { label: 'Learning Items', value: String(data?.entries.filter(e => e.memoryType === 'learned').length ?? 0), icon: Lightbulb },
           ].map(stat => (
-            <div key={stat.label} className="bg-[#0A1020] border border-white/8 rounded-xl p-4">
+            <div key={stat.label} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-1">
                 <stat.icon className="w-3.5 h-3.5 text-slate-500" />
                 <p className="text-xs text-slate-500">{stat.label}</p>
@@ -129,7 +131,7 @@ export default function LearningPage() {
               className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
                 typeFilter === t
                   ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+                  : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/[0.06]'
               }`}
             >
               {t === 'all' ? 'All Types' : (TYPE_CONFIG[t]?.label ?? t)}
@@ -142,11 +144,11 @@ export default function LearningPage() {
       {loading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-20 bg-white/4 rounded-xl animate-pulse" />
+            <div key={i} className="h-20 bg-white/[0.03] rounded-xl animate-pulse" />
           ))}
         </div>
       ) : noMigration ? (
-        <div className="bg-[#0A1020] border border-amber-500/20 rounded-xl p-8 text-center">
+        <div className="bg-white/[0.03] border border-amber-500/20 rounded-xl p-8 text-center">
           <AlertCircle className="w-8 h-8 text-amber-400 mx-auto mb-3" />
           <p className="text-sm text-amber-400 font-medium mb-1">Memory table not yet migrated</p>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
@@ -156,7 +158,7 @@ export default function LearningPage() {
           </p>
         </div>
       ) : total === 0 ? (
-        <div className="bg-[#0A1020] border border-white/8 rounded-xl p-12 text-center">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-12 text-center">
           <BookOpen className="w-10 h-10 text-slate-600 mx-auto mb-3" />
           <p className="text-sm text-slate-500 mb-1">No memories stored yet</p>
           <p className="text-xs text-slate-600 max-w-sm mx-auto">
@@ -165,7 +167,7 @@ export default function LearningPage() {
           </p>
         </div>
       ) : (
-        <div className="bg-[#0A1020] border border-white/8 rounded-xl overflow-hidden">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
             <span className="text-xs text-slate-500">{total} {total === 1 ? 'entry' : 'entries'} total</span>
             <span className="text-xs text-slate-600 font-mono">Page {page} of {totalPages}</span>
@@ -230,7 +232,7 @@ export default function LearningPage() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-40 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-40 transition-colors"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
                 Previous
@@ -239,7 +241,7 @@ export default function LearningPage() {
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-40 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-40 transition-colors"
               >
                 Next
                 <ChevronRight className="w-3.5 h-3.5" />

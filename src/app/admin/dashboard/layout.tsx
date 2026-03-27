@@ -9,9 +9,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Plug, Mail, Users, LogOut,
   Menu, X, ChevronRight, Server, Activity, Shield,
-  Brain, MessageSquare, Bell, FileText, AppWindow, BookOpen,
+  Brain, Bell, FileText, AppWindow, BookOpen,
   Route, Zap, Database, Palette, CheckCircle, Layers,
-  FlaskConical, Github, FolderOpen, DollarSign, ShieldAlert, Bot,
+  FlaskConical, FolderOpen, DollarSign, ShieldAlert, Bot,
 } from 'lucide-react'
 
 interface NavItem {
@@ -32,7 +32,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard, color: 'text-blue-400' },
       { href: '/admin/dashboard/apps', label: 'App Registry', icon: AppWindow, color: 'text-cyan-400' },
-      { href: '/admin/dashboard/integrations', label: 'App Integrations', icon: Plug, color: 'text-emerald-400' },
+      { href: '/admin/dashboard/integrations', label: 'App Onboarding', icon: Plug, color: 'text-emerald-400' },
     ],
   },
   {
@@ -42,8 +42,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/dashboard/budgets', label: 'Budgets', icon: DollarSign, color: 'text-amber-400' },
       { href: '/admin/dashboard/models', label: 'Model Registry', icon: Layers, color: 'text-orange-400' },
       { href: '/admin/dashboard/routing', label: 'Routing Policies', icon: Route, color: 'text-pink-400' },
-      { href: '/admin/dashboard/ai-usage', label: 'AI Usage', icon: Activity, color: 'text-blue-400' },
-      { href: '/admin/dashboard/brain-chat', label: 'Gateway Test', icon: MessageSquare, color: 'text-cyan-400' },
+      { href: '/admin/dashboard/learning', label: 'Learning', icon: BookOpen, color: 'text-emerald-400' },
     ],
   },
   {
@@ -53,15 +52,13 @@ const navGroups: NavGroup[] = [
       { href: '/admin/dashboard/agents', label: 'Agent Activity', icon: Zap, color: 'text-orange-400' },
       { href: '/admin/dashboard/memory', label: 'Memory & Retrieval', icon: Database, color: 'text-green-400' },
       { href: '/admin/dashboard/multimodal', label: 'Multimodal Services', icon: Palette, color: 'text-rose-400' },
-      { href: '/admin/dashboard/learning', label: 'Learning', icon: BookOpen, color: 'text-emerald-400' },
     ],
   },
   {
     label: 'Developer',
     items: [
-      { href: '/admin/dashboard/playground', label: 'Playground', icon: FlaskConical, color: 'text-purple-400' },
+      { href: '/admin/dashboard/playground', label: 'Workspace', icon: FlaskConical, color: 'text-purple-400' },
       { href: '/admin/dashboard/projects', label: 'Projects', icon: FolderOpen, color: 'text-blue-400' },
-      { href: '/admin/dashboard/dev-workspace', label: 'Dev Workspace', icon: Github, color: 'text-slate-300' },
     ],
   },
   {
@@ -97,23 +94,24 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="p-6 border-b border-white/5">
-        <Link href="/" className="flex items-center gap-2.5 group" onClick={onClose}>
-          <div className="relative w-9 h-9 flex-shrink-0">
+      <div className="p-6 pb-5 border-b border-white/[0.06]">
+        <Link href="/" className="flex items-center gap-3 group" onClick={onClose}>
+          <div className="relative w-[44px] h-[44px] flex-shrink-0">
             <Image
               src="/Amarktai-logo.png"
               alt="AmarktAI Network"
-              width={36}
-              height={36}
+              width={44}
+              height={44}
               className="rounded-xl object-contain"
             />
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 blur-lg opacity-20 group-hover:opacity-40 transition-opacity" />
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 blur-xl opacity-25 group-hover:opacity-50 transition-opacity duration-300" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white">
+            <p className="text-base font-bold text-white leading-tight">
               <span className="text-white">Amarkt</span><span className="text-blue-400">AI</span>
             </p>
-            <p className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">Network</p>
+            <p className="text-[11px] text-slate-500 font-mono tracking-widest uppercase leading-tight">Network</p>
+            <p className="text-[9px] text-slate-600 font-medium tracking-wide mt-0.5">AI Operating System</p>
           </div>
         </Link>
       </div>
@@ -133,10 +131,13 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-4 mt-2 overflow-y-auto">
-        {navGroups.map((group) => (
-          <div key={group.label} className="mb-4">
-            <p className="text-[10px] text-slate-600 font-mono tracking-widest uppercase px-3 mb-2">
+      <nav className="flex-1 px-3 pt-4 pb-2 overflow-y-auto scrollbar-thin">
+        {navGroups.map((group, groupIdx) => (
+          <div key={group.label} className="mb-1">
+            {groupIdx > 0 && (
+              <div className="mx-3 mb-3 mt-2 border-t border-white/[0.04]" />
+            )}
+            <p className="text-[11px] text-slate-500 font-mono tracking-widest uppercase px-3 mb-1.5 font-medium">
               {group.label}
             </p>
             <div className="space-y-0.5">
@@ -147,13 +148,17 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                     key={item.href}
                     href={item.href}
                     onClick={onClose}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
+                    className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-300 group ${
                       active
-                        ? 'bg-blue-500/12 text-white border border-blue-500/20'
-                        : 'text-slate-500 hover:text-white hover:bg-white/5'
+                        ? 'bg-blue-500/15 text-white border border-blue-500/25 shadow-[0_0_12px_-3px_rgba(59,130,246,0.3)]'
+                        : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent'
                     }`}
                   >
-                    <item.icon className={`w-4 h-4 flex-shrink-0 ${active ? item.color : 'group-hover:' + item.color}`} />
+                    <item.icon
+                      className={`w-[18px] h-[18px] flex-shrink-0 transition-colors duration-300 ${
+                        active ? item.color : 'group-hover:' + item.color
+                      }`}
+                    />
                     <span className="flex-1">{item.label}</span>
                     {active && <ChevronRight className="w-3 h-3 text-blue-400" />}
                   </Link>
@@ -165,22 +170,25 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-white/5 space-y-2">
+      <div className="p-4 border-t border-white/[0.06] space-y-2">
         <Link
           href="/"
           onClick={onClose}
-          className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+          className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-white hover:bg-white/[0.04] transition-all duration-300"
         >
           <Shield className="w-3.5 h-3.5" />
           View Public Site
         </Link>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/5 transition-all w-full"
+          className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/5 transition-all duration-300 w-full"
         >
           <LogOut className="w-4 h-4" />
           Sign Out
         </button>
+        <div className="px-3 pt-2 border-t border-white/[0.04]">
+          <p className="text-[10px] text-slate-600 font-mono tracking-wide">v2.0.0 — Production</p>
+        </div>
       </div>
     </div>
   )
@@ -191,6 +199,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const currentPage = allNavItems.find((n) => n.href === pathname)
+  const currentGroup = navGroups.find((g) =>
+    g.items.some((item) => item.href === pathname)
+  )
 
   return (
     <div
@@ -205,7 +216,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 flex-col bg-[#080E1C]/90 backdrop-blur-xl border-r border-white/5 fixed inset-y-0 left-0 z-40">
+      <aside className="hidden lg:flex w-64 flex-col bg-[#060C1B]/95 backdrop-blur-xl border-r border-white/[0.06] fixed inset-y-0 left-0 z-40">
         <SidebarContent />
       </aside>
 
@@ -224,11 +235,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               animate={{ x: 0 }}
               exit={{ x: -264 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="relative w-64 bg-[#080E1C] border-r border-white/5 flex flex-col"
+              className="relative w-64 bg-[#060C1B] border-r border-white/[0.06] flex flex-col"
             >
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors duration-300"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -241,19 +252,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 relative z-10">
         {/* Top Bar */}
-        <div className="h-14 border-b border-white/5 bg-[#050816]/80 backdrop-blur-xl flex items-center gap-4 px-4 lg:px-6 sticky top-0 z-30">
+        <div className="h-16 border-b border-white/[0.06] bg-gradient-to-r from-[#050816]/90 via-[#050816]/80 to-[#060C1B]/90 backdrop-blur-xl flex items-center gap-4 px-4 lg:px-6 sticky top-0 z-30">
           <button
-            className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+            className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors duration-300"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-sm">
+            {currentGroup && (
+              <span className="text-slate-500 font-medium hidden sm:inline">{currentGroup.label}</span>
+            )}
+            {currentGroup && currentPage && (
+              <ChevronRight className="w-3 h-3 text-slate-600 hidden sm:inline" />
+            )}
             {currentPage && (
-              <>
+              <div className="flex items-center gap-2">
                 <currentPage.icon className={`w-4 h-4 ${currentPage.color}`} />
-                <span className="text-sm font-semibold text-white">{currentPage.label}</span>
-              </>
+                <span className="font-semibold text-white">{currentPage.label}</span>
+              </div>
             )}
           </div>
           <div className="flex-1" />

@@ -65,7 +65,7 @@ export default function ModelsPage() {
   const providers = [...new Set(data?.models.map(m => m.provider) ?? [])]
 
   return (
-    <div className="max-w-5xl space-y-5">
+    <div className="max-w-6xl space-y-5">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Model Registry</h1>
@@ -76,7 +76,7 @@ export default function ModelsPage() {
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -92,7 +92,7 @@ export default function ModelsPage() {
             { label: 'Providers', value: String(providers.length) },
             { label: 'Shown', value: String(data.total) },
           ].map(stat => (
-            <div key={stat.label} className="bg-[#0A1020] border border-white/8 rounded-xl p-4">
+            <div key={stat.label} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
               <p className="text-xs text-slate-500">{stat.label}</p>
               <p className="text-xl font-bold text-white mt-1">{stat.value}</p>
             </div>
@@ -104,21 +104,21 @@ export default function ModelsPage() {
       {loading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-16 bg-white/4 rounded-xl animate-pulse" />
+            <div key={i} className="h-16 bg-white/[0.03] rounded-xl animate-pulse" />
           ))}
         </div>
       ) : error ? (
-        <div className="bg-[#0A1020] border border-red-500/20 rounded-xl p-8 text-center">
+        <div className="bg-white/[0.03] border border-red-500/20 rounded-2xl p-8 text-center">
           <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
           <p className="text-sm text-red-400">{error}</p>
         </div>
       ) : !data || data.total === 0 ? (
-        <div className="bg-[#0A1020] border border-white/8 rounded-xl p-12 text-center">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-12 text-center">
           <Layers className="w-10 h-10 text-slate-600 mx-auto mb-3" />
           <p className="text-sm text-slate-500">No models registered.</p>
         </div>
       ) : (
-        <div className="bg-[#0A1020] border border-white/8 rounded-xl overflow-hidden">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-white/5">
             <span className="text-xs text-slate-500">{data.total} models in registry</span>
           </div>

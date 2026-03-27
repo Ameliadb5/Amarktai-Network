@@ -80,7 +80,7 @@ export default function WaitlistPage() {
         {entries.length > 0 && (
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 glass text-slate-300 text-sm rounded-xl hover:text-white border border-white/10"
+            className="flex items-center gap-2 px-4 py-2 glass text-slate-300 text-sm rounded-xl hover:text-white border border-white/[0.06]"
           >
             <Download className="w-4 h-4" />
             Export CSV

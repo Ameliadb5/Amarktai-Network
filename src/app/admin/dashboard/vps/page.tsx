@@ -299,7 +299,7 @@ export default function VpsMonitorPage() {
               icon: <Wifi className="w-4 h-4 text-violet-400" />,
             },
           ].map(({ label, value, icon }) => (
-            <div key={label} className="glass rounded-xl p-4 flex items-center gap-3">
+            <div key={label} className="glass rounded-2xl p-4 flex items-center gap-3">
               {icon}
               <div>
                 <p className="text-xl font-bold text-white font-heading">{value}</p>

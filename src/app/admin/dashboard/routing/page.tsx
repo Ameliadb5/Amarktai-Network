@@ -91,7 +91,7 @@ export default function RoutingPage() {
   const decision = result?.decision
 
   return (
-    <div className="max-w-5xl space-y-5">
+    <div className="max-w-6xl space-y-5">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Routing Policies</h1>
@@ -102,7 +102,7 @@ export default function RoutingPage() {
         <button
           onClick={() => load(selectedContext)}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Re-run
@@ -118,7 +118,7 @@ export default function RoutingPage() {
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               selectedContext === i
                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+                : 'bg-white/5 text-slate-400 border border-white/[0.06] hover:bg-white/[0.06]'
             }`}
           >
             {ctx.label}
@@ -129,18 +129,18 @@ export default function RoutingPage() {
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-20 bg-white/4 rounded-xl animate-pulse" />
+            <div key={i} className="h-20 bg-white/[0.03] rounded-xl animate-pulse" />
           ))}
         </div>
       ) : error ? (
-        <div className="bg-[#0A1020] border border-red-500/20 rounded-xl p-8 text-center">
+        <div className="bg-white/[0.03] border border-red-500/20 rounded-2xl p-8 text-center">
           <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
           <p className="text-sm text-red-400">{error}</p>
         </div>
       ) : decision ? (
         <>
           {/* Routing mode */}
-          <div className="bg-[#0A1020] border border-white/8 rounded-xl p-5">
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
             <div className="flex items-center gap-3 mb-3">
               <Route className="w-5 h-5 text-pink-400" />
               <h2 className="text-sm font-bold text-white">Routing Decision</h2>
@@ -153,7 +153,7 @@ export default function RoutingPage() {
             {/* Model chain */}
             <div className="flex items-center gap-2 flex-wrap">
               {decision.primary && (
-                <div className="bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2">
                   <p className="text-[10px] text-slate-500 uppercase">Primary</p>
                   <p className="text-sm text-white font-medium">{decision.primary.display_name || decision.primary.model_id}</p>
                   <p className="text-[10px] text-slate-500 font-mono">{decision.primary.provider}</p>
@@ -162,7 +162,7 @@ export default function RoutingPage() {
               {decision.secondary && (
                 <>
                   <ArrowRight className="w-4 h-4 text-slate-600" />
-                  <div className="bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2">
                     <p className="text-[10px] text-slate-500 uppercase">Secondary</p>
                     <p className="text-sm text-white font-medium">{decision.secondary.display_name || decision.secondary.model_id}</p>
                     <p className="text-[10px] text-slate-500 font-mono">{decision.secondary.provider}</p>
@@ -215,7 +215,7 @@ export default function RoutingPage() {
           </div>
 
           {/* Input context */}
-          <div className="bg-[#0A1020] border border-white/8 rounded-xl p-5">
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
             <h2 className="text-sm font-bold text-white mb-3">Input Context</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {result?.context && Object.entries(result.context).map(([key, val]) => (

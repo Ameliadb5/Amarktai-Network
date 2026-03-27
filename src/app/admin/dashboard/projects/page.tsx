@@ -179,7 +179,7 @@ function ProjectsPageInner() {
         <button
           onClick={loadProjects}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white text-sm disabled:opacity-50 transition-all"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-slate-400 hover:text-white text-sm disabled:opacity-50 transition-all"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -198,7 +198,7 @@ function ProjectsPageInner() {
               className={`w-full text-left p-3 rounded-xl border transition-all ${
                 selected?.id === p.id
                   ? 'bg-blue-600/15 border-blue-500/30 text-white'
-                  : 'bg-white/3 border-white/8 text-slate-400 hover:text-white hover:border-white/15'
+                  : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:text-white hover:border-white/15'
               }`}
             >
               <p className="font-medium text-sm truncate">{p.name}</p>
@@ -210,7 +210,7 @@ function ProjectsPageInner() {
             </button>
           ))}
           {projects.length === 0 && !loading && (
-            <div className="p-4 rounded-xl bg-white/3 border border-white/8 text-center text-slate-600 text-xs">
+            <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center text-slate-600 text-xs">
               No projects. Create one in Playground.
             </div>
           )}
@@ -226,7 +226,7 @@ function ProjectsPageInner() {
         {/* Project detail */}
         <div className="lg:col-span-2">
           {!selected ? (
-            <div className="p-10 rounded-2xl bg-white/3 border border-white/8 text-center text-slate-600">
+            <div className="p-10 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-center text-slate-600">
               <FolderOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p>Select a project to view its files and history.</p>
             </div>
@@ -255,7 +255,7 @@ function ProjectsPageInner() {
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-1 border-b border-white/8 pb-1">
+              <div className="flex gap-1 border-b border-white/[0.06] pb-1">
                 {(['prompts', 'files', 'push'] as const).map(t => (
                   <button
                     key={t}
@@ -274,11 +274,11 @@ function ProjectsPageInner() {
               {tab === 'prompts' && (
                 <div className="space-y-2">
                   {selected.promptHistory.length === 0 ? (
-                    <div className="p-6 rounded-xl bg-white/3 border border-white/8 text-center text-slate-600 text-sm">
+                    <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center text-slate-600 text-sm">
                       No prompt history yet. Use Gateway Test or Playground to generate prompts.
                     </div>
                   ) : selected.promptHistory.slice(0, 20).map((ph) => (
-                    <div key={ph.id} className="p-3 rounded-xl bg-white/3 border border-white/8 text-sm">
+                    <div key={ph.id} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm">
                       <div className="flex items-center gap-2 mb-1 text-xs text-slate-500">
                         <MessageSquare className="w-3 h-3" />
                         <span className="font-mono text-purple-400">{ph.model}</span>
@@ -306,19 +306,19 @@ function ProjectsPageInner() {
                     </button>
                   </div>
                   {addingFile && (
-                    <form onSubmit={handleAddFile} className="p-3 rounded-xl bg-white/3 border border-blue-500/20 space-y-2">
+                    <form onSubmit={handleAddFile} className="p-3 rounded-xl bg-white/[0.03] border border-blue-500/20 space-y-2">
                       <div className="grid grid-cols-2 gap-2">
                         <input
                           required
                           placeholder="filename.md"
                           value={newFileForm.name}
                           onChange={e => setNewFileForm(f => ({ ...f, name: e.target.value }))}
-                          className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500/50"
+                          className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500/50"
                         />
                         <select
                           value={newFileForm.type}
                           onChange={e => setNewFileForm(f => ({ ...f, type: e.target.value }))}
-                          className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500/50"
+                          className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500/50"
                         >
                           {['snippet', 'config', 'prompt', 'workflow', 'note'].map(t => (
                             <option key={t} value={t}>{t}</option>
@@ -330,7 +330,7 @@ function ProjectsPageInner() {
                         placeholder="File content…"
                         value={newFileForm.content}
                         onChange={e => setNewFileForm(f => ({ ...f, content: e.target.value }))}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500/50 resize-none font-mono"
+                        className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500/50 resize-none font-mono"
                       />
                       <div className="flex gap-2">
                         <button type="submit" className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs">
@@ -341,11 +341,11 @@ function ProjectsPageInner() {
                     </form>
                   )}
                   {selected.files.length === 0 && !addingFile ? (
-                    <div className="p-6 rounded-xl bg-white/3 border border-white/8 text-center text-slate-600 text-sm">
+                    <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center text-slate-600 text-sm">
                       No files yet. Add snippets, configs, prompts, or notes.
                     </div>
                   ) : selected.files.map(file => (
-                    <div key={file.id} className="p-3 rounded-xl bg-white/3 border border-white/8">
+                    <div key={file.id} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           <FileText className="w-3.5 h-3.5 text-blue-400" />
@@ -368,14 +368,14 @@ function ProjectsPageInner() {
               {/* Push tab */}
               {tab === 'push' && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-white/3 border border-white/8 space-y-3">
+                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-3">
                     <div>
                       <label className="text-xs text-slate-400 block mb-1">Target Repo (owner/repo)</label>
                       <input
                         placeholder="your-org/your-repo"
                         value={pushForm.repo}
                         onChange={e => setPushForm(f => ({ ...f, repo: e.target.value }))}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/50 font-mono"
+                        className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/50 font-mono"
                       />
                     </div>
                     <div>
@@ -383,7 +383,7 @@ function ProjectsPageInner() {
                       <input
                         value={pushForm.branch}
                         onChange={e => setPushForm(f => ({ ...f, branch: e.target.value }))}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/50 font-mono"
+                        className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/50 font-mono"
                       />
                     </div>
                     <div>
@@ -392,7 +392,7 @@ function ProjectsPageInner() {
                         placeholder={`AmarktAI Playground: ${selected.name}`}
                         value={pushForm.message}
                         onChange={e => setPushForm(f => ({ ...f, message: e.target.value }))}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/50"
+                        className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500/50"
                       />
                     </div>
                     <button

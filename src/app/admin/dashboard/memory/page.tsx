@@ -68,10 +68,10 @@ export default function MemoryPage() {
   }
 
   return (
-    <div className="max-w-5xl space-y-5">
+    <div className="max-w-6xl space-y-5">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">Memory &amp; Retrieval</h1>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-300 text-transparent bg-clip-text">Memory &amp; Retrieval</h1>
           <p className="text-sm text-slate-500 mt-1">
             Memory layer status and retrieval engine configuration.
           </p>
@@ -79,7 +79,7 @@ export default function MemoryPage() {
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -89,11 +89,11 @@ export default function MemoryPage() {
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-24 bg-white/4 rounded-xl animate-pulse" />
+            <div key={i} className="h-24 bg-white/[0.03] rounded-xl animate-pulse" />
           ))}
         </div>
       ) : error ? (
-        <div className="bg-[#0A1020] border border-red-500/20 rounded-xl p-8 text-center">
+        <div className="bg-white/[0.03] border border-red-500/20 rounded-2xl p-8 text-center">
           <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
           <p className="text-sm text-red-400">{error}</p>
         </div>
@@ -101,26 +101,26 @@ export default function MemoryPage() {
         <>
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-[#0A1020] border border-white/8 rounded-xl p-4">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
               <p className="text-xs text-slate-500">Total Entries</p>
               <p className="text-xl font-bold text-white mt-1">{memory?.totalEntries ?? 0}</p>
             </div>
-            <div className="bg-[#0A1020] border border-white/8 rounded-xl p-4">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
               <p className="text-xs text-slate-500">App Namespaces</p>
               <p className="text-xl font-bold text-white mt-1">{memory?.appSlugs?.length ?? 0}</p>
             </div>
-            <div className="bg-[#0A1020] border border-white/8 rounded-xl p-4">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
               <p className="text-xs text-slate-500">Indexed Entries</p>
               <p className="text-xl font-bold text-white mt-1">{retrieval?.totalIndexedEntries ?? 0}</p>
             </div>
-            <div className="bg-[#0A1020] border border-white/8 rounded-xl p-4">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
               <p className="text-xs text-slate-500">Retrieval Namespaces</p>
               <p className="text-xl font-bold text-white mt-1">{retrieval?.appNamespaces?.length ?? 0}</p>
             </div>
           </div>
 
           {/* Memory section */}
-          <div className="bg-[#0A1020] border border-white/8 rounded-xl p-5">
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
             <div className="flex items-center gap-3 mb-4">
               <Database className="w-5 h-5 text-green-400" />
               <h2 className="text-sm font-bold text-white">Memory Layer</h2>
@@ -158,7 +158,7 @@ export default function MemoryPage() {
           </div>
 
           {/* Retrieval section */}
-          <div className="bg-[#0A1020] border border-white/8 rounded-xl p-5">
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
             <div className="flex items-center gap-3 mb-4">
               <Database className="w-5 h-5 text-cyan-400" />
               <h2 className="text-sm font-bold text-white">Retrieval Engine</h2>
