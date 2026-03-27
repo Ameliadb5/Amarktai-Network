@@ -99,5 +99,61 @@ describe('Multimodal Router', () => {
       const prompt = buildCreativePrompt(request)
       expect(prompt).toBeTruthy()
     })
+
+    it('builds voice script prompt', () => {
+      const request: MultimodalRequest = {
+        appSlug: 'amarktai-friends',
+        contentType: 'voice_script',
+        prompt: 'Welcome message for new users',
+      }
+      const prompt = buildCreativePrompt(request)
+      expect(prompt).toBeTruthy()
+      expect(prompt.toLowerCase()).toContain('voice')
+    })
+
+    it('builds tts brief prompt', () => {
+      const request: MultimodalRequest = {
+        appSlug: 'amarktai-marketing',
+        contentType: 'tts_brief',
+        prompt: 'Brand voice for marketing narration',
+      }
+      const prompt = buildCreativePrompt(request)
+      expect(prompt).toBeTruthy()
+    })
+
+    it('builds speech workflow prompt', () => {
+      const request: MultimodalRequest = {
+        appSlug: 'amarktai-network',
+        contentType: 'speech_workflow',
+        prompt: 'Customer support voice interaction flow',
+      }
+      const prompt = buildCreativePrompt(request)
+      expect(prompt).toBeTruthy()
+    })
+
+    it('builds voice profile prompt', () => {
+      const request: MultimodalRequest = {
+        appSlug: 'amarktai-friends',
+        contentType: 'voice_profile',
+        prompt: 'Friendly companion voice character',
+      }
+      const prompt = buildCreativePrompt(request)
+      expect(prompt).toBeTruthy()
+    })
+  })
+
+  describe('getSupportedContentTypes includes voice types', () => {
+    it('returns voice content types', () => {
+      const types = getSupportedContentTypes()
+      expect(types).toContain('voice_script')
+      expect(types).toContain('tts_brief')
+      expect(types).toContain('speech_workflow')
+      expect(types).toContain('voice_profile')
+    })
+
+    it('returns at least 14 content types', () => {
+      const types = getSupportedContentTypes()
+      expect(types.length).toBeGreaterThanOrEqual(14)
+    })
   })
 })

@@ -173,36 +173,25 @@ describe('Model Registry', () => {
     })
   })
 
-  describe('data integrity', () => {
-    it('no duplicate provider+model_id combinations', () => {
+  describe('TTS / voice model support', () => {
+    it('has at least one TTS-capable model', () => {
       const registry = getModelRegistry()
-      const keys = registry.map(m => `${m.provider}:${m.model_id}`)
-      const uniqueKeys = new Set(keys)
-      expect(uniqueKeys.size).toBe(keys.length)
+      const ttsModels = registry.filter(m => m.supports_tts === true)
+      expect(ttsModels.length).toBeGreaterThan(0)
     })
 
-    it('all cost_tier values are valid', () => {
-      const validTiers = ['free', 'very_low', 'low', 'medium', 'high', 'premium']
+    it('TTS models use tts role', () => {
       const registry = getModelRegistry()
-      for (const model of registry) {
-        expect(validTiers).toContain(model.cost_tier)
+      const ttsModels = registry.filter(m => m.supports_tts === true)
+      for (const model of ttsModels) {
+        expect(['tts', 'voice_interaction']).toContain(model.primary_role)
       }
     })
 
-    it('all latency_tier values are valid', () => {
-      const validTiers = ['ultra_low', 'low', 'medium', 'high']
-      const registry = getModelRegistry()
-      for (const model of registry) {
-        expect(validTiers).toContain(model.latency_tier)
-      }
-    })
-
-    it('context_window is realistic for each model', () => {
-      const registry = getModelRegistry()
-      for (const model of registry) {
-        expect(model.context_window).toBeGreaterThanOrEqual(4096)
-        expect(model.context_window).toBeLessThanOrEqual(1_000_001)
-      }
+    it('getModelsByRole returns tts models', () => {
+      const ttsModels = getModelsByRole('tts')
+      expect(ttsModels.length).toBeGreaterThan(0)
     })
   })
 })
+

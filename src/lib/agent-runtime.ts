@@ -29,6 +29,12 @@ export type AgentType =
   | 'trading_analyst'
   | 'app_ops'
   | 'learning'
+  | 'security'
+  | 'voice'
+  | 'travel_planner'
+  | 'developer'
+  | 'support_community'
+  | 'healing'
 
 /** Lifecycle status of an individual agent task. */
 export type AgentStatus = 'idle' | 'running' | 'completed' | 'failed' | 'waiting'
@@ -218,6 +224,96 @@ const AGENT_DEFINITIONS: ReadonlyMap<AgentType, AgentDefinition> = new Map<Agent
       capabilities: ['pattern_analysis', 'regression_detection', 'improvement_suggestions', 'metric_tracking'],
       requiredPermissions: ['agent:learning'],
       canHandoff: [],
+      memoryEnabled: false,
+      defaultProvider: 'openai',
+      defaultModel: 'gpt-4o-mini',
+    },
+  ],
+  [
+    'security',
+    {
+      type: 'security',
+      name: 'Security',
+      description:
+        'Monitors system access, detects anomalies, enforces app-level content policies, and audits AI outputs for safety.',
+      capabilities: ['anomaly_detection', 'content_moderation', 'access_audit', 'policy_enforcement', 'threat_assessment'],
+      requiredPermissions: ['agent:security'],
+      canHandoff: ['validator'],
+      memoryEnabled: true,
+      defaultProvider: 'openai',
+      defaultModel: 'gpt-4o',
+    },
+  ],
+  [
+    'voice',
+    {
+      type: 'voice',
+      name: 'Voice',
+      description:
+        'Orchestrates voice-driven workflows including TTS script generation, multi-voice profile routing, and speech interaction planning.',
+      capabilities: ['tts_script_generation', 'voice_profile_routing', 'speech_workflow_planning', 'audio_content_planning', 'multi_voice_coordination'],
+      requiredPermissions: ['agent:voice'],
+      canHandoff: ['creative', 'campaign'],
+      memoryEnabled: true,
+      defaultProvider: 'openai',
+      defaultModel: 'gpt-4o',
+    },
+  ],
+  [
+    'travel_planner',
+    {
+      type: 'travel_planner',
+      name: 'Travel Planner',
+      description:
+        'Multi-modal travel planning including itinerary generation, destination research, budget estimation, and booking workflow coordination.',
+      capabilities: ['itinerary_generation', 'destination_research', 'budget_estimation', 'booking_workflow', 'multi_modal_routing'],
+      requiredPermissions: ['agent:travel_planner'],
+      canHandoff: ['creative', 'voice'],
+      memoryEnabled: true,
+      defaultProvider: 'gemini',
+      defaultModel: 'gemini-1.5-pro',
+    },
+  ],
+  [
+    'developer',
+    {
+      type: 'developer',
+      name: 'Developer',
+      description:
+        'Code generation, refactoring, debugging, architecture design, and GitHub integration workflows for the AmarktAI Network.',
+      capabilities: ['code_generation', 'code_refactoring', 'debugging', 'architecture_design', 'github_integration', 'pr_workflow'],
+      requiredPermissions: ['agent:developer'],
+      canHandoff: ['validator', 'planner'],
+      memoryEnabled: true,
+      defaultProvider: 'openai',
+      defaultModel: 'gpt-4o',
+    },
+  ],
+  [
+    'support_community',
+    {
+      type: 'support_community',
+      name: 'Support & Community',
+      description:
+        'Handles user support conversations, community moderation, FAQ routing, escalation workflows, and sentiment monitoring.',
+      capabilities: ['support_routing', 'community_moderation', 'faq_resolution', 'escalation_handling', 'sentiment_analysis'],
+      requiredPermissions: ['agent:support_community'],
+      canHandoff: ['security', 'validator'],
+      memoryEnabled: true,
+      defaultProvider: 'groq',
+      defaultModel: 'llama-3.3-70b-versatile',
+    },
+  ],
+  [
+    'healing',
+    {
+      type: 'healing',
+      name: 'Healing',
+      description:
+        'Detects degraded services, generates recovery playbooks, routes failovers, and monitors post-recovery stability.',
+      capabilities: ['failure_detection', 'recovery_planning', 'failover_routing', 'stability_monitoring', 'alert_suppression'],
+      requiredPermissions: ['agent:healing'],
+      canHandoff: ['app_ops', 'validator'],
       memoryEnabled: false,
       defaultProvider: 'openai',
       defaultModel: 'gpt-4o-mini',

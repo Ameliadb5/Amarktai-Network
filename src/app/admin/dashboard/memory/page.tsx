@@ -34,10 +34,21 @@ export default function MemoryPage() {
         fetch('/api/admin/memory'),
         fetch('/api/admin/retrieval'),
       ])
-      if (!memRes.ok) throw new Error(`Memory API: HTTP ${memRes.status}`)
-      if (!retRes.ok) throw new Error(`Retrieval API: HTTP ${retRes.status}`)
-      setMemory(await memRes.json())
-      setRetrieval(await retRes.json())
+      // Try to get body even on errors for better messages
+      const memBody = await memRes.json().catch(() => ({}))
+      const retBody = await retRes.json().catch(() => ({}))
+      if (!memRes.ok) {
+        const msg = memBody.error ?? `Memory API: HTTP ${memRes.status}`
+        const hint = memRes.status === 503 ? ' Configure DATABASE_URL to enable memory.' : ''
+        throw new Error(msg + hint)
+      }
+      if (!retRes.ok) {
+        const msg = retBody.error ?? `Retrieval API: HTTP ${retRes.status}`
+        const hint = retRes.status === 503 ? ' Configure DATABASE_URL to enable retrieval.' : ''
+        throw new Error(msg + hint)
+      }
+      setMemory(memBody)
+      setRetrieval(retBody)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {

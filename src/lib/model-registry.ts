@@ -52,7 +52,9 @@ export type ModelRole =
   | 'agent_planning'
   | 'multilingual'
   | 'vision'
-  | 'image_generation';
+  | 'image_generation'
+  | 'tts'
+  | 'voice_interaction';
 
 // ── ModelEntry interface ────────────────────────────────────────────────────
 
@@ -113,6 +115,12 @@ export interface ModelEntry {
 
   /** Can plan or decompose video-production workflows. */
   supports_video_planning: boolean;
+
+  /** Can generate speech / audio from text (TTS). */
+  supports_tts?: boolean;
+
+  /** Can engage in real-time speech interaction (STT+TTS). */
+  supports_voice_interaction?: boolean;
 
   /** Suitable for multi-step agent / tool-orchestration planning. */
   supports_agent_planning: boolean;
@@ -767,6 +775,69 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     specialist_domains: ['marketing', 'creative', 'design', 'travel'],
   },
 
+  // ── OpenAI — text-to-speech ───────────────────────────────────────────────
+
+  {
+    provider: 'openai',
+    provider_tier: 'premium',
+    model_id: 'tts-1',
+    model_name: 'TTS-1',
+    family: 'TTS',
+    primary_role: 'tts',
+    secondary_roles: [],
+    supports_chat: false,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: true,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_tts: true,
+    supports_agent_planning: false,
+    context_window: 4_096,
+    latency_tier: 'low',
+    cost_tier: 'low',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 1,
+    validator_eligible: false,
+    specialist_domains: ['voice', 'tts', 'friends', 'travel', 'marketing'],
+  },
+  {
+    provider: 'openai',
+    provider_tier: 'premium',
+    model_id: 'tts-1-hd',
+    model_name: 'TTS-1 HD',
+    family: 'TTS',
+    primary_role: 'tts',
+    secondary_roles: [],
+    supports_chat: false,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: true,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_tts: true,
+    supports_agent_planning: false,
+    context_window: 4_096,
+    latency_tier: 'medium',
+    cost_tier: 'medium',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 2,
+    validator_eligible: false,
+    specialist_domains: ['voice', 'tts', 'friends', 'travel', 'marketing', 'secure'],
+  },
+
   // ── Gemini (Google) ───────────────────────────────────────────────────────
 
   {
@@ -1286,7 +1357,7 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
 
 /** Keys of `ModelEntry` that hold boolean capability flags. */
 type BooleanCapabilityKey = {
-  [K in keyof ModelEntry]: ModelEntry[K] extends boolean ? K : never;
+  [K in keyof ModelEntry]-?: NonNullable<ModelEntry[K]> extends boolean ? K : never;
 }[keyof ModelEntry];
 
 // ── Helper functions ────────────────────────────────────────────────────────

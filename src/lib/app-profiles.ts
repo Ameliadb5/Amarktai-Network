@@ -106,6 +106,8 @@ const FULL_AGENT_PERMISSIONS = [
   'chat', 'summarise', 'translate', 'tool_use', 'agent_planning', 'code_generation',
   'agent:planner', 'agent:router', 'agent:validator', 'agent:memory', 'agent:retrieval',
   'agent:creative', 'agent:campaign', 'agent:trading_analyst', 'agent:app_ops', 'agent:learning',
+  'agent:security', 'agent:voice', 'agent:travel_planner', 'agent:developer',
+  'agent:support_community', 'agent:healing',
 ];
 
 const BASIC_PRIVACY_RULES = ['mask_pii', 'no_raw_credentials'];

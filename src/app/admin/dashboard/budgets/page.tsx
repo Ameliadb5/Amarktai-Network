@@ -52,8 +52,16 @@ export default function BudgetsPage() {
     setError(null)
     try {
       const res = await fetch('/api/admin/budgets')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setData(await res.json())
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // Show a meaningful error — 503 means DB not configured
+        const msg = body.error ?? `HTTP ${res.status}`
+        const hint = res.status === 503
+          ? ' Configure DATABASE_URL in your environment to enable budget tracking.'
+          : ''
+        throw new Error(msg + hint)
+      }
+      setData(body)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load budgets')
     } finally {
