@@ -14,7 +14,6 @@
 
 import {
   type ModelEntry,
-  getEnabledModels,
   getUsableModels,
   isProviderUsable,
   isProviderDegraded,
@@ -366,8 +365,8 @@ export function routeRequest(context: RoutingContext): RoutingDecision {
       primaryModel: null,
       secondaryModel: null,
       fallbackModels: [],
-      reason: `No eligible models found for app "${context.appSlug}". All models are either disabled, have unhealthy providers, or are excluded by the app profile.`,
-      warnings: ['No eligible models – check that at least one provider has a valid API key and is healthy.'],
+      reason: `No eligible models found for app "${context.appSlug}". All models are either disabled, from unconfigured/errored/disabled providers, or excluded by the app profile.`,
+      warnings: ['No eligible models – check that at least one provider has a valid API key and a healthy or configured status.'],
       costEstimate: 'low',
       latencyEstimate: 'medium',
     }
