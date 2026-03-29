@@ -1,134 +1,199 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Route, RefreshCw, AlertCircle, ArrowRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Route, RefreshCw, AlertCircle, ArrowRight, Search,
+  Zap, Shield, Clock, CheckCircle, ChevronRight, Activity,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
-interface RoutingDecision {
-  mode: string
-  primary: { provider: string; model_id: string; display_name: string } | null
-  secondary: { provider: string; model_id: string; display_name: string } | null
-  fallbacks: { provider: string; model_id: string; display_name: string }[]
-  reason: string
-  warnings: string[]
-  costEstimate: { tier: string; label: string }
-  latencyEstimate: { tier: string; label: string }
+/* ── Types ─────────────────────────────────────────────────── */
+
+interface FallbackNode {
+  provider: string
+  model: string
+  priority: number
 }
 
-interface RoutingContext {
+interface RouteEntry {
+  id: string
   appSlug: string
-  appCategory: string
   taskType: string
-  taskComplexity: string
-  message: string
-  requiresRetrieval: boolean
-  requiresMultimodal: boolean
+  primaryProvider: string
+  primaryModel: string
+  fallbackChain: FallbackNode[]
+  successRate: number
+  avgLatencyMs: number
+  active: boolean
 }
 
-interface RoutingResponse {
-  context: RoutingContext
-  decision: RoutingDecision
-  error?: string
+interface RoutingDecisionEvent {
+  id: string
+  timestamp: string
+  appSlug: string
+  taskType: string
+  chosenProvider: string
+  chosenModel: string
+  wasFallback: boolean
+  latencyMs: number
+  success: boolean
 }
 
-const SAMPLE_CONTEXTS: { label: string; body: Partial<RoutingContext> }[] = [
-  {
-    label: 'Simple Chat',
-    body: { appSlug: 'demo-app', appCategory: 'generic', taskType: 'chat', taskComplexity: 'simple', message: 'Hello, how are you?' },
-  },
-  {
-    label: 'Complex Analysis',
-    body: { appSlug: 'finance-app', appCategory: 'finance', taskType: 'analysis', taskComplexity: 'complex', message: 'Analyze quarterly revenue trends and forecast next quarter.' },
-  },
-  {
-    label: 'Creative + Multimodal',
-    body: { appSlug: 'marketing-app', appCategory: 'marketing', taskType: 'content_generation', taskComplexity: 'moderate', message: 'Create a social media campaign for product launch.', requiresMultimodal: true },
-  },
-  {
-    label: 'RAG Retrieval',
-    body: { appSlug: 'knowledge-base', appCategory: 'generic', taskType: 'question_answering', taskComplexity: 'moderate', message: 'What were the key decisions from last sprint?', requiresRetrieval: true },
-  },
-]
-
-const DEFAULT_MODE_COLOR = 'text-slate-400 bg-slate-500/10 border-slate-500/20'
-
-const MODE_COLORS: Record<string, string> = {
-  direct: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-  specialist: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-  review: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
-  consensus: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  premium: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
-  retrieval_chain: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-  multimodal: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
-  validation: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
+interface RoutingStats {
+  totalRoutes: number
+  activeFallbacks: number
+  avgLatencyMs: number
+  successRate: number
 }
+
+interface RoutingData {
+  routes: RouteEntry[]
+  fallbackChains: FallbackNode[][]
+  stats: RoutingStats
+  recentDecisions?: RoutingDecisionEvent[]
+}
+
+/* ── Stat card ─────────────────────────────────────────────── */
+
+function StatCard({ label, value, icon: Icon, color, delay }: {
+  label: string; value: string; icon: LucideIcon; color: string; delay: number
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.35 }}
+      className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-4"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[11px] text-slate-500 font-medium tracking-wide uppercase">{label}</p>
+        <div className={`p-1.5 rounded-lg bg-white/[0.04] ${color}`}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+      </div>
+      <p className={`text-3xl font-extrabold tracking-tight ${color}`}>{value}</p>
+    </motion.div>
+  )
+}
+
+/* ── Fallback chain visualization ──────────────────────────── */
+
+function FallbackChain({ primary, chain }: {
+  primary: { provider: string; model: string }
+  chain: FallbackNode[]
+}) {
+  const nodes = [
+    { provider: primary.provider, model: primary.model, label: 'Primary' },
+    ...chain.map((n, i) => ({ ...n, label: `Fallback ${i + 1}` })),
+  ]
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {nodes.map((node, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          {i > 0 && <ArrowRight className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />}
+          <div className={`px-2.5 py-1 rounded-lg border text-xs font-mono ${
+            i === 0
+              ? 'bg-blue-500/10 border-blue-500/25 text-blue-400'
+              : 'bg-white/[0.03] border-white/[0.06] text-slate-400'
+          }`}>
+            <span className="text-[10px] text-slate-500 block leading-tight">{node.label}</span>
+            {node.model}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ── Main page ─────────────────────────────────────────────── */
 
 export default function RoutingPage() {
-  const [result, setResult] = useState<RoutingResponse | null>(null)
+  const [data, setData] = useState<RoutingData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedContext, setSelectedContext] = useState(0)
+  const [search, setSearch] = useState('')
+  const [expanded, setExpanded] = useState<string | null>(null)
 
-  const load = useCallback(async (idx: number) => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/admin/routing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(SAMPLE_CONTEXTS[idx].body),
-      })
+      const res = await fetch('/api/admin/routing')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setResult(await res.json())
+      setData(await res.json())
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to test routing')
+      setError(e instanceof Error ? e.message : 'Failed to load routing data')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { load(selectedContext) }, [load, selectedContext])
+  useEffect(() => { load() }, [load])
 
-  const decision = result?.decision
+  const stats = data?.stats
+  const routes = data?.routes ?? []
+  const decisions = data?.recentDecisions ?? []
+
+  const filtered = routes.filter(r =>
+    !search ||
+    r.appSlug.toLowerCase().includes(search.toLowerCase()) ||
+    r.primaryProvider.toLowerCase().includes(search.toLowerCase()) ||
+    r.primaryModel.toLowerCase().includes(search.toLowerCase()) ||
+    r.taskType.toLowerCase().includes(search.toLowerCase())
+  )
+
+  /* ── Stat cards config ─────────────────────────────────── */
+  const statCards: { label: string; value: string; icon: LucideIcon; color: string }[] = [
+    { label: 'Total Routes', value: String(stats?.totalRoutes ?? 0), icon: Route, color: 'text-blue-400' },
+    { label: 'Active Fallbacks', value: String(stats?.activeFallbacks ?? 0), icon: Shield, color: 'text-violet-400' },
+    { label: 'Avg Latency', value: `${stats?.avgLatencyMs ?? 0}ms`, icon: Clock, color: 'text-cyan-400' },
+    { label: 'Success Rate', value: `${(stats?.successRate ?? 0).toFixed(1)}%`, icon: CheckCircle, color: 'text-emerald-400' },
+  ]
 
   return (
     <div className="max-w-6xl space-y-5">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">Routing Policies</h1>
+          <h1 className="text-xl font-bold text-white">AI Request Routing</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Test the routing engine with different contexts to see model selection logic.
+            Monitor how requests flow through providers, models, and fallback chains.
           </p>
         </div>
         <button
-          onClick={() => load(selectedContext)}
+          onClick={load}
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Re-run
+          Refresh
         </button>
       </div>
 
-      {/* Context selector */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {SAMPLE_CONTEXTS.map((ctx, i) => (
-          <button
-            key={ctx.label}
-            onClick={() => setSelectedContext(i)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              selectedContext === i
-                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                : 'bg-white/5 text-slate-400 border border-white/[0.06] hover:bg-white/[0.06]'
-            }`}
-          >
-            {ctx.label}
-          </button>
+      {/* Stats row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {statCards.map((c, i) => (
+          <StatCard key={c.label} {...c} delay={i * 0.06} />
         ))}
       </div>
 
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Filter by app, provider, or task…"
+          className="w-full pl-10 pr-4 py-2.5 bg-white/[0.03] backdrop-blur-xl rounded-xl text-sm text-white placeholder-slate-500 border border-white/[0.06] focus:outline-none focus:border-blue-500/50 transition-colors"
+        />
+      </div>
+
+      {/* Loading / Error */}
       {loading ? (
         <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
+          {[...Array(4)].map((_, i) => (
             <div key={i} className="h-20 bg-white/[0.03] rounded-xl animate-pulse" />
           ))}
         </div>
@@ -137,100 +202,156 @@ export default function RoutingPage() {
           <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
           <p className="text-sm text-red-400">{error}</p>
         </div>
-      ) : decision ? (
+      ) : (
         <>
-          {/* Routing mode */}
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <Route className="w-5 h-5 text-pink-400" />
-              <h2 className="text-sm font-bold text-white">Routing Decision</h2>
-              <span className={`ml-auto text-xs font-medium uppercase px-2.5 py-1 rounded-full border ${MODE_COLORS[decision.mode] ?? DEFAULT_MODE_COLOR}`}>
-                {decision.mode}
-              </span>
-            </div>
-            <p className="text-sm text-slate-300 mb-3">{decision.reason}</p>
-
-            {/* Model chain */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {decision.primary && (
-                <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2">
-                  <p className="text-[10px] text-slate-500 uppercase">Primary</p>
-                  <p className="text-sm text-white font-medium">{decision.primary.display_name || decision.primary.model_id}</p>
-                  <p className="text-[10px] text-slate-500 font-mono">{decision.primary.provider}</p>
-                </div>
-              )}
-              {decision.secondary && (
-                <>
-                  <ArrowRight className="w-4 h-4 text-slate-600" />
-                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2">
-                    <p className="text-[10px] text-slate-500 uppercase">Secondary</p>
-                    <p className="text-sm text-white font-medium">{decision.secondary.display_name || decision.secondary.model_id}</p>
-                    <p className="text-[10px] text-slate-500 font-mono">{decision.secondary.provider}</p>
-                  </div>
-                </>
-              )}
+          {/* Route table */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15 }}
+            className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl overflow-hidden"
+          >
+            <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
+              <Route className="w-4 h-4 text-blue-400" />
+              <h2 className="text-sm font-bold text-white">Route Table</h2>
+              <span className="ml-auto text-xs text-slate-500">{filtered.length} route{filtered.length !== 1 ? 's' : ''}</span>
             </div>
 
-            {/* Fallbacks */}
-            {decision.fallbacks && decision.fallbacks.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-white/5">
-                <p className="text-[10px] text-slate-500 uppercase mb-2">Fallback Chain</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {decision.fallbacks.map((fb, i) => (
-                    <span key={i} className="text-xs text-slate-400 bg-white/5 px-2 py-1 rounded font-mono">
-                      {fb.display_name || fb.model_id}
-                    </span>
-                  ))}
-                </div>
+            {filtered.length === 0 ? (
+              <div className="p-12 text-center">
+                <Route className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                <p className="text-sm text-slate-400">No routes match your filter.</p>
               </div>
-            )}
+            ) : (
+              <div className="divide-y divide-white/[0.04]">
+                {filtered.map((route, i) => (
+                  <motion.div
+                    key={route.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                  >
+                    <button
+                      onClick={() => setExpanded(expanded === route.id ? null : route.id)}
+                      className="w-full text-left px-5 py-3.5 hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium text-white truncate">{route.appSlug}</span>
+                            <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border bg-violet-500/10 border-violet-500/25 text-violet-400">
+                              {route.taskType}
+                            </span>
+                            {!route.active && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-600/20 text-slate-500">inactive</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 font-mono truncate">
+                            {route.primaryProvider}/{route.primaryModel}
+                            {route.fallbackChain.length > 0 && (
+                              <span className="text-slate-600"> → {route.fallbackChain.length} fallback{route.fallbackChain.length !== 1 ? 's' : ''}</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-5 flex-shrink-0">
+                          <div className="text-right">
+                            <p className="text-xs text-slate-500">Success</p>
+                            <p className={`text-sm font-semibold ${route.successRate >= 95 ? 'text-emerald-400' : route.successRate >= 80 ? 'text-amber-400' : 'text-red-400'}`}>
+                              {route.successRate.toFixed(1)}%
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-slate-500">Latency</p>
+                            <p className="text-sm font-semibold text-cyan-400">{route.avgLatencyMs}ms</p>
+                          </div>
+                          <ChevronRight className={`w-4 h-4 text-slate-600 transition-transform ${expanded === route.id ? 'rotate-90' : ''}`} />
+                        </div>
+                      </div>
+                    </button>
 
-            {/* Estimates */}
-            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/5">
-              {decision.costEstimate && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-slate-500">Cost:</span>
-                  <span className="text-xs text-amber-400">{decision.costEstimate.label || decision.costEstimate.tier}</span>
-                </div>
-              )}
-              {decision.latencyEstimate && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-slate-500">Latency:</span>
-                  <span className="text-xs text-cyan-400">{decision.latencyEstimate.label || decision.latencyEstimate.tier}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Warnings */}
-            {decision.warnings && decision.warnings.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-white/5">
-                {decision.warnings.map((w, i) => (
-                  <p key={i} className="text-xs text-amber-400 flex items-center gap-1.5">
-                    <AlertCircle className="w-3 h-3" />
-                    {w}
-                  </p>
+                    {/* Expanded fallback visualization */}
+                    <AnimatePresence>
+                      {expanded === route.id && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-5 pb-4 pt-1">
+                            <p className="text-[10px] text-slate-500 uppercase mb-2">Fallback Chain</p>
+                            <FallbackChain
+                              primary={{ provider: route.primaryProvider, model: route.primaryModel }}
+                              chain={route.fallbackChain}
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
                 ))}
               </div>
             )}
-          </div>
+          </motion.div>
 
-          {/* Input context */}
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-            <h2 className="text-sm font-bold text-white mb-3">Input Context</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {result?.context && Object.entries(result.context).map(([key, val]) => (
-                <div key={key}>
-                  <p className="text-[10px] text-slate-500 uppercase">{key}</p>
-                  <p className="text-sm text-slate-300 truncate">{String(val)}</p>
-                </div>
-              ))}
+          {/* Recent routing decisions */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl overflow-hidden"
+          >
+            <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
+              <Activity className="w-4 h-4 text-violet-400" />
+              <h2 className="text-sm font-bold text-white">Recent Routing Decisions</h2>
             </div>
-          </div>
+
+            {decisions.length === 0 ? (
+              <div className="p-10 text-center">
+                <Zap className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-400">No recent decisions recorded.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/[0.04]">
+                {decisions.slice(0, 15).map((d, i) => (
+                  <motion.div
+                    key={d.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 + i * 0.03 }}
+                    className="px-5 py-3 flex items-center gap-4"
+                  >
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${d.success ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">
+                        <span className="font-medium">{d.appSlug}</span>
+                        <span className="text-slate-500 mx-1.5">·</span>
+                        <span className="text-slate-400">{d.taskType}</span>
+                      </p>
+                      <p className="text-xs text-slate-500 font-mono truncate">
+                        {d.chosenProvider}/{d.chosenModel}
+                        {d.wasFallback && (
+                          <span className="ml-1.5 text-amber-400">(fallback)</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4 flex-shrink-0 text-right">
+                      <span className="text-xs text-cyan-400 font-mono">{d.latencyMs}ms</span>
+                      <span className="text-xs text-slate-600 w-24 truncate">
+                        {new Date(d.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </motion.div>
         </>
-      ) : null}
+      )}
 
       <p className="text-xs text-slate-600">
-        Select a routing scenario above to see how the engine selects models. Results reflect current registry and provider state.
+        Routes reflect current provider registry state. Fallback chains activate automatically on provider failure.
       </p>
     </div>
   )
