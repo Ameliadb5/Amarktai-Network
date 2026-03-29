@@ -86,6 +86,23 @@ export interface AppProfile {
   latency_sensitivity: 'low' | 'medium' | 'high';
   /** Privacy rules applied to logging for this app. */
   logging_privacy_rules: string[];
+
+  // ── Safety ──────────────────────────────────────────────────────────────
+
+  /** When true, all content passes through strict safety filters (default: true). */
+  safe_mode?: boolean;
+  /** When true, non-harmful adult content is allowed. Requires safe_mode=false and explicit opt-in. */
+  adult_mode?: boolean;
+
+  // ── Budget ──────────────────────────────────────────────────────────────
+
+  /** Per-app monthly budget cap in USD (optional). */
+  monthly_budget_usd?: number;
+
+  // ── AI Capabilities ─────────────────────────────────────────────────────
+
+  /** AI capabilities enabled for this app. */
+  enabled_capabilities?: string[];
 }
 
 // ── Shared constants ────────────────────────────────────────────────────────

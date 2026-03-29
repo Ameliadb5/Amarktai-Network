@@ -600,3 +600,175 @@ export async function getEcosystemLearningState(): Promise<{
     }
   }
 }
+
+// ── Win/Loss Scoring System ─────────────────────────────────────────
+
+/** Score entry tracking model performance per task type. */
+export interface ModelScore {
+  modelId: string
+  providerKey: string
+  taskType: string
+  wins: number
+  losses: number
+  totalLatencyMs: number
+  avgLatencyMs: number
+  winRate: number
+  lastUsed: string
+}
+
+/**
+ * In-memory model performance scores.
+ * Key: `${providerKey}:${modelId}:${taskType}`
+ */
+const modelScores = new Map<string, ModelScore>()
+
+/**
+ * Record a win or loss for a model on a specific task type.
+ * A "win" is a successful response; a "loss" is a failure or low confidence.
+ */
+export function recordModelScore(
+  providerKey: string,
+  modelId: string,
+  taskType: string,
+  success: boolean,
+  latencyMs: number,
+  confidenceScore?: number | null,
+): ModelScore {
+  const key = `${providerKey}:${modelId}:${taskType}`
+  const existing = modelScores.get(key) ?? {
+    modelId,
+    providerKey,
+    taskType,
+    wins: 0,
+    losses: 0,
+    totalLatencyMs: 0,
+    avgLatencyMs: 0,
+    winRate: 0,
+    lastUsed: new Date().toISOString(),
+  }
+
+  // A win requires success AND acceptable confidence (>= 0.5 if provided)
+  const isWin = success && (confidenceScore === null || confidenceScore === undefined || confidenceScore >= 0.5)
+
+  if (isWin) {
+    existing.wins++
+  } else {
+    existing.losses++
+  }
+
+  existing.totalLatencyMs += latencyMs
+  const total = existing.wins + existing.losses
+  existing.avgLatencyMs = Math.round(existing.totalLatencyMs / total)
+  existing.winRate = total > 0 ? existing.wins / total : 0
+  existing.lastUsed = new Date().toISOString()
+
+  modelScores.set(key, existing)
+  return existing
+}
+
+/**
+ * Get the best performing model for a specific task type.
+ * "Best" = highest win rate with minimum sample size, preferring cheaper models.
+ */
+export function getBestModelForTask(taskType: string): ModelScore | null {
+  const candidates = Array.from(modelScores.values())
+    .filter(s => s.taskType === taskType && (s.wins + s.losses) >= 3) // minimum 3 attempts
+
+  if (candidates.length === 0) return null
+
+  // Sort by win rate (desc), then by avg latency (asc) as tiebreaker
+  candidates.sort((a, b) => {
+    if (b.winRate !== a.winRate) return b.winRate - a.winRate
+    return a.avgLatencyMs - b.avgLatencyMs
+  })
+
+  return candidates[0]
+}
+
+/**
+ * Get the best performing provider for a specific app.
+ * Aggregates scores across all task types for the given provider.
+ */
+export function getBestProviderForApp(_appSlug: string): { providerKey: string; winRate: number } | null {
+  const providerStats = new Map<string, { wins: number; losses: number }>()
+
+  for (const score of modelScores.values()) {
+    const existing = providerStats.get(score.providerKey) ?? { wins: 0, losses: 0 }
+    existing.wins += score.wins
+    existing.losses += score.losses
+    providerStats.set(score.providerKey, existing)
+  }
+
+  let best: { providerKey: string; winRate: number } | null = null
+  for (const [, stats] of providerStats) {
+    const total = stats.wins + stats.losses
+    if (total < 5) continue
+    const rate = stats.wins / total
+    if (!best || rate > best.winRate) {
+      best = { providerKey: stats.wins > 0 ? Array.from(providerStats.entries()).find(([, v]) => v === stats)?.[0] ?? 'unknown' : 'unknown', winRate: rate }
+    }
+  }
+
+  return best
+}
+
+/**
+ * Get all model scores for dashboard display.
+ */
+export function getAllModelScores(): ModelScore[] {
+  return Array.from(modelScores.values())
+    .sort((a, b) => b.winRate - a.winRate)
+}
+
+// ── Auto Optimization Engine ────────────────────────────────────────
+
+/**
+ * Determine the optimal model for a request based on learning data.
+ * Prefers the cheapest model that has historically succeeded.
+ * Upgrades to premium if the cheap model fails.
+ *
+ * Returns null if no optimization data is available (use default routing).
+ */
+export function getOptimizedModel(
+  taskType: string,
+  previousFailure?: boolean,
+): { modelId: string; providerKey: string; reason: string } | null {
+  const candidates = Array.from(modelScores.values())
+    .filter(s => s.taskType === taskType && (s.wins + s.losses) >= 3)
+
+  if (candidates.length === 0) return null
+
+  if (previousFailure) {
+    // Upgrade: pick the model with best win rate regardless of cost
+    const sorted = [...candidates].sort((a, b) => b.winRate - a.winRate)
+    const best = sorted[0]
+    return {
+      modelId: best.modelId,
+      providerKey: best.providerKey,
+      reason: `Upgraded after failure — ${best.modelId} has ${Math.round(best.winRate * 100)}% win rate`,
+    }
+  }
+
+  // Default: prefer cheapest model with acceptable win rate (>= 70%)
+  const acceptable = candidates.filter(s => s.winRate >= 0.7)
+  if (acceptable.length === 0) {
+    // No model has 70%+ win rate, pick the best available
+    const sorted = [...candidates].sort((a, b) => b.winRate - a.winRate)
+    const best = sorted[0]
+    return {
+      modelId: best.modelId,
+      providerKey: best.providerKey,
+      reason: `Best available — ${best.modelId} has ${Math.round(best.winRate * 100)}% win rate`,
+    }
+  }
+
+  // Sort acceptable by avg latency (proxy for cost — faster usually = cheaper)
+  const sorted = [...acceptable].sort((a, b) => a.avgLatencyMs - b.avgLatencyMs)
+  const cheapest = sorted[0]
+
+  return {
+    modelId: cheapest.modelId,
+    providerKey: cheapest.providerKey,
+    reason: `Cheapest successful — ${cheapest.modelId} with ${Math.round(cheapest.winRate * 100)}% win rate, ${cheapest.avgLatencyMs}ms avg`,
+  }
+}

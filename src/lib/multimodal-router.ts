@@ -43,6 +43,9 @@ export type ContentType =
   | 'speech_workflow'
   | 'voice_profile'
 
+/** Quality mode for image/video generation. */
+export type QualityMode = 'cheap' | 'balanced' | 'premium'
+
 /** Input for a multimodal generation request. */
 export interface MultimodalRequest {
   /** App slug for profile lookup and memory scoping. */
@@ -59,6 +62,8 @@ export interface MultimodalRequest {
   targetPlatform?: string
   /** Desired output format. */
   outputFormat?: 'text' | 'json' | 'markdown'
+  /** Quality mode for image/video generation (default: 'balanced'). */
+  qualityMode?: QualityMode
 }
 
 /** Result from the multimodal generation router. */
@@ -530,6 +535,28 @@ export async function generateContent(request: MultimodalRequest): Promise<Multi
 }
 
 // ── Engine status ───────────────────────────────────────────────────────────
+
+/**
+ * Image generation quality mode to model mapping.
+ * Maps quality modes to the appropriate provider/model combination.
+ */
+const IMAGE_QUALITY_MODELS: Record<QualityMode, { provider: string; model: string }> = {
+  cheap: { provider: 'together', model: 'stabilityai/stable-diffusion-xl-base-1.0' },
+  balanced: { provider: 'together', model: 'black-forest-labs/FLUX.1-schnell' },
+  premium: { provider: 'openai', model: 'dall-e-3' },
+}
+
+/**
+ * Resolve the image generation provider and model based on quality mode.
+ */
+export function resolveImageProvider(qualityMode: QualityMode = 'balanced'): {
+  provider: string
+  model: string
+  qualityMode: QualityMode
+} {
+  const mapping = IMAGE_QUALITY_MODELS[qualityMode]
+  return { ...mapping, qualityMode }
+}
 
 /**
  * Returns the current operational status of the multimodal router.

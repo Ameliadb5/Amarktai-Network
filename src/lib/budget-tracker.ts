@@ -221,3 +221,81 @@ export async function isProviderWithinBudget(providerKey: string): Promise<boole
     return true   // default to allowing if check fails
   }
 }
+
+// ── Per-App Budget Caps ─────────────────────────────────────────────────────
+
+/** In-memory per-app budget caps (future: store in DB). */
+const appBudgetCaps = new Map<string, { monthlyBudgetUsd: number; currentSpendUsd: number }>()
+
+/**
+ * Set a per-app monthly budget cap.
+ */
+export function setAppBudgetCap(appSlug: string, monthlyBudgetUsd: number): void {
+  const existing = appBudgetCaps.get(appSlug)
+  appBudgetCaps.set(appSlug, {
+    monthlyBudgetUsd,
+    currentSpendUsd: existing?.currentSpendUsd ?? 0,
+  })
+}
+
+/**
+ * Get the per-app budget cap, or null if none is configured.
+ */
+export function getAppBudgetCap(appSlug: string): { monthlyBudgetUsd: number; currentSpendUsd: number } | null {
+  return appBudgetCaps.get(appSlug) ?? null
+}
+
+/**
+ * Record spend against an app's budget.
+ */
+export function recordAppSpend(appSlug: string, amountUsd: number): void {
+  const cap = appBudgetCaps.get(appSlug)
+  if (cap) {
+    cap.currentSpendUsd += amountUsd
+  }
+}
+
+/**
+ * Check if an app is within its budget cap.
+ * Returns true if no cap is set or if spend is under the cap.
+ */
+export function isAppWithinBudget(appSlug: string): boolean {
+  const cap = appBudgetCaps.get(appSlug)
+  if (!cap) return true
+  return cap.currentSpendUsd < cap.monthlyBudgetUsd
+}
+
+// ── Model Tier Downgrade Logic ──────────────────────────────────────────────
+
+export type ModelTier = 'premium' | 'mid' | 'cheap'
+
+/**
+ * Model tier classification based on cost rates.
+ * Returns recommended tier based on remaining budget percentage.
+ */
+export function getRecommendedModelTier(usagePercent: number): ModelTier {
+  if (usagePercent >= 90) return 'cheap'
+  if (usagePercent >= 70) return 'mid'
+  return 'premium'
+}
+
+/**
+ * Suggest a model downgrade based on budget status.
+ * Returns the tier that should be used for new requests.
+ */
+export async function suggestModelTier(providerKey: string): Promise<ModelTier> {
+  try {
+    const budget = await prisma.providerBudget.findUnique({
+      where: { providerKey },
+    })
+    if (!budget?.monthlyBudgetUsd) return 'premium' // no budget = use best
+
+    const since = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    const estimated = await estimateProviderSpend(providerKey, since)
+    const usagePct = (estimated / budget.monthlyBudgetUsd) * 100
+
+    return getRecommendedModelTier(usagePct)
+  } catch {
+    return 'premium' // default to premium if check fails
+  }
+}

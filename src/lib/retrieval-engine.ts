@@ -18,6 +18,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { retrievalCache, buildRetrievalCacheKey } from '@/lib/cache'
 
 // ── Type definitions ────────────────────────────────────────────────────────
 
@@ -167,6 +168,18 @@ export async function retrieve(query: RetrievalQuery): Promise<RetrievalResult> 
     ? 1 - freshnessWeight - importanceWeight
     : 0.3
 
+  // ── Check retrieval cache ────────────────────────────────────────────
+  const cacheKey = buildRetrievalCacheKey(
+    query.appSlug,
+    query.query,
+    maxResults,
+    query.includeGlobal ?? false,
+  )
+  const cached = retrievalCache.get(cacheKey) as RetrievalResult | undefined
+  if (cached) {
+    return { ...cached, retrievalLatencyMs: Date.now() - start }
+  }
+
   try {
     // ── Build the Prisma where clause ──────────────────────────────────
     const slugs: string[] = [query.appSlug]
@@ -231,7 +244,7 @@ export async function retrieve(query: RetrievalQuery): Promise<RetrievalResult> 
     const fromApp = limited.filter((e) => e.source === 'app').length
     const fromGlobal = limited.filter((e) => e.source === 'global').length
 
-    return {
+    const result: RetrievalResult = {
       entries: limited,
       totalFound: scored.length,
       fromApp,
@@ -239,6 +252,11 @@ export async function retrieve(query: RetrievalQuery): Promise<RetrievalResult> 
       retrievalLatencyMs: Date.now() - start,
       rerankApplied: false,
     }
+
+    // ── Store in retrieval cache ────────────────────────────────────────
+    retrievalCache.set(cacheKey, result)
+
+    return result
   } catch (err) {
     console.warn('[retrieval-engine] retrieve failed:', err instanceof Error ? err.message : err)
     return {
