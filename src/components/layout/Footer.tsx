@@ -111,10 +111,7 @@ export default function Footer() {
           {/* Status badge */}
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-1">
             <span className="relative flex h-1.5 w-1.5">
-              <span
-                className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
-                style={{ animation: 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite' }}
-              />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </span>
             <span className="text-xs font-medium text-emerald-400/90 font-mono">
