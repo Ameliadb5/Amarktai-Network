@@ -59,8 +59,16 @@ export interface RateLimitState {
 
 // ── In-memory storage ───────────────────────────────────────────────
 
+/** A queued request for heavy jobs like video generation. */
+export interface QueuedRequest {
+  appSlug: string
+  taskType: string
+  priority: number
+  queuedAt: string
+}
+
 const connectedApps = new Map<string, ConnectedApp>()
-const requestQueue: Array<{ appSlug: string; taskType: string; priority: number; queuedAt: string }> = []
+const requestQueue: QueuedRequest[] = []
 
 // ── Default rate limits ─────────────────────────────────────────────
 
@@ -202,7 +210,7 @@ export function enqueueRequest(appSlug: string, taskType: string, priority = 5):
 /**
  * Dequeue the next request.
  */
-export function dequeueRequest(): { appSlug: string; taskType: string; priority: number; queuedAt: string } | null {
+export function dequeueRequest(): QueuedRequest | null {
   return requestQueue.shift() ?? null
 }
 

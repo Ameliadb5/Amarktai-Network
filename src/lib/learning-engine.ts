@@ -700,12 +700,12 @@ export function getBestProviderForApp(_appSlug: string): { providerKey: string; 
   }
 
   let best: { providerKey: string; winRate: number } | null = null
-  for (const [, stats] of providerStats) {
+  for (const [providerKey, stats] of providerStats) {
     const total = stats.wins + stats.losses
     if (total < 5) continue
     const rate = stats.wins / total
     if (!best || rate > best.winRate) {
-      best = { providerKey: stats.wins > 0 ? Array.from(providerStats.entries()).find(([, v]) => v === stats)?.[0] ?? 'unknown' : 'unknown', winRate: rate }
+      best = { providerKey, winRate: rate }
     }
   }
 

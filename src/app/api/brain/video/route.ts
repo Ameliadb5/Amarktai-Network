@@ -136,7 +136,13 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Determine best provider ──────────────────────────────────────
-    const provider = runwayKey ? 'runway' : pikaKey ? 'pika' : stabilityKey ? 'stability-ai' : 'openai-sora'
+    const providerPriority = [
+      { key: 'runway', available: !!runwayKey },
+      { key: 'pika', available: !!pikaKey },
+      { key: 'stability-ai', available: !!stabilityKey },
+      { key: 'openai-sora', available: !!openaiKey },
+    ]
+    const provider = providerPriority.find(p => p.available)?.key ?? 'unknown'
 
     // Submit video generation job
     const jobId = `vid_${randomUUID()}`;
