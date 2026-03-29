@@ -31,7 +31,8 @@ const STEPS = [
 ]
 
 function slugify(v: string) {
-  return v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+  return v.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
 
 // ── Shared style helpers ─────────────────────────────────────────
@@ -173,7 +174,7 @@ export default function NewAppPage() {
           <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Preferred Models</p>
           {models.map((m, i) => (
             <div key={i} className="flex items-center gap-2">
-              <span className="text-xs text-slate-600 w-5 text-right">{i + 1}.</span>
+              <span aria-hidden="true" className="text-xs text-slate-600 w-5 text-right">{i + 1}.</span>
               <input value={m} placeholder="e.g. gpt-4o, llama-3-70b"
                 onChange={e => { const n = [...models]; n[i] = e.target.value; setModels(n) }}
                 className={inputCls} />
