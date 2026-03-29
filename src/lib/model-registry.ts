@@ -1938,6 +1938,106 @@ type BooleanCapabilityKey = {
   [K in keyof ModelEntry]-?: NonNullable<ModelEntry[K]> extends boolean ? K : never;
 }[keyof ModelEntry];
 
+// ── Provider health cache ───────────────────────────────────────────────
+//
+// The static MODEL_REGISTRY marks every model as enabled/configured because
+// these are *known* models. At runtime the provider health cache overlays
+// truthful health information derived from the database and live health
+// checks. When the cache is populated, helper functions like
+// `getUsableModels()` and `getModelEffectiveHealth()` reflect real state.
+// When the cache is empty (e.g. during tests or before first health check),
+// all enabled models are assumed usable for backwards compatibility.
+// ────────────────────────────────────────────────────────────────────────
+
+/** Health status values that can be stored in the provider health cache. */
+export type ProviderHealthStatus = ModelEntry['health_status'];
+
+interface ProviderHealthEntry {
+  status: ProviderHealthStatus;
+  lastChecked: Date;
+}
+
+const providerHealthCache = new Map<string, ProviderHealthEntry>();
+
+/**
+ * Update the cached health state for a provider.
+ *
+ * Call this after running `runProviderHealthCheck()` or after querying
+ * the `AiProvider` table so that model-selection helpers reflect real
+ * provider health.
+ */
+export function setProviderHealth(
+  providerKey: string,
+  status: ProviderHealthStatus,
+): void {
+  providerHealthCache.set(providerKey, { status, lastChecked: new Date() });
+}
+
+/**
+ * Retrieve the cached health status for a provider.
+ *
+ * Returns `'unconfigured'` when no health data has been recorded yet.
+ */
+export function getProviderHealth(providerKey: string): ProviderHealthStatus {
+  return providerHealthCache.get(providerKey)?.status ?? 'unconfigured';
+}
+
+/** Returns the full provider health cache snapshot (for diagnostics / dashboards). */
+export function getProviderHealthSnapshot(): ReadonlyMap<string, Readonly<ProviderHealthEntry>> {
+  return providerHealthCache;
+}
+
+/** Clear all cached provider health data (useful in tests). */
+export function clearProviderHealthCache(): void {
+  providerHealthCache.clear();
+}
+
+/**
+ * Whether a provider is usable for routing.
+ *
+ * A provider is usable when its health status is `healthy` or `configured`.
+ * When the health cache is **empty** (no health data recorded yet), all
+ * providers are assumed usable so that the system works before the first
+ * health check run.
+ */
+export function isProviderUsable(providerKey: string): boolean {
+  if (providerHealthCache.size === 0) return true;
+  const status = getProviderHealth(providerKey);
+  return status === 'healthy' || status === 'configured';
+}
+
+/**
+ * Whether a provider is degraded.
+ *
+ * Degraded providers are still usable but should be deprioritised in
+ * fallback ordering.
+ */
+export function isProviderDegraded(providerKey: string): boolean {
+  return getProviderHealth(providerKey) === 'degraded';
+}
+
+/**
+ * Returns the effective health status for a model, considering the
+ * provider health cache.
+ *
+ * When the cache is empty the model's static `health_status` is returned.
+ */
+export function getModelEffectiveHealth(model: ModelEntry): ProviderHealthStatus {
+  if (providerHealthCache.size === 0) return model.health_status;
+  return getProviderHealth(model.provider);
+}
+
+/**
+ * Returns models that are registered as enabled **and** whose provider
+ * is currently usable (healthy / configured).
+ *
+ * This is the health-aware replacement for `getEnabledModels()` and
+ * should be preferred by the routing engine and orchestrator.
+ */
+export function getUsableModels(): ModelEntry[] {
+  return MODEL_REGISTRY.filter((m) => m.enabled && isProviderUsable(m.provider));
+}
+
 // ── Helper functions ────────────────────────────────────────────────────────
 
 /** Returns the full, immutable model registry. */

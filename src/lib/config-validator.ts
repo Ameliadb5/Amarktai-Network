@@ -304,3 +304,84 @@ export function classifyDbError(err: unknown): {
 
   return { category: 'unknown', message: err.message };
 }
+
+// ── Provider key validation ─────────────────────────────────────────────────
+
+/** Result of validating a single provider's configuration. */
+export interface ProviderValidationEntry {
+  providerKey: string;
+  displayName: string;
+  enabled: boolean;
+  hasKey: boolean;
+  healthStatus: string | null;
+}
+
+/** Result of validating all configured providers. */
+export interface ProviderValidationResult {
+  valid: boolean;
+  providers: ProviderValidationEntry[];
+  issues: ConfigIssue[];
+}
+
+/**
+ * Validate that all enabled AI providers in the database have valid API keys.
+ *
+ * This is an async function because it queries the `AiProvider` table.
+ * Returns a summary of each provider's configuration state and any issues
+ * found (e.g. enabled provider with no API key).
+ *
+ * When the database is unreachable, returns a single error issue.
+ */
+export async function validateProviderKeys(): Promise<ProviderValidationResult> {
+  const issues: ConfigIssue[] = [];
+  const providers: ProviderValidationEntry[] = [];
+
+  try {
+    const { prisma } = await import('@/lib/prisma');
+    const rows = await prisma.aiProvider.findMany({
+      select: {
+        providerKey: true,
+        displayName: true,
+        enabled: true,
+        apiKey: true,
+        healthStatus: true,
+      },
+    });
+
+    for (const row of rows) {
+      const hasKey = !!(row.apiKey?.trim());
+      providers.push({
+        providerKey: row.providerKey,
+        displayName: row.displayName,
+        enabled: row.enabled,
+        hasKey,
+        healthStatus: row.healthStatus,
+      });
+
+      if (row.enabled && !hasKey) {
+        issues.push({
+          key: `PROVIDER:${row.providerKey}`,
+          severity: 'error',
+          message: `Provider "${row.displayName}" (${row.providerKey}) is enabled but has no API key. Models from this provider will be unavailable.`,
+        });
+      }
+
+      if (row.enabled && row.healthStatus === 'error') {
+        issues.push({
+          key: `PROVIDER:${row.providerKey}`,
+          severity: 'warning',
+          message: `Provider "${row.displayName}" (${row.providerKey}) has health status "error". Check the API key and provider availability.`,
+        });
+      }
+    }
+  } catch {
+    issues.push({
+      key: 'PROVIDER_VALIDATION',
+      severity: 'warning',
+      message: 'Could not query AI provider table — database may be unreachable.',
+    });
+  }
+
+  const valid = !issues.some((i) => i.severity === 'error');
+  return { valid, providers, issues };
+}

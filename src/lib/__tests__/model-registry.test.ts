@@ -4,7 +4,7 @@
  * Validates the model registry data integrity, helper functions,
  * and that routing can reliably query models by capability/role/provider.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import {
   getModelRegistry,
   getModelsByProvider,
@@ -17,6 +17,14 @@ import {
   getCheapestModelForCapability,
   getPremiumModelForCapability,
   getDefaultModelForProvider,
+  setProviderHealth,
+  getProviderHealth,
+  clearProviderHealthCache,
+  isProviderUsable,
+  isProviderDegraded,
+  getModelEffectiveHealth,
+  getUsableModels,
+  getProviderHealthSnapshot,
   type ModelEntry as _ModelEntry,
 } from '@/lib/model-registry'
 
@@ -191,6 +199,128 @@ describe('Model Registry', () => {
     it('getModelsByRole returns tts models', () => {
       const ttsModels = getModelsByRole('tts')
       expect(ttsModels.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('Provider Health Cache', () => {
+    afterEach(() => {
+      clearProviderHealthCache()
+    })
+
+    it('getProviderHealth returns unconfigured when cache is empty', () => {
+      expect(getProviderHealth('openai')).toBe('unconfigured')
+    })
+
+    it('setProviderHealth stores and retrieves health status', () => {
+      setProviderHealth('openai', 'healthy')
+      expect(getProviderHealth('openai')).toBe('healthy')
+    })
+
+    it('clearProviderHealthCache resets all entries', () => {
+      setProviderHealth('openai', 'healthy')
+      setProviderHealth('groq', 'error')
+      clearProviderHealthCache()
+      expect(getProviderHealth('openai')).toBe('unconfigured')
+      expect(getProviderHealth('groq')).toBe('unconfigured')
+    })
+
+    it('getProviderHealthSnapshot returns all cached entries', () => {
+      setProviderHealth('openai', 'healthy')
+      setProviderHealth('groq', 'degraded')
+      const snapshot = getProviderHealthSnapshot()
+      expect(snapshot.size).toBe(2)
+      expect(snapshot.get('openai')?.status).toBe('healthy')
+      expect(snapshot.get('groq')?.status).toBe('degraded')
+    })
+
+    it('isProviderUsable returns true when cache is empty (backwards compatible)', () => {
+      expect(isProviderUsable('openai')).toBe(true)
+      expect(isProviderUsable('nonexistent')).toBe(true)
+    })
+
+    it('isProviderUsable returns true for healthy or configured providers', () => {
+      setProviderHealth('openai', 'healthy')
+      setProviderHealth('groq', 'configured')
+      expect(isProviderUsable('openai')).toBe(true)
+      expect(isProviderUsable('groq')).toBe(true)
+    })
+
+    it('isProviderUsable returns false for unconfigured, error, or disabled providers', () => {
+      setProviderHealth('openai', 'healthy') // populate cache so size > 0
+      setProviderHealth('groq', 'unconfigured')
+      setProviderHealth('deepseek', 'error')
+      setProviderHealth('grok', 'disabled')
+      expect(isProviderUsable('groq')).toBe(false)
+      expect(isProviderUsable('deepseek')).toBe(false)
+      expect(isProviderUsable('grok')).toBe(false)
+    })
+
+    it('isProviderUsable returns false for degraded providers (not usable, just not excluded)', () => {
+      setProviderHealth('openai', 'healthy')
+      setProviderHealth('groq', 'degraded')
+      expect(isProviderUsable('groq')).toBe(false)
+    })
+
+    it('isProviderDegraded correctly identifies degraded providers', () => {
+      setProviderHealth('openai', 'healthy')
+      setProviderHealth('groq', 'degraded')
+      expect(isProviderDegraded('openai')).toBe(false)
+      expect(isProviderDegraded('groq')).toBe(true)
+    })
+
+    it('getModelEffectiveHealth returns static health when cache is empty', () => {
+      const model = getModelById('openai', 'gpt-4o')!
+      expect(getModelEffectiveHealth(model)).toBe('configured')
+    })
+
+    it('getModelEffectiveHealth returns provider health when cache is populated', () => {
+      setProviderHealth('openai', 'healthy')
+      const model = getModelById('openai', 'gpt-4o')!
+      expect(getModelEffectiveHealth(model)).toBe('healthy')
+    })
+
+    it('getUsableModels returns all enabled models when cache is empty', () => {
+      const usable = getUsableModels()
+      const enabled = getEnabledModels()
+      expect(usable.length).toBe(enabled.length)
+    })
+
+    it('getUsableModels excludes models from unhealthy providers', () => {
+      const allEnabled = getEnabledModels()
+      const openaiCount = allEnabled.filter(m => m.provider === 'openai').length
+
+      // Mark openai as healthy, everything else as unconfigured
+      setProviderHealth('openai', 'healthy')
+      setProviderHealth('groq', 'unconfigured')
+      setProviderHealth('deepseek', 'error')
+      setProviderHealth('grok', 'disabled')
+      setProviderHealth('nvidia', 'unconfigured')
+      setProviderHealth('huggingface', 'unconfigured')
+      setProviderHealth('openrouter', 'unconfigured')
+      setProviderHealth('together', 'unconfigured')
+      setProviderHealth('gemini', 'unconfigured')
+
+      const usable = getUsableModels()
+      expect(usable.length).toBe(openaiCount)
+      expect(usable.every(m => m.provider === 'openai')).toBe(true)
+    })
+
+    it('getUsableModels includes models from both healthy and configured providers', () => {
+      setProviderHealth('openai', 'healthy')
+      setProviderHealth('groq', 'configured')
+      setProviderHealth('deepseek', 'error')
+      setProviderHealth('grok', 'unconfigured')
+      setProviderHealth('nvidia', 'unconfigured')
+      setProviderHealth('huggingface', 'unconfigured')
+      setProviderHealth('openrouter', 'unconfigured')
+      setProviderHealth('together', 'unconfigured')
+      setProviderHealth('gemini', 'unconfigured')
+
+      const usable = getUsableModels()
+      const providers = new Set(usable.map(m => m.provider))
+      expect(providers.has('openai')).toBe(true)
+      expect(providers.has('groq')).toBe(true)
+      expect(providers.has('deepseek')).toBe(false)
     })
   })
 })

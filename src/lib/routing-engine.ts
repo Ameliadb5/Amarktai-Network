@@ -15,6 +15,9 @@
 import {
   type ModelEntry,
   getEnabledModels,
+  getUsableModels,
+  isProviderUsable,
+  isProviderDegraded,
   getModelById,
 } from '@/lib/model-registry'
 
@@ -145,11 +148,14 @@ const LATENCY_CEILING: Record<string, number> = {
 // ── Helpers (internal) ──────────────────────────────────────────────────
 
 /**
- * Filter the global enabled-model list down to models that the app
+ * Filter the global usable-model list down to models that the app
  * profile allows (by provider *and* by model id).
+ *
+ * Uses `getUsableModels()` which excludes models whose provider is
+ * unconfigured, errored, or disabled when health data is available.
  */
 function getEligibleModels(profile: AppProfile): ModelEntry[] {
-  return getEnabledModels().filter(
+  return getUsableModels().filter(
     (m) => isProviderAllowed(profile, m.provider) && isModelAllowed(profile, m.model_id),
   )
 }
@@ -270,6 +276,9 @@ export function selectValidatorModel(
  *
  * The list is sorted by `fallback_priority` (ascending – 1 = first
  * choice) and capped at 3 entries to keep retry overhead bounded.
+ *
+ * Degraded providers are automatically pushed to the end of the list
+ * so that healthy alternatives are tried first.
  */
 export function buildFallbackList(
   context: RoutingContext,
@@ -282,7 +291,13 @@ export function buildFallbackList(
   return eligibleModels
     .filter((m) => !excludeProvider || m.provider !== excludeProvider)
     .filter((m) => withinCostCeiling(m, profile, context.maxCostTier))
-    .sort((a, b) => a.fallback_priority - b.fallback_priority)
+    .sort((a, b) => {
+      // Demote degraded providers to the end of the fallback list.
+      const aDegraded = isProviderDegraded(a.provider) ? 1 : 0
+      const bDegraded = isProviderDegraded(b.provider) ? 1 : 0
+      if (aDegraded !== bDegraded) return aDegraded - bDegraded
+      return a.fallback_priority - b.fallback_priority
+    })
     .slice(0, MAX_FALLBACKS)
 }
 
@@ -351,8 +366,8 @@ export function routeRequest(context: RoutingContext): RoutingDecision {
       primaryModel: null,
       secondaryModel: null,
       fallbackModels: [],
-      reason: `No eligible models found for app "${context.appSlug}". All models are either disabled or excluded by the app profile.`,
-      warnings: ['No eligible models – request will fail without manual intervention.'],
+      reason: `No eligible models found for app "${context.appSlug}". All models are either disabled, have unhealthy providers, or are excluded by the app profile.`,
+      warnings: ['No eligible models – check that at least one provider has a valid API key and is healthy.'],
       costEstimate: 'low',
       latencyEstimate: 'medium',
     }
@@ -363,7 +378,7 @@ export function routeRequest(context: RoutingContext): RoutingDecision {
 
   if (escalation) {
     const escalatedModel = getModelById(escalation.escalate_to_provider, escalation.escalate_to_model)
-    if (escalatedModel && escalatedModel.enabled) {
+    if (escalatedModel && escalatedModel.enabled && isProviderUsable(escalatedModel.provider)) {
       const fallbacks = buildFallbackList(context, profile, eligible, escalatedModel.provider)
       return {
         mode: 'premium_escalation',

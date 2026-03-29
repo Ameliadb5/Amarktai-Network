@@ -6,7 +6,7 @@
  * PROVE the wiring is real.
  */
 import { describe, it, expect } from 'vitest'
-import { getDefaultModelForProvider, getModelRegistry } from '@/lib/model-registry'
+import { getDefaultModelForProvider, getModelRegistry, getUsableModels, getEnabledModels, clearProviderHealthCache } from '@/lib/model-registry'
 import { getAppProfile } from '@/lib/app-profiles'
 import { classifyTask, decideExecution } from '@/lib/orchestrator'
 import { routeRequest, type RoutingContext } from '@/lib/routing-engine'
@@ -219,6 +219,31 @@ describe('Integration Verification', () => {
       // The retrieval engine provides scored results with freshness decay.
       const freshScore = computeFreshnessScore(new Date())
       expect(freshScore).toBeGreaterThan(0)
+    })
+  })
+
+  describe('Health-Aware Model Selection (Phase 1 truthfulness)', () => {
+    it('getUsableModels returns same as getEnabledModels when health cache is empty', () => {
+      clearProviderHealthCache()
+      const usable = getUsableModels()
+      const enabled = getEnabledModels()
+      expect(usable.length).toBe(enabled.length)
+    })
+
+    it('routing engine uses getUsableModels for health-aware selection', () => {
+      clearProviderHealthCache()
+      // When health cache is empty, routing works normally (backwards compatible)
+      const ctx: RoutingContext = {
+        appSlug: 'amarktai-network',
+        appCategory: 'generic',
+        taskType: 'chat',
+        taskComplexity: 'simple',
+        message: 'test',
+        requiresRetrieval: false,
+        requiresMultimodal: false,
+      }
+      const decision = routeRequest(ctx)
+      expect(decision.primaryModel).toBeDefined()
     })
   })
 })
