@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   Bell,
@@ -11,7 +12,25 @@ import {
   Mail,
   Shield,
   BellOff,
+  RefreshCw,
+  Zap,
 } from 'lucide-react'
+
+interface HealingIssue {
+  id: string
+  severity: 'critical' | 'warning' | 'info'
+  title: string
+  description: string
+  action: string
+  affectedResource: string
+  detectedAt: string
+  autoHealed: boolean
+}
+
+interface HealingResponse {
+  healthScore: number
+  issues: HealingIssue[]
+}
 
 const severityLegend = [
   {
@@ -46,7 +65,43 @@ const notificationChannels = [
   { name: 'Email Digest', icon: Mail, status: 'Coming soon' },
 ]
 
+const SEVERITY_ICONS = {
+  critical: AlertCircle,
+  warning: AlertTriangle,
+  info: Info,
+}
+
+const SEVERITY_COLORS = {
+  critical: 'text-red-400 bg-red-500/10 border-red-500/20',
+  warning: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  info: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+}
+
 export default function AlertsPage() {
+  const [issues, setIssues] = useState<HealingIssue[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/admin/healing')
+      if (res.ok) {
+        const data: HealingResponse = await res.json()
+        setIssues(data.issues ?? [])
+      }
+    } catch {
+      // Healing API may not be reachable — that's ok
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const criticalCount = issues.filter(i => i.severity === 'critical').length
+  const warningCount = issues.filter(i => i.severity === 'warning').length
+  const totalCount = issues.length
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -55,14 +110,24 @@ export default function AlertsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0 }}
       >
-        <h1
-          className="text-2xl font-bold text-white font-heading"
-        >
-          Alerts & Notifications
-        </h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Aggregated alerts from all connected apps and system monitors
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white font-heading">
+              Alerts & Notifications
+            </h1>
+            <p className="text-sm text-slate-400 mt-1">
+              Aggregated alerts from self-healing engine and system monitors
+            </p>
+          </div>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </motion.div>
 
       {/* Explanation Banner */}
@@ -77,16 +142,13 @@ export default function AlertsPage() {
             <Shield className="w-4 h-4 text-blue-400" />
           </div>
           <div>
-            <h3
-              className="text-sm font-semibold text-white font-heading"
-            >
+            <h3 className="text-sm font-semibold text-white font-heading">
               Centralized Alert Hub
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed mt-1">
-              This page will aggregate alerts from all connected apps —
-              including health checks, error spikes, VPS threshold warnings,
-              and security events. Alerts are pushed through the integration API
-              and routed here in real time.
+              Alerts are sourced from the self-healing engine, provider health
+              checks, budget monitors, and content moderation events. Critical
+              issues require immediate attention.
             </p>
           </div>
         </div>
@@ -98,9 +160,7 @@ export default function AlertsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <h2
-          className="text-sm font-semibold text-white mb-3 font-heading"
-        >
+        <h2 className="text-sm font-semibold text-white mb-3 font-heading">
           Alert Severity Levels
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -115,13 +175,9 @@ export default function AlertsPage() {
                 className={`glass rounded-2xl p-4 border ${item.borderColor}`}
               >
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div
-                    className={`w-2.5 h-2.5 rounded-full ${item.color}`}
-                  />
+                  <div className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
                   <Icon className={`w-4 h-4 ${item.textColor}`} />
-                  <span
-                    className={`text-sm font-semibold ${item.textColor}`}
-                  >
+                  <span className={`text-sm font-semibold ${item.textColor}`}>
                     {item.level}
                   </span>
                 </div>
@@ -134,7 +190,7 @@ export default function AlertsPage() {
         </div>
       </motion.div>
 
-      {/* Empty Alert Feed */}
+      {/* Alert Feed */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -142,40 +198,90 @@ export default function AlertsPage() {
         className="glass rounded-2xl p-6"
       >
         <div className="flex items-center justify-between mb-5">
-          <h2
-            className="text-sm font-semibold text-white font-heading"
-          >
+          <h2 className="text-sm font-semibold text-white font-heading">
             Alert Feed
           </h2>
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-800/50 border border-slate-700/50">
-            <Bell className="w-3 h-3 text-slate-500" />
-            <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
-              0 Alerts
-            </span>
+          <div className="flex items-center gap-3">
+            {criticalCount > 0 && (
+              <span className="text-[10px] font-medium text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">
+                {criticalCount} Critical
+              </span>
+            )}
+            {warningCount > 0 && (
+              <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                {warningCount} Warning
+              </span>
+            )}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-800/50 border border-slate-700/50">
+              <Bell className="w-3 h-3 text-slate-500" />
+              <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                {totalCount} Alert{totalCount !== 1 ? 's' : ''}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-center mb-4">
-            <BellOff className="w-7 h-7 text-slate-700" />
+        {loading ? (
+          <div className="py-12 text-center">
+            <RefreshCw className="w-6 h-6 text-blue-400 animate-spin mx-auto mb-2" />
+            <p className="text-xs text-slate-500">Loading alerts...</p>
           </div>
-          <p className="text-sm text-slate-400">No alerts received yet</p>
-          <p className="text-xs text-slate-600 mt-1.5 max-w-md">
-            Alerts will appear here when connected apps send notifications
-            through the integration API.
-          </p>
-        </div>
+        ) : totalCount === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-center mb-4">
+              <BellOff className="w-7 h-7 text-slate-700" />
+            </div>
+            <p className="text-sm text-slate-400">All systems healthy — no alerts</p>
+            <p className="text-xs text-slate-600 mt-1.5 max-w-md">
+              Alerts will appear here when the self-healing engine detects
+              provider failures, budget overages, or content violations.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {issues.map((issue, i) => {
+              const SevIcon = SEVERITY_ICONS[issue.severity]
+              const colorClass = SEVERITY_COLORS[issue.severity]
+              return (
+                <motion.div
+                  key={issue.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 * i }}
+                  className={`rounded-xl border p-4 ${colorClass.split(' ').slice(1).join(' ')} bg-white/[0.02]`}
+                >
+                  <div className="flex items-start gap-3">
+                    <SevIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${colorClass.split(' ')[0]}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold text-white">{issue.title}</span>
+                        {issue.autoHealed && (
+                          <span className="text-[9px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                            <Zap className="w-2.5 h-2.5" /> Auto-healed
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400">{issue.description}</p>
+                      <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-500">
+                        <span>Resource: {issue.affectedResource}</span>
+                        <span>Action: {issue.action}</span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
+        )}
       </motion.div>
 
-      {/* Notification Settings (Future) */}
+      {/* Notification Settings */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
       >
-        <h2
-          className="text-sm font-semibold text-white mb-3 font-heading"
-        >
+        <h2 className="text-sm font-semibold text-white mb-3 font-heading">
           Notification Channels
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

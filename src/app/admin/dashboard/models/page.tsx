@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Layers, RefreshCw, AlertCircle } from 'lucide-react'
+import { Layers, RefreshCw, AlertCircle, ChevronDown } from 'lucide-react'
 
 interface ModelEntry {
   provider: string
@@ -14,6 +14,9 @@ interface ModelEntry {
   enabled: boolean
   health: string
   context_window?: number
+  fallback_priority?: number
+  validator_eligible?: boolean
+  specialist_domains?: string[]
 }
 
 interface ModelsResponse {
@@ -35,7 +38,11 @@ const TIER_COLORS: Record<string, string> = {
 
 const HEALTH_COLORS: Record<string, string> = {
   healthy: 'text-emerald-400 bg-emerald-500/10',
+  configured: 'text-blue-400 bg-blue-500/10',
   degraded: 'text-amber-400 bg-amber-500/10',
+  error: 'text-red-400 bg-red-500/10',
+  unconfigured: 'text-slate-500 bg-slate-500/10',
+  disabled: 'text-slate-600 bg-slate-500/10',
   down: 'text-red-400 bg-red-500/10',
   unknown: 'text-slate-400 bg-slate-500/10',
 }
@@ -44,6 +51,8 @@ export default function ModelsPage() {
   const [data, setData] = useState<ModelsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filterProvider, setFilterProvider] = useState<string | null>(null)
+  const [expandedModel, setExpandedModel] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,6 +72,7 @@ export default function ModelsPage() {
 
   const enabledCount = data?.models.filter(m => m.enabled).length ?? 0
   const providers = [...new Set(data?.models.map(m => m.provider) ?? [])]
+  const filteredModels = (data?.models ?? []).filter(m => !filterProvider || m.provider === filterProvider)
 
   return (
     <div className="max-w-6xl space-y-5">
@@ -100,6 +110,28 @@ export default function ModelsPage() {
         </div>
       )}
 
+      {/* Filter */}
+      {data && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs text-slate-500">Filter by provider:</span>
+          <button
+            onClick={() => setFilterProvider(null)}
+            className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${!filterProvider ? 'bg-blue-500/15 border-blue-500/30 text-blue-400' : 'bg-white/[0.02] border-white/[0.06] text-slate-500 hover:text-white'}`}
+          >
+            All
+          </button>
+          {providers.map(p => (
+            <button
+              key={p}
+              onClick={() => setFilterProvider(p)}
+              className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${filterProvider === p ? 'bg-blue-500/15 border-blue-500/30 text-blue-400' : 'bg-white/[0.02] border-white/[0.06] text-slate-500 hover:text-white'}`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="space-y-3">
@@ -120,7 +152,7 @@ export default function ModelsPage() {
       ) : (
         <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-white/5">
-            <span className="text-xs text-slate-500">{data.total} models in registry</span>
+            <span className="text-xs text-slate-500">{filteredModels.length} models{filterProvider ? ` from ${filterProvider}` : ' in registry'}</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -136,48 +168,121 @@ export default function ModelsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
-                {data.models.map((model) => (
-                  <tr key={`${model.provider}:${model.model_id}`} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-3">
-                      <span className="text-xs text-slate-400 font-mono bg-white/5 px-1.5 py-0.5 rounded">
-                        {model.provider}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-white">{model.display_name || model.model_id}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border ${TIER_COLORS[model.cost_tier] ?? 'text-slate-400 bg-slate-500/10 border-slate-500/20'}`}>
-                        {model.cost_tier}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border ${TIER_COLORS[model.latency_tier] ?? 'text-slate-400 bg-slate-500/10 border-slate-500/20'}`}>
-                        {model.latency_tier}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1 flex-wrap">
-                        {model.roles?.map(role => (
-                          <span key={role} className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded">
-                            {role}
+                {filteredModels.map((model) => {
+                  const modelKey = `${model.provider}:${model.model_id}`
+                  const isExpanded = expandedModel === modelKey
+                  return (
+                    <>
+                      <tr
+                        key={modelKey}
+                        className="hover:bg-white/[0.02] transition-colors cursor-pointer"
+                        onClick={() => setExpandedModel(isExpanded ? null : modelKey)}
+                      >
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-slate-400 font-mono bg-white/5 px-1.5 py-0.5 rounded">
+                            {model.provider}
                           </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${HEALTH_COLORS[model.health] ?? HEALTH_COLORS.unknown}`}>
-                        {model.health ?? 'unknown'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${model.enabled ? 'text-emerald-400' : 'text-slate-500'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${model.enabled ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                        {model.enabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-white">{model.display_name || model.model_id}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border ${TIER_COLORS[model.cost_tier] ?? 'text-slate-400 bg-slate-500/10 border-slate-500/20'}`}>
+                            {model.cost_tier}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border ${TIER_COLORS[model.latency_tier] ?? 'text-slate-400 bg-slate-500/10 border-slate-500/20'}`}>
+                            {model.latency_tier}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1 flex-wrap">
+                            {model.roles?.slice(0, 3).map(role => (
+                              <span key={role} className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded">
+                                {role}
+                              </span>
+                            ))}
+                            {(model.roles?.length ?? 0) > 3 && (
+                              <span className="text-[10px] text-slate-500">+{(model.roles?.length ?? 0) - 3}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${HEALTH_COLORS[model.health] ?? HEALTH_COLORS.unknown}`}>
+                            {model.health ?? 'unknown'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${model.enabled ? 'text-emerald-400' : 'text-slate-500'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${model.enabled ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                              {model.enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                            <ChevronDown className={`w-3 h-3 text-slate-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr key={`${modelKey}-detail`}>
+                          <td colSpan={7} className="px-4 py-4 bg-white/[0.01]">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                              <div>
+                                <p className="text-slate-500 font-medium mb-1">Model ID</p>
+                                <p className="text-slate-300 font-mono">{model.model_id}</p>
+                              </div>
+                              {model.context_window && (
+                                <div>
+                                  <p className="text-slate-500 font-medium mb-1">Context Window</p>
+                                  <p className="text-slate-300">{model.context_window.toLocaleString()} tokens</p>
+                                </div>
+                              )}
+                              {model.fallback_priority !== undefined && (
+                                <div>
+                                  <p className="text-slate-500 font-medium mb-1">Fallback Priority</p>
+                                  <p className="text-slate-300">#{model.fallback_priority}</p>
+                                </div>
+                              )}
+                              {model.validator_eligible !== undefined && (
+                                <div>
+                                  <p className="text-slate-500 font-medium mb-1">Validator Eligible</p>
+                                  <p className={model.validator_eligible ? 'text-emerald-400' : 'text-slate-500'}>
+                                    {model.validator_eligible ? 'Yes' : 'No'}
+                                  </p>
+                                </div>
+                              )}
+                              <div className="sm:col-span-2">
+                                <p className="text-slate-500 font-medium mb-1">Capabilities</p>
+                                <div className="flex gap-1 flex-wrap">
+                                  {model.capabilities?.map(cap => (
+                                    <span key={cap} className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">
+                                      {cap}
+                                    </span>
+                                  ))}
+                                  {(!model.capabilities || model.capabilities.length === 0) && (
+                                    <span className="text-slate-600">None reported</span>
+                                  )}
+                                </div>
+                              </div>
+                              {model.specialist_domains && model.specialist_domains.length > 0 && (
+                                <div className="sm:col-span-3">
+                                  <p className="text-slate-500 font-medium mb-1">Specialist Domains</p>
+                                  <div className="flex gap-1 flex-wrap">
+                                    {model.specialist_domains.map(d => (
+                                      <span key={d} className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                        {d}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  )
+                })}
               </tbody>
             </table>
           </div>

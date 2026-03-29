@@ -10,6 +10,8 @@ import { orchestrate } from '@/lib/orchestrator'
 import { saveMemory } from '@/lib/memory'
 import { retrieve } from '@/lib/retrieval-engine'
 import { logRouteOutcome } from '@/lib/learning-engine'
+import { scanContent, blockedExplanation } from '@/lib/content-filter'
+import { getBudgetSummary } from '@/lib/budget-tracker'
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -66,6 +68,35 @@ export async function POST(request: NextRequest) {
 
   const traceId = body.traceId || randomUUID()
 
+  // ── Content filter — scan input for policy violations ───────────────
+  const inputFilter = scanContent(body.message)
+  if (inputFilter.flagged) {
+    return NextResponse.json(
+      {
+        success: false,
+        traceId,
+        app: null,
+        routedProvider: null,
+        routedModel: null,
+        taskType: body.taskType,
+        executionMode: 'direct',
+        confidenceScore: null,
+        validationUsed: false,
+        consensusUsed: false,
+        output: null,
+        warnings: [],
+        errors: ['Input blocked by safety filter'],
+        categories: inputFilter.categories,
+        message: blockedExplanation(inputFilter.categories),
+        latencyMs: Date.now() - start,
+        memoryUsed: false,
+        fallbackUsed: false,
+        timestamp: new Date().toISOString(),
+      },
+      { status: 403 },
+    )
+  }
+
   // ── Authenticate the calling app ──────────────────────────────────────
   const auth = await authenticateApp(body.appId, body.appSecret)
   if (!auth.ok || !auth.app) {
@@ -112,6 +143,25 @@ export async function POST(request: NextRequest) {
     // Retrieval engine unavailable — proceed without context
   }
 
+  // ── Budget enforcement — block if all providers are over critical ────
+  try {
+    const budgetSummary = await getBudgetSummary()
+    const allCritical = budgetSummary.entries.length > 0 &&
+      budgetSummary.entries.every(e => e.status === 'critical')
+    if (allCritical) {
+      return NextResponse.json(
+        errorResponse({
+          traceId, taskType: body.taskType, app,
+          error: 'All providers have exceeded their budget critical thresholds. Please contact your administrator.',
+          statusCode: 429, latencyMs: Date.now() - start,
+        }),
+        { status: 429 },
+      )
+    }
+  } catch {
+    // Budget check failed — proceed without enforcement
+  }
+
   // ── Orchestrate ───────────────────────────────────────────────────────
   const result = await orchestrate({
     appSlug: app.slug,
@@ -149,6 +199,37 @@ export async function POST(request: NextRequest) {
       errorResponse({ traceId, taskType: body.taskType, app, error: result.errors[0], statusCode: 503, latencyMs }),
       { status: 503 },
     )
+  }
+
+  // ── Content filter — scan output for policy violations ──────────────
+  if (success && result.output) {
+    const filterResult = scanContent(result.output)
+    if (filterResult.flagged) {
+      return NextResponse.json(
+        {
+          success: false,
+          traceId,
+          app: { id: app.id, name: app.name, slug: app.slug },
+          routedProvider: result.routedProvider,
+          routedModel: result.routedModel,
+          taskType: body.taskType,
+          executionMode: result.executionMode,
+          confidenceScore: result.confidenceScore,
+          validationUsed: result.validationUsed,
+          consensusUsed: result.consensusUsed,
+          output: null,
+          warnings: [],
+          errors: ['Content blocked by safety filter'],
+          categories: filterResult.categories,
+          message: blockedExplanation(filterResult.categories),
+          latencyMs,
+          memoryUsed,
+          fallbackUsed: result.fallbackUsed,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 403 },
+      )
+    }
   }
 
   // ── Save memory on success ────────────────────────────────────────────

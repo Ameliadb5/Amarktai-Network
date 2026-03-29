@@ -415,12 +415,19 @@ export const DEFAULT_APP_PROFILES: ReadonlyMap<string, AppProfile> = new Map<str
 const COMPLEXITY_ORDER: Record<string, number> = { simple: 0, moderate: 1, complex: 2 };
 
 /**
+ * Runtime profile overrides — set via the admin API.
+ * These take precedence over DEFAULT_APP_PROFILES.
+ * Stored in-memory (persists for the server process lifetime).
+ */
+export const runtimeProfileOverrides = new Map<string, AppProfile>();
+
+/**
  * Get the app profile for a given slug. Falls back to `DEFAULT_PROFILE`
  * when the slug is not in the registry.
  */
 export function getAppProfile(appSlug: string): AppProfile {
   const key = (appSlug ?? '').toLowerCase().trim();
-  return DEFAULT_APP_PROFILES.get(key) ?? DEFAULT_PROFILE;
+  return runtimeProfileOverrides.get(key) ?? DEFAULT_APP_PROFILES.get(key) ?? DEFAULT_PROFILE;
 }
 
 /** Check whether a provider key is allowed for the given profile. */

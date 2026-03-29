@@ -213,3 +213,32 @@ describe('configErrorResponse', () => {
     expect(resp.issues).toHaveLength(2)
   })
 })
+
+describe('validateProviderKeys (type/export verification)', () => {
+  it('validateProviderKeys is exported as an async function', async () => {
+    // Dynamic import to verify the function is correctly exported
+    const mod = await import('@/lib/config-validator')
+    expect(typeof mod.validateProviderKeys).toBe('function')
+  })
+
+  it('ProviderValidationResult type has expected shape', async () => {
+    // validateProviderKeys queries the DB which is not available in tests,
+    // so it should return a warning issue about DB being unreachable.
+    const { validateProviderKeys } = await import('@/lib/config-validator')
+    const result = await validateProviderKeys()
+    expect(result).toHaveProperty('valid')
+    expect(result).toHaveProperty('providers')
+    expect(result).toHaveProperty('issues')
+    expect(Array.isArray(result.providers)).toBe(true)
+    expect(Array.isArray(result.issues)).toBe(true)
+  })
+
+  it('returns warning when database is unreachable', async () => {
+    const { validateProviderKeys } = await import('@/lib/config-validator')
+    const result = await validateProviderKeys()
+    // Without a database, should get a warning about provider table
+    const dbWarning = result.issues.find(i => i.key === 'PROVIDER_VALIDATION')
+    expect(dbWarning).toBeDefined()
+    expect(dbWarning?.severity).toBe('warning')
+  })
+})

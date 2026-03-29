@@ -44,7 +44,7 @@ export default function BudgetsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ monthlyBudgetUsd: '', warningThresholdPct: '75', criticalThresholdPct: '90' })
+  const [editForm, setEditForm] = useState({ monthlyBudgetUsd: '', warningThresholdPct: '75', criticalThresholdPct: '90', autoDegrade: false, autoSuspend: false })
   const [saving, setSaving]   = useState(false)
 
   const load = useCallback(async () => {
@@ -77,6 +77,8 @@ export default function BudgetsPage() {
       monthlyBudgetUsd: entry.monthlyBudgetUsd?.toString() ?? '',
       warningThresholdPct: entry.warningThresholdPct.toString(),
       criticalThresholdPct: entry.criticalThresholdPct.toString(),
+      autoDegrade: false,
+      autoSuspend: false,
     })
   }
 
@@ -242,6 +244,26 @@ export default function BudgetsPage() {
                             className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:border-blue-500/50"
                           />
                         </div>
+                      </div>
+                      <div className="flex gap-6 mt-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editForm.autoDegrade}
+                            onChange={e => setEditForm(f => ({ ...f, autoDegrade: e.target.checked }))}
+                            className="w-4 h-4 rounded border-white/20 bg-white/5 text-blue-500 focus:ring-blue-500/50"
+                          />
+                          <span className="text-xs text-slate-400">Auto-degrade at warning (switch to cheaper models)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editForm.autoSuspend}
+                            onChange={e => setEditForm(f => ({ ...f, autoSuspend: e.target.checked }))}
+                            className="w-4 h-4 rounded border-white/20 bg-white/5 text-red-500 focus:ring-red-500/50"
+                          />
+                          <span className="text-xs text-slate-400">Auto-suspend at critical (stop premium tasks)</span>
+                        </label>
                       </div>
                       <div className="flex gap-2">
                         <button

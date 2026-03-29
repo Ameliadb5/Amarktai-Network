@@ -1,7 +1,7 @@
 'use client'
 
 import '@fontsource-variable/inter'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -12,6 +12,7 @@ import {
   Brain, Bell, FileText, AppWindow, BookOpen,
   Route, Zap, Database, Palette, CheckCircle, Layers,
   FlaskConical, FolderOpen, DollarSign, ShieldAlert, Bot,
+  Sun, Moon, User,
 } from 'lucide-react'
 
 interface NavItem {
@@ -82,7 +83,20 @@ const navGroups: NavGroup[] = [
 
 const allNavItems = navGroups.flatMap((g) => g.items)
 
-function SidebarContent({ onClose }: { onClose?: () => void }) {
+function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 dark:hover:bg-white/5 transition-colors duration-200"
+      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+      title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+    >
+      {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+    </button>
+  )
+}
+
+function SidebarContent({ onClose, theme, onThemeToggle }: { onClose?: () => void; theme: 'dark' | 'light'; onThemeToggle: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -94,7 +108,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="p-6 pb-5 border-b border-white/[0.06]">
+      <div className="p-6 pb-5 border-b border-white/[0.06] dark:border-white/[0.06]">
         <Link href="/" className="flex items-center gap-3 group" onClick={onClose}>
           <div className="relative w-[44px] h-[44px] flex-shrink-0">
             <Image
@@ -118,12 +132,12 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 
       {/* System status */}
       <div className="mx-4 mt-4 px-3 py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15 flex items-center gap-2">
-        <span className="relative flex h-2 w-2">
+        <span className="relative flex h-2 w-2" aria-hidden="true">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
         </span>
         <span className="text-xs text-emerald-400 font-mono">AMARKTAI NETWORK ACTIVE</span>
-        <div className="ml-auto flex gap-0.5 items-end">
+        <div className="ml-auto flex gap-0.5 items-end" aria-hidden="true">
           {[8, 12, 6, 10, 7].map((h, b) => (
             <div key={b} className="w-1 bg-emerald-500/70 rounded-sm" style={{ height: `${h}px` }} />
           ))}
@@ -131,7 +145,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 pt-4 pb-2 overflow-y-auto scrollbar-thin">
+      <nav className="flex-1 px-3 pt-4 pb-2 overflow-y-auto scrollbar-thin" aria-label="Dashboard navigation">
         {navGroups.map((group, groupIdx) => (
           <div key={group.label} className="mb-1">
             {groupIdx > 0 && (
@@ -140,7 +154,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             <p className="text-[11px] text-slate-500 font-mono tracking-widest uppercase px-3 mb-1.5 font-medium">
               {group.label}
             </p>
-            <div className="space-y-0.5">
+            <div className="space-y-0.5" role="list">
               {group.items.map((item) => {
                 const active = pathname === item.href
                 return (
@@ -148,7 +162,9 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                     key={item.href}
                     href={item.href}
                     onClick={onClose}
-                    className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-300 group ${
+                    role="listitem"
+                    aria-current={active ? 'page' : undefined}
+                    className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-300 group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060C1B] ${
                       active
                         ? 'bg-blue-500/15 text-white border border-blue-500/25 shadow-[0_0_12px_-3px_rgba(59,130,246,0.3)]'
                         : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent'
@@ -171,17 +187,21 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 
       {/* Footer */}
       <div className="p-4 border-t border-white/[0.06] space-y-2">
+        <div className="flex items-center justify-between px-3 py-1">
+          <span className="text-[11px] text-slate-500 font-mono">Theme</span>
+          <ThemeToggle theme={theme} onToggle={onThemeToggle} />
+        </div>
         <Link
           href="/"
           onClick={onClose}
-          className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-white hover:bg-white/[0.04] transition-all duration-300"
+          className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-white hover:bg-white/[0.04] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
           <Shield className="w-3.5 h-3.5" />
           View Public Site
         </Link>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/5 transition-all duration-300 w-full"
+          className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/5 transition-all duration-300 w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
         >
           <LogOut className="w-4 h-4" />
           Sign Out
@@ -197,6 +217,32 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('amarktai-theme') as 'dark' | 'light' | null
+      if (saved === 'light' || saved === 'dark') {
+        setTheme(saved)
+      }
+    } catch {
+      // localStorage unavailable (SSR or restricted context)
+    }
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    document.documentElement.classList.toggle('light', theme === 'light')
+    try {
+      localStorage.setItem('amarktai-theme', theme)
+    } catch {
+      // localStorage unavailable
+    }
+  }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  }, [])
 
   const currentPage = allNavItems.find((n) => n.href === pathname)
   const currentGroup = navGroups.find((g) =>
@@ -205,19 +251,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div
-      className="min-h-screen bg-[#050816] flex"
+      className="min-h-screen bg-[#050816] dark:bg-[#050816] flex"
       style={{ fontFamily: "'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif" }}
     >
       {/* Subtle background */}
-      <div className="fixed inset-0 pointer-events-none">
+      <div className="fixed inset-0 pointer-events-none" aria-hidden="true">
         <div className="absolute top-0 left-0 w-96 h-96 bg-blue-600/3 rounded-full blur-[120px]" />
         <div className="absolute bottom-0 right-0 w-80 h-80 bg-violet-600/3 rounded-full blur-[100px]" />
         <div className="absolute inset-0 grid-bg opacity-[0.15]" />
       </div>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 flex-col bg-[#060C1B]/95 backdrop-blur-xl border-r border-white/[0.06] fixed inset-y-0 left-0 z-40">
-        <SidebarContent />
+      <aside className="hidden lg:flex w-64 flex-col bg-[#060C1B]/95 backdrop-blur-xl border-r border-white/[0.06] fixed inset-y-0 left-0 z-40" aria-label="Sidebar">
+        <SidebarContent theme={theme} onThemeToggle={toggleTheme} />
       </aside>
 
       {/* Mobile Sidebar Overlay */}
@@ -240,10 +286,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors duration-300"
+                aria-label="Close sidebar"
               >
                 <X className="w-4 h-4" />
               </button>
-              <SidebarContent onClose={() => setSidebarOpen(false)} />
+              <SidebarContent onClose={() => setSidebarOpen(false)} theme={theme} onThemeToggle={toggleTheme} />
             </motion.div>
           </motion.div>
         )}
@@ -252,10 +299,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 relative z-10">
         {/* Top Bar */}
-        <div className="h-16 border-b border-white/[0.06] bg-gradient-to-r from-[#050816]/90 via-[#050816]/80 to-[#060C1B]/90 backdrop-blur-xl flex items-center gap-4 px-4 lg:px-6 sticky top-0 z-30">
+        <div className="h-16 border-b border-white/[0.06] bg-gradient-to-r from-[#050816]/90 via-[#050816]/80 to-[#060C1B]/90 backdrop-blur-xl flex items-center gap-4 px-4 lg:px-6 sticky top-0 z-30" role="banner">
           <button
             className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors duration-300"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open sidebar"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -264,7 +312,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <span className="text-slate-500 font-medium hidden sm:inline">{currentGroup.label}</span>
             )}
             {currentGroup && currentPage && (
-              <ChevronRight className="w-3 h-3 text-slate-600 hidden sm:inline" />
+              <ChevronRight className="w-3 h-3 text-slate-600 hidden sm:inline" aria-hidden="true" />
             )}
             {currentPage && (
               <div className="flex items-center gap-2">
@@ -274,20 +322,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             )}
           </div>
           <div className="flex-1" />
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
             <div className="hidden sm:flex items-center gap-2">
-              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              <Activity className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
               <span className="text-xs text-slate-400 font-mono">System Online</span>
             </div>
-            <div className="h-4 w-px bg-white/10" />
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold">
-              A
+            <div className="h-4 w-px bg-white/10" aria-hidden="true" />
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold" aria-label="Admin user">
+                <User className="w-3.5 h-3.5" />
+              </div>
+              <span className="hidden sm:inline text-xs text-slate-400 font-medium">Admin</span>
             </div>
           </div>
         </div>
 
         {/* Page Content */}
-        <main className="p-4 lg:p-6 max-w-7xl">
+        <main className="p-4 lg:p-6 max-w-7xl" role="main">
           {children}
         </main>
       </div>
