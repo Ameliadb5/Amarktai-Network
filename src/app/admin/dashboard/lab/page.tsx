@@ -42,11 +42,14 @@ export default function LabPage() {
       const res = await fetch('/api/admin/brain/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt.trim(), model, capability }),
+        body: JSON.stringify({ message: prompt.trim(), taskType: capability }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `HTTP ${res.status}`)
+      }
       const data = await res.json()
-      setOutput(typeof data.response === 'string' ? data.response : JSON.stringify(data, null, 2))
+      setOutput(data.output ?? data.error ?? JSON.stringify(data, null, 2))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Request failed')
     } finally {

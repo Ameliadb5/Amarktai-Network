@@ -52,6 +52,15 @@ export async function GET(request: NextRequest) {
     const ecosystem = await getEcosystemLearningState()
     return NextResponse.json(ecosystem)
   }
+  if (view === 'dashboard') {
+    // Combined view for the Intelligence dashboard Learning tab
+    const [status, insights, performance] = await Promise.all([
+      getLearningStatus(),
+      generateInsights(),
+      getProviderPerformance(),
+    ])
+    return NextResponse.json({ ...status, insights, performance })
+  }
 
   // Default: paginated memory entries (backwards-compatible)
   const page  = Math.max(1, parseInt(searchParams.get('page')  ?? '1'))

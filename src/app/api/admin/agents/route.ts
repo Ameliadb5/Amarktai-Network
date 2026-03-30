@@ -10,5 +10,16 @@ export async function GET() {
   }
   const definitions = getAgentDefinitions()
   const status = getAgentStatus()
-  return NextResponse.json({ definitions, status })
+
+  // Convert Map to serializable array
+  const agents = Array.from(definitions.entries()).map(([type, def]) => ({
+    id: type,
+    name: def.name,
+    type,
+    description: def.description,
+    capabilities: def.capabilities,
+    status: 'idle',
+  }))
+
+  return NextResponse.json({ agents, status })
 }

@@ -421,7 +421,7 @@ function CapabilitiesTab({ routingData }: { routingData: unknown }) {
 const API_MAP: Record<TabKey, string | null> = {
   routing:      '/api/admin/routing',
   memory:       '/api/admin/memory',
-  learning:     '/api/admin/learning',
+  learning:     '/api/admin/learning?view=dashboard',
   agents:       '/api/admin/agents',
   capabilities: null,
 }
