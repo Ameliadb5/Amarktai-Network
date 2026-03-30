@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  FlaskConical, Play, Loader2, Copy, Check,
+  FlaskConical, Play, Loader2, Copy, Check, Gauge, CheckCircle, XCircle,
 } from 'lucide-react'
 
 const MODELS = [
@@ -170,6 +170,184 @@ export default function LabPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* ── Benchmark Panel ─────────────────────────────────── */}
+      <BenchmarkPanel />
+    </motion.div>
+  )
+}
+
+/* ── Benchmark ──────────────────────────────────────────── */
+
+const BENCHMARK_PROVIDERS = [
+  { key: 'openai',     label: 'OpenAI' },
+  { key: 'anthropic',  label: 'Anthropic' },
+  { key: 'grok',       label: 'Grok / xAI' },
+  { key: 'gemini',     label: 'Gemini' },
+  { key: 'deepseek',   label: 'DeepSeek' },
+  { key: 'groq',       label: 'Groq' },
+  { key: 'mistral',    label: 'Mistral' },
+  { key: 'together',   label: 'Together AI' },
+]
+
+interface BenchmarkResult {
+  providerKey: string
+  model: string
+  output: string | null
+  success: boolean
+  error: string | null
+  latencyMs: number
+}
+
+function BenchmarkPanel() {
+  const [benchPrompt, setBenchPrompt] = useState('')
+  const [benchTask, setBenchTask] = useState('chat')
+  const [selectedProviders, setSelectedProviders] = useState<string[]>(['openai', 'anthropic'])
+  const [benchRunning, setBenchRunning] = useState(false)
+  const [benchResults, setBenchResults] = useState<BenchmarkResult[] | null>(null)
+  const [benchError, setBenchError] = useState<string | null>(null)
+
+  const toggleProvider = (key: string) => {
+    setSelectedProviders(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    )
+  }
+
+  const handleBenchmark = async () => {
+    if (!benchPrompt.trim() || selectedProviders.length === 0) return
+    setBenchRunning(true)
+    setBenchError(null)
+    setBenchResults(null)
+    try {
+      const res = await fetch('/api/admin/benchmark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: benchPrompt.trim(),
+          taskType: benchTask,
+          providerKeys: selectedProviders,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      setBenchResults(data.results ?? [])
+    } catch (e) {
+      setBenchError(e instanceof Error ? e.message : 'Benchmark failed')
+    } finally {
+      setBenchRunning(false)
+    }
+  }
+
+  return (
+    <motion.div variants={fadeUp} className="space-y-5">
+      <div className="flex items-center gap-2">
+        <Gauge className="w-4 h-4 text-amber-400" />
+        <h2 className="text-sm font-semibold text-white">Benchmark</h2>
+        <span className="text-xs text-slate-500">Run the same prompt across multiple providers simultaneously</span>
+      </div>
+
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-5">
+        {/* Provider selection */}
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Providers to benchmark</label>
+          <div className="flex flex-wrap gap-2">
+            {BENCHMARK_PROVIDERS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => toggleProvider(key)}
+                className={`text-xs px-2.5 py-1 rounded-lg transition-colors border ${
+                  selectedProviders.includes(key)
+                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                    : 'bg-white/[0.04] text-slate-400 border-transparent hover:bg-white/[0.06]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Task type */}
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Task type</label>
+          <div className="flex flex-wrap gap-1.5">
+            {CAPABILITIES.map(c => (
+              <button
+                key={c}
+                onClick={() => setBenchTask(c)}
+                className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${
+                  benchTask === c
+                    ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                    : 'bg-white/[0.04] text-slate-400 border border-transparent hover:bg-white/[0.06]'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Prompt */}
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Prompt</label>
+          <textarea
+            value={benchPrompt}
+            onChange={e => setBenchPrompt(e.target.value)}
+            placeholder="Enter a prompt to send to all selected providers…"
+            rows={4}
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 resize-none focus:outline-none focus:border-blue-500/40 transition-colors"
+          />
+        </div>
+
+        {/* Run */}
+        <button
+          onClick={handleBenchmark}
+          disabled={benchRunning || !benchPrompt.trim() || selectedProviders.length === 0}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-amber-600 to-amber-500 text-white hover:from-amber-500 hover:to-amber-400 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {benchRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gauge className="w-4 h-4" />}
+          {benchRunning ? `Running across ${selectedProviders.length} providers…` : `Run Benchmark (${selectedProviders.length} providers)`}
+        </button>
+
+        {benchError && <p className="text-sm text-red-400">{benchError}</p>}
+      </div>
+
+      {/* Results grid */}
+      {benchResults && benchResults.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {benchResults.map((r, i) => (
+            <div
+              key={i}
+              className={`bg-white/[0.03] border rounded-xl p-5 space-y-3 ${
+                r.success ? 'border-white/[0.06]' : 'border-red-500/20'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-white">{r.providerKey}</p>
+                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">{r.model}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {r.success
+                    ? <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    : <XCircle className="w-4 h-4 text-red-400" />}
+                  <span className="text-xs text-slate-500">{r.latencyMs}ms</span>
+                </div>
+              </div>
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 min-h-[80px] max-h-[200px] overflow-auto">
+                {r.success && r.output ? (
+                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{r.output}</pre>
+                ) : (
+                  <p className="text-xs text-red-400">{r.error ?? 'No output'}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </motion.div>
   )
 }

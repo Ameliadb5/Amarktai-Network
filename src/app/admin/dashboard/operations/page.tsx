@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   RefreshCw, AlertCircle, Brain, Layers, Bell, FileText, Shield,
-  CheckCircle, XCircle, Clock, WifiOff,
+  CheckCircle, XCircle, Clock, WifiOff, Key, Plus, Save, Activity,
+  Eye, EyeOff, ToggleLeft, ToggleRight,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -14,9 +15,11 @@ interface Provider {
   providerKey: string
   displayName: string
   enabled: boolean
+  maskedPreview?: string
   healthStatus: string
   healthMessage: string
   lastCheckedAt: string | null
+  notes?: string
 }
 
 interface ModelEntry {
@@ -156,7 +159,7 @@ export default function OperationsPage() {
         </div>
       ) : (
         <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
-          {tab === 'Providers' && <ProvidersView providers={providers} />}
+          {tab === 'Providers' && <ProvidersView providers={providers} onRefresh={load} />}
           {tab === 'Models' && <ModelsView models={models} />}
           {tab === 'Alerts' && <AlertsView alerts={alerts} />}
           {tab === 'Events' && <EventsView events={events} />}
@@ -169,25 +172,283 @@ export default function OperationsPage() {
 
 /* ── Sub-views ─────────────────────────────────────────── */
 
-function ProvidersView({ providers }: { providers: Provider[] }) {
-  if (providers.length === 0) return <EmptyState message="No providers configured." />
+function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefresh: () => void }) {
+  const [keyInputs, setKeyInputs] = useState<Record<number, string>>({})
+  const [showKey, setShowKey] = useState<Record<number, boolean>>({})
+  const [saving, setSaving] = useState<Record<number, boolean>>({})
+  const [testing, setTesting] = useState<Record<number, boolean>>({})
+  const [cardErrors, setCardErrors] = useState<Record<number, string>>({})
+  const [localProviders, setLocalProviders] = useState<Provider[]>(providers)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newProvider, setNewProvider] = useState({ providerKey: '', displayName: '', apiKey: '' })
+  const [addingProvider, setAddingProvider] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
+
+  useEffect(() => { setLocalProviders(providers) }, [providers])
+
+  const setCardError = (id: number, msg: string) => {
+    setCardErrors(e => ({ ...e, [id]: msg }))
+    setTimeout(() => setCardErrors(e => { const n = { ...e }; delete n[id]; return n }), 5000)
+  }
+
+  const handleSaveKey = async (p: Provider) => {
+    const key = keyInputs[p.id] ?? ''
+    setSaving(s => ({ ...s, [p.id]: true }))
+    try {
+      const res = await fetch(`/api/admin/providers/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: key }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const updated = await res.json()
+      setLocalProviders(prev => prev.map(x => x.id === p.id ? { ...x, ...updated } : x))
+      // Clear key from state after save to minimize in-memory exposure
+      setKeyInputs(k => { const n = { ...k }; delete n[p.id]; return n })
+    } catch (e) {
+      setCardError(p.id, e instanceof Error ? e.message : 'Failed to save key')
+    } finally {
+      setSaving(s => ({ ...s, [p.id]: false }))
+    }
+  }
+
+  const handleTestConnection = async (p: Provider) => {
+    setTesting(t => ({ ...t, [p.id]: true }))
+    try {
+      const res = await fetch(`/api/admin/providers/${p.id}/health-check`, { method: 'POST' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const result = await res.json()
+      setLocalProviders(prev => prev.map(x => x.id === p.id ? { ...x, ...result } : x))
+    } catch (e) {
+      setCardError(p.id, e instanceof Error ? e.message : 'Health check failed')
+    } finally {
+      setTesting(t => ({ ...t, [p.id]: false }))
+    }
+  }
+
+  const handleToggleEnabled = async (p: Provider) => {
+    setSaving(s => ({ ...s, [p.id]: true }))
+    try {
+      const res = await fetch(`/api/admin/providers/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !p.enabled }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const updated = await res.json()
+      setLocalProviders(prev => prev.map(x => x.id === p.id ? { ...x, ...updated } : x))
+    } catch (e) {
+      setCardError(p.id, e instanceof Error ? e.message : 'Toggle failed')
+    } finally {
+      setSaving(s => ({ ...s, [p.id]: false }))
+    }
+  }
+
+  const handleAddProvider = async () => {
+    if (!newProvider.providerKey.trim() || !newProvider.displayName.trim()) {
+      setAddError('Provider key and display name are required')
+      return
+    }
+    setAddingProvider(true)
+    setAddError(null)
+    try {
+      const res = await fetch('/api/admin/providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newProvider, enabled: false }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      const created = await res.json()
+      setLocalProviders(prev => [...prev, created])
+      setNewProvider({ providerKey: '', displayName: '', apiKey: '' })
+      setShowAddForm(false)
+      onRefresh()
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : 'Failed to add provider')
+    } finally {
+      setAddingProvider(false)
+    }
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {providers.map((p) => {
-        const h = HEALTH[p.healthStatus] ?? HEALTH.disabled
-        const Icon = h.icon
-        return (
-          <div key={p.id} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white">{p.displayName}</h3>
-              <span className={`flex items-center gap-1 text-xs ${h.color}`}><Icon className="w-3 h-3" />{h.label}</span>
-            </div>
-            <p className="text-xs text-slate-500 font-mono">{p.providerKey}</p>
-            {p.healthMessage && <p className="text-xs text-slate-400">{p.healthMessage}</p>}
-            {p.lastCheckedAt && <p className="text-[10px] text-slate-600">Checked {formatDistanceToNow(new Date(p.lastCheckedAt), { addSuffix: true })}</p>}
+    <div className="space-y-6">
+      {/* Add new provider */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Key className="w-4 h-4 text-blue-400" />
+            <h3 className="text-sm font-semibold text-white">API Key Management</h3>
           </div>
-        )
-      })}
+          <button
+            onClick={() => { setShowAddForm(f => !f); setAddError(null) }}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            Add Provider
+          </button>
+        </div>
+
+        {showAddForm && (
+          <div className="space-y-3 p-4 bg-white/[0.02] border border-white/[0.06] rounded-lg">
+            <p className="text-xs text-slate-400 font-medium">New Provider</p>
+            {addError && <p className="text-xs text-red-400">{addError}</p>}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                type="text"
+                placeholder="Provider key (e.g. openai)"
+                value={newProvider.providerKey}
+                onChange={e => setNewProvider(n => ({ ...n, providerKey: e.target.value }))}
+                className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors"
+              />
+              <input
+                type="text"
+                placeholder="Display name (e.g. OpenAI)"
+                value={newProvider.displayName}
+                onChange={e => setNewProvider(n => ({ ...n, displayName: e.target.value }))}
+                className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors"
+              />
+              <input
+                type="password"
+                placeholder="API key (optional)"
+                value={newProvider.apiKey}
+                onChange={e => setNewProvider(n => ({ ...n, apiKey: e.target.value }))}
+                className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAddProvider}
+                disabled={addingProvider}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+              >
+                {addingProvider ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                Create
+              </button>
+              <button onClick={() => setShowAddForm(false)} className="text-xs px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Provider cards */}
+      {localProviders.length === 0 ? (
+        <EmptyState message="No providers configured." />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {localProviders.map((p) => {
+            const h = HEALTH[p.healthStatus] ?? HEALTH.disabled
+            const Icon = h.icon
+            const keyDirty = keyInputs[p.id] !== undefined
+            const isSaving = saving[p.id] ?? false
+            const isTesting = testing[p.id] ?? false
+            const isKeyVisible = showKey[p.id] ?? false
+            const cardError = cardErrors[p.id]
+
+            return (
+              <div key={p.id} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 space-y-4">
+                {/* Header row */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">{p.displayName}</h3>
+                    <p className="text-xs text-slate-500 font-mono">{p.providerKey}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {/* Health badge */}
+                    <span className={`flex items-center gap-1 text-xs ${h.color}`}>
+                      <Icon className="w-3 h-3" />
+                      {h.label}
+                    </span>
+                    {/* Enable toggle */}
+                    <button
+                      onClick={() => handleToggleEnabled(p)}
+                      disabled={isSaving}
+                      title={p.enabled ? 'Disable provider' : 'Enable provider'}
+                      className="text-slate-400 hover:text-white transition-colors disabled:opacity-50"
+                    >
+                      {p.enabled
+                        ? <ToggleRight className="w-5 h-5 text-emerald-400" />
+                        : <ToggleLeft className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Health detail */}
+                {p.healthMessage && (
+                  <p className="text-xs text-slate-500">{p.healthMessage}</p>
+                )}
+                {p.lastCheckedAt && (
+                  <p className="text-[10px] text-slate-600">Checked {formatDistanceToNow(new Date(p.lastCheckedAt), { addSuffix: true })}</p>
+                )}
+
+                {/* API Key row */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">API Key</label>
+                  {/* Show masked preview when no edit in progress */}
+                  {!keyDirty && (
+                    <div className="flex items-center gap-2 text-xs text-slate-400 font-mono bg-white/[0.02] border border-white/[0.06] rounded-lg px-3 py-2">
+                      {p.maskedPreview ? (
+                        <span className="flex-1 truncate">{p.maskedPreview}</span>
+                      ) : (
+                        <span className="flex-1 text-slate-600 italic">No key set</span>
+                      )}
+                    </div>
+                  )}
+                  {/* Key edit input */}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type={isKeyVisible ? 'text' : 'password'}
+                        placeholder={p.maskedPreview ? 'Enter new key to replace…' : 'Enter API key…'}
+                        value={keyInputs[p.id] ?? ''}
+                        onChange={e => setKeyInputs(k => ({ ...k, [p.id]: e.target.value }))}
+                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 pr-9 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKey(s => ({ ...s, [p.id]: !s[p.id] }))}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                      >
+                        {isKeyVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    {keyDirty && (
+                      <button
+                        onClick={() => handleSaveKey(p)}
+                        disabled={isSaving}
+                        className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+                      >
+                        {isSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                        Save
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Test connection */}
+                <button
+                  onClick={() => handleTestConnection(p)}
+                  disabled={isTesting || !p.enabled}
+                  title={!p.enabled ? 'Enable provider first' : 'Run a live health check'}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isTesting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
+                  {isTesting ? 'Testing…' : 'Test Connection'}
+                </button>
+
+                {/* Inline error */}
+                {cardError && (
+                  <p className="text-xs text-red-400">{cardError}</p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

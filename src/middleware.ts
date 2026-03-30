@@ -23,6 +23,16 @@ export async function middleware(request: NextRequest) {
     if (!session.isLoggedIn) {
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
+
+    // Prevent browser from caching dashboard pages so back-button after logout
+    // does not serve a stale authenticated page.
+    if (pathname.startsWith('/admin/dashboard')) {
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+      response.headers.set('Pragma', 'no-cache')
+      response.headers.set('Expires', '0')
+    }
+
+    return response
   }
 
   return NextResponse.next()
