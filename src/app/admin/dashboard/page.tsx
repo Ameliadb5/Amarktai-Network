@@ -5,8 +5,8 @@ import { motion } from 'framer-motion'
 import {
   CheckCircle, AlertCircle, AlertTriangle, WifiOff, Clock,
   RefreshCw, Zap, Activity, Brain, Database, Server,
-  ArrowRight, Cpu, Gauge, Bot, FlaskConical,
-  Layers,
+  ArrowRight, Cpu, Gauge, DollarSign, Bell,
+  ShieldAlert, Puzzle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
@@ -86,6 +86,15 @@ const fadeUp = {
 }
 
 const CARD = 'bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl'
+const INNER = 'bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]'
+
+/* ── Helpers ───────────────────────────────────────────────────── */
+function appStatusCfg(status: string, health: string | undefined) {
+  if (health === 'error') return { label: 'Issue', dot: 'bg-red-400', color: 'text-red-400' }
+  if (status === 'active' && (health === 'healthy' || !health))
+    return { label: 'Live', dot: 'bg-emerald-400', color: 'text-emerald-400' }
+  return { label: 'Idle', dot: 'bg-amber-400', color: 'text-amber-400' }
+}
 
 /* ── Main ──────────────────────────────────────────────────────── */
 export default function DashboardOverview() {
@@ -131,60 +140,58 @@ export default function DashboardOverview() {
   useEffect(() => { load() }, [load])
 
   /* ── Derived ─────────────────────────────────────────────────── */
-  const healthyProviders = providers.filter(p => p.healthStatus === 'healthy')
-  const enabledProviders = providers.filter(p => p.enabled)
-  const totalApps        = data?.productStats.length ?? 0
-
-  const totalReqs   = data?.brainStats?.totalRequests ?? 0
+  const healthyProviders  = providers.filter(p => p.healthStatus === 'healthy')
+  const enabledProviders  = providers.filter(p => p.enabled)
+  const unconfiguredProvs = providers.filter(p => p.healthStatus === 'unconfigured')
+  const totalApps  = data?.productStats.length ?? 0
+  const totalReqs  = data?.brainStats?.totalRequests ?? 0
   const successReqs = data?.brainStats?.successCount ?? 0
-  const errorReqs   = data?.brainStats?.errorCount ?? 0
+  const errorReqs  = data?.brainStats?.errorCount ?? 0
   const successRate = totalReqs > 0 ? Math.round((successReqs / totalReqs) * 100) : 100
+
   const systemHealth = totalReqs > 0
     ? Math.round(((successReqs / totalReqs) * 0.7 + (healthyProviders.length > 0 ? 0.3 : 0)) * 100)
     : healthyProviders.length > 0 ? 85 : enabledProviders.length > 0 ? 50 : 0
+  const alertEvents = data?.recentEvents.filter(e => e.severity === 'critical' || e.severity === 'error') ?? []
+  const errorEvents = alertEvents.slice(0, 6)
 
-  const systemOnline = enabledProviders.length > 0 || totalApps > 0
-
-  /* ── Loading skeleton ────────────────────────────────────────── */
+  /* ── Loading state ───────────────────────────────────────────── */
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-16 bg-white/[0.03] rounded-2xl border border-white/[0.04]" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-28 bg-white/[0.03] rounded-2xl border border-white/[0.04]" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {[...Array(2)].map((_, i) => (
-            <div key={i} className="h-56 bg-white/[0.03] rounded-2xl border border-white/[0.04]" />
-          ))}
-        </div>
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <RefreshCw className="w-6 h-6 text-blue-400 animate-spin" />
+        <p className="text-sm text-slate-500 font-mono">Loading control center…</p>
+      </div>
+    )
+  }
+
+  /* ── Error state ─────────────────────────────────────────────── */
+  if (!data && dbError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-4 text-center">
+        <AlertCircle className="w-8 h-8 text-red-400" />
+        <p className="text-sm text-red-400 font-semibold">Failed to load dashboard</p>
+        <p className="text-xs text-slate-500 max-w-md">{dbError}</p>
+        <button
+          onClick={() => { setLoading(true); load() }}
+          className="mt-2 px-4 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs text-white hover:bg-white/[0.1] transition-colors"
+        >
+          Retry
+        </button>
       </div>
     )
   }
 
   return (
-    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
+    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-8">
 
       {/* ─── Header ─────────────────────────────────────────────── */}
       <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Overview</h1>
-          <p className="text-xs text-slate-500 mt-0.5">System status and key metrics</p>
+          <h1 className="text-xl font-bold text-white tracking-tight">Control Center</h1>
+          <p className="text-xs text-slate-500 mt-0.5">System overview &amp; network health</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-mono font-medium ${
-            systemOnline
-              ? 'bg-emerald-400/[0.08] border-emerald-400/20 text-emerald-400'
-              : 'bg-red-400/[0.08] border-red-400/20 text-red-400'
-          }`}>
-            <span className="relative flex h-1.5 w-1.5">
-              {systemOnline && <span className="animate-ping absolute inset-0 rounded-full bg-emerald-400 opacity-75" />}
-              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${systemOnline ? 'bg-emerald-400' : 'bg-red-400'}`} />
-            </span>
-            {systemOnline ? 'Online' : 'Offline'}
-          </div>
           {lastRefreshed && (
             <span className="text-[11px] text-slate-600 font-mono hidden sm:inline">
               {formatDistanceToNow(lastRefreshed, { addSuffix: true })}
@@ -201,7 +208,7 @@ export default function DashboardOverview() {
         </div>
       </motion.div>
 
-      {/* ─── DB Error ───────────────────────────────────────────── */}
+      {/* ─── DB Error Banner ────────────────────────────────────── */}
       {dbError && (
         <motion.div variants={fadeUp} className="bg-red-500/[0.06] border border-red-500/20 rounded-xl px-5 py-4 flex items-start gap-3">
           <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
@@ -216,202 +223,216 @@ export default function DashboardOverview() {
         </motion.div>
       )}
 
-      {/* ─── Key Metrics ────────────────────────────────────────── */}
-      <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard label="Total Apps"       value={data?.metrics.totalProducts ?? 0} icon={<Server className="w-4 h-4" />} />
-        <MetricCard label="Active Providers" value={enabledProviders.length}          icon={<Cpu className="w-4 h-4" />} suffix={`/ ${providers.length}`} />
-        <MetricCard label="Requests"         value={totalReqs.toLocaleString()}       icon={<Brain className="w-4 h-4" />} suffix="total" />
-        <MetricCard label="System Health"    value={`${systemHealth}%`}               icon={<Gauge className="w-4 h-4" />} />
+      {/* ─── Top Strip: 5 Metric Cards ──────────────────────────── */}
+      <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <MetricCard label="System Health"  value={`${systemHealth}%`}               icon={<Gauge className="w-4 h-4" />} />
+        <MetricCard label="Active Apps"    value={totalApps}                         icon={<Server className="w-4 h-4" />} />
+        <MetricCard label="AI Activity"    value={totalReqs.toLocaleString()}        icon={<Brain className="w-4 h-4" />} suffix="reqs" />
+        <MetricCard label="Cost Burn"      value="—"                                icon={<DollarSign className="w-4 h-4" />} /> {/* TODO: wire to billing API */}
+        <MetricCard label="Alerts"         value={alertEvents.length}               icon={<Bell className="w-4 h-4" />} />
       </motion.div>
 
-      {/* ─── Provider Health ─────────────────────────────────────── */}
-      <motion.div variants={fadeUp}>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Zap className="w-4 h-4 text-blue-400" />
-            Provider Health
-          </h2>
-          <Link href="/admin/dashboard/ai-providers" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
-            Manage <ArrowRight className="w-3 h-3" />
-          </Link>
-        </div>
-        {providers.length === 0 ? (
-          <div className={`${CARD} p-8 text-center`}>
-            <WifiOff className="w-7 h-7 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No providers configured</p>
-            <Link href="/admin/dashboard/ai-providers" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300 transition-colors">
-              Set up AI providers →
+      {/* ─── Main 3-Column Grid ─────────────────────────────────── */}
+      <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* LEFT — App Network */}
+        <div className={CARD}>
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Server className="w-4 h-4 text-cyan-400" /> App Network
+            </h2>
+            <Link href="/admin/dashboard/apps" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+              All <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {providers.map(p => {
-              const cfg = H[p.healthStatus as keyof typeof H] ?? H.unconfigured
-              const Icon = cfg.icon
-              return (
-                <div key={p.id} className={`${CARD} p-4 flex items-center gap-3 hover:border-white/[0.12] transition-all group`}>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    p.healthStatus === 'healthy' ? 'bg-emerald-400/10' :
-                    p.healthStatus === 'error' ? 'bg-red-400/10' :
-                    p.healthStatus === 'configured' || p.healthStatus === 'degraded' ? 'bg-amber-400/10' :
-                    'bg-white/[0.04]'
-                  }`}>
-                    <Icon className={`w-5 h-5 ${cfg.color}`} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-white truncate">{p.displayName}</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                      <span className={`text-xs font-mono ${cfg.color}`}>{cfg.label}</span>
-                      {!p.enabled && <span className="text-[10px] text-slate-600 font-mono ml-1">(disabled)</span>}
+          <div className="p-4 space-y-1.5 max-h-[380px] overflow-y-auto">
+            {totalApps === 0 ? (
+              <div className="py-10 text-center">
+                <Server className="w-6 h-6 text-slate-700 mx-auto mb-2" />
+                <p className="text-sm text-slate-500">No apps registered</p>
+                <Link href="/admin/dashboard/apps" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                  Register your first app →
+                </Link>
+              </div>
+            ) : (
+              data?.productStats.map(app => {
+                const cfg = appStatusCfg(app.status, app.integration?.healthStatus)
+                return (
+                  <div key={app.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.03] transition-colors">
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      {cfg.label === 'Live' && <span className={`animate-ping absolute inset-0 rounded-full ${cfg.dot} opacity-75`} />}
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${cfg.dot}`} />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white font-medium truncate">{app.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-[10px] font-mono ${cfg.color}`}>{cfg.label}</span>
+                        {app.integration?.lastHeartbeatAt && (
+                          <span className="text-[10px] text-slate-600 font-mono">
+                            {formatDistanceToNow(new Date(app.integration.lastHeartbeatAt), { addSuffix: true })}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </motion.div>
-
-      {/* ─── Brain Performance & Memory ──────────────────────────── */}
-      <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Brain Performance */}
-        <div className={CARD}>
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Brain className="w-4 h-4 text-violet-400" />
-              Brain Performance
-            </h2>
-          </div>
-          <div className="p-5 grid grid-cols-2 gap-4">
-            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">Success Rate</p>
-              <p className={`text-2xl font-bold font-mono mt-1.5 ${
-                successRate >= 90 ? 'text-emerald-400' : successRate >= 70 ? 'text-amber-400' : 'text-red-400'
-              }`}>
-                {totalReqs > 0 ? `${successRate}%` : '—'}
-              </p>
-              {totalReqs > 0 && (
-                <div className="mt-2 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                  <div className={`h-full rounded-full transition-all duration-700 ${
-                    successRate >= 90 ? 'bg-emerald-400' : successRate >= 70 ? 'bg-amber-400' : 'bg-red-400'
-                  }`} style={{ width: `${successRate}%` }} />
-                </div>
-              )}
-            </div>
-            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">Avg Latency</p>
-              <p className="text-2xl font-bold font-mono mt-1.5 text-white">
-                {data?.brainStats?.avgLatencyMs ? `${data.brainStats.avgLatencyMs}` : '—'}
-              </p>
-              {data?.brainStats?.avgLatencyMs && <span className="text-xs text-slate-500 font-mono">ms</span>}
-            </div>
-            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">Total Success</p>
-              <p className="text-2xl font-bold font-mono mt-1.5 text-emerald-400">{successReqs.toLocaleString()}</p>
-            </div>
-            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">Total Errors</p>
-              <p className={`text-2xl font-bold font-mono mt-1.5 ${errorReqs > 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                {errorReqs.toLocaleString()}
-              </p>
-            </div>
+                )
+              })
+            )}
           </div>
         </div>
 
-        {/* Memory Status */}
+        {/* CENTER — Intelligence Activity */}
         <div className={CARD}>
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
+          <div className="px-5 py-3.5 border-b border-white/[0.06]">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Database className="w-4 h-4 text-cyan-400" />
-              Memory Status
+              <Brain className="w-4 h-4 text-violet-400" /> Intelligence Activity
             </h2>
-            <span className={`text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full ${
-              memory?.statusLabel === 'saving'
-                ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/20'
-                : memory?.statusLabel === 'empty'
-                ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-                : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
-            }`}>
-              {memory?.statusLabel === 'saving' ? 'ACTIVE' : memory?.statusLabel === 'empty' ? 'EMPTY' : 'NOT CONFIGURED'}
-            </span>
           </div>
-          <div className="p-5 space-y-5">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]">
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Entries</p>
-                <p className="text-2xl font-bold font-mono mt-1.5 text-white">{(memory?.totalEntries ?? 0).toLocaleString()}</p>
+          <div className="p-4 space-y-4">
+            {/* Brain performance */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className={INNER}>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Success</p>
+                <p className={`text-lg font-bold font-mono mt-1 ${successRate >= 90 ? 'text-emerald-400' : successRate >= 70 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {totalReqs > 0 ? `${successRate}%` : '—'}
+                </p>
               </div>
-              <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]">
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Namespaces</p>
-                <p className="text-2xl font-bold font-mono mt-1.5 text-white">{memory?.appSlugs?.length ?? 0}</p>
+              <div className={INNER}>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Latency</p>
+                <p className="text-lg font-bold font-mono mt-1 text-white">
+                  {data?.brainStats?.avgLatencyMs ? `${data.brainStats.avgLatencyMs}ms` : '—'}
+                </p>
               </div>
-              <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]">
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Retrieval</p>
-                <p className={`text-lg font-bold font-mono mt-1.5 ${memory?.available ? 'text-emerald-400' : 'text-slate-500'}`}>
-                  {memory?.available ? 'Ready' : 'Off'}
+              <div className={INNER}>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Errors</p>
+                <p className={`text-lg font-bold font-mono mt-1 ${errorReqs > 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                  {errorReqs.toLocaleString()}
                 </p>
               </div>
             </div>
-            {memory?.appSlugs && memory.appSlugs.length > 0 && (
+
+            {/* Provider usage */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Providers</p>
+                <Link href="/admin/dashboard/ai-providers" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors">Manage →</Link>
+              </div>
+              {providers.length === 0 ? (
+                <p className="text-xs text-slate-600 py-3 text-center">No providers configured</p>
+              ) : (
+                <div className="space-y-1 max-h-[120px] overflow-y-auto">
+                  {enabledProviders.map(p => {
+                    const cfg = H[p.healthStatus as keyof typeof H] ?? H.unconfigured
+                    return (
+                      <div key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/[0.03] transition-colors">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+                        <span className="text-xs text-white truncate flex-1">{p.displayName}</span>
+                        <span className={`text-[10px] font-mono ${cfg.color}`}>{cfg.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Memory status */}
+            <div className={INNER}>
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="w-3.5 h-3.5 text-cyan-400" />
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Memory</p>
+                <span className={`ml-auto text-[9px] font-mono font-semibold px-2 py-0.5 rounded-full ${
+                  memory?.statusLabel === 'saving'
+                    ? 'bg-emerald-400/10 text-emerald-400'
+                    : memory?.statusLabel === 'empty'
+                    ? 'bg-amber-400/10 text-amber-400'
+                    : 'bg-slate-500/10 text-slate-500'
+                }`}>
+                  {memory?.statusLabel === 'saving' ? 'ACTIVE' : memory?.statusLabel === 'empty' ? 'EMPTY' : 'OFF'}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-xs font-mono">
+                <span className="text-white">{(memory?.totalEntries ?? 0).toLocaleString()} <span className="text-slate-500">entries</span></span>
+                <span className="text-white">{memory?.appSlugs?.length ?? 0} <span className="text-slate-500">ns</span></span>
+              </div>
+              {memory?.error && (
+                <p className="text-[10px] text-red-400/70 font-mono mt-2 truncate">{memory.error}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT — Alerts & Issues */}
+        <div className={CARD}>
+          <div className="px-5 py-3.5 border-b border-white/[0.06]">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-red-400" /> Alerts &amp; Issues
+            </h2>
+          </div>
+          <div className="p-4 space-y-4 max-h-[380px] overflow-y-auto">
+            {/* Missing API keys */}
+            {unconfiguredProvs.length > 0 && (
               <div>
-                <p className="text-xs text-slate-500 mb-2 uppercase tracking-wider">Connected Namespaces</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {memory.appSlugs.map(slug => (
-                    <span key={slug} className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-cyan-400/[0.06] text-cyan-400/80 border border-cyan-400/10">
-                      {slug}
-                    </span>
+                <p className="text-[10px] text-amber-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <Zap className="w-3 h-3" /> Missing API Keys
+                </p>
+                <div className="space-y-1">
+                  {unconfiguredProvs.map(p => (
+                    <div key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-400/[0.04] border border-amber-400/10">
+                      <WifiOff className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span className="text-xs text-white truncate flex-1">{p.displayName}</span>
+                      <Link href="/admin/dashboard/ai-providers" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors shrink-0">
+                        Configure
+                      </Link>
+                    </div>
                   ))}
                 </div>
               </div>
             )}
-            {memory?.error && (
-              <p className="text-xs text-red-400/70 font-mono bg-red-400/[0.05] rounded-lg px-3 py-2">{memory.error}</p>
-            )}
+
+            {/* Recent errors */}
+            <div>
+              <p className="text-[10px] text-red-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <AlertCircle className="w-3 h-3" /> Recent Errors
+              </p>
+              {errorEvents.length === 0 ? (
+                <div className="py-4 text-center">
+                  <CheckCircle className="w-5 h-5 text-emerald-400/40 mx-auto mb-1" />
+                  <p className="text-xs text-slate-600">No errors — all clear</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {errorEvents.map(ev => (
+                    <div key={ev.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/[0.03] transition-colors">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                      <span className="text-xs text-white truncate flex-1">{ev.title}</span>
+                      <span className="text-[10px] text-slate-600 font-mono shrink-0">
+                        {formatDistanceToNow(new Date(ev.timestamp), { addSuffix: true })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* TODO: Capability gaps — wire to analysis API */}
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Puzzle className="w-3 h-3" /> Capability Gaps
+              </p>
+              <div className="py-3 text-center rounded-lg bg-white/[0.02] border border-dashed border-white/[0.06]">
+                <p className="text-[11px] text-slate-600">Analysis coming soon</p>
+              </div>
+            </div>
           </div>
         </div>
       </motion.div>
 
-      {/* ─── Quick Actions ──────────────────────────────────────── */}
-      <motion.div variants={fadeUp}>
-        <div className={CARD}>
-          <div className="px-5 py-3.5 border-b border-white/[0.06]">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-400" /> Quick Actions
-            </h2>
-          </div>
-          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {[
-              { label: 'Providers',  href: '/admin/dashboard/ai-providers', icon: Cpu,         desc: 'Manage AI keys' },
-              { label: 'Models',     href: '/admin/dashboard/models',       icon: Layers,      desc: 'Model registry' },
-              { label: 'Playground', href: '/admin/dashboard/playground',   icon: FlaskConical, desc: 'Test prompts' },
-              { label: 'Events',     href: '/admin/dashboard/events',       icon: Activity,    desc: 'Logs & alerts' },
-              { label: 'Agents',     href: '/admin/dashboard/agents',       icon: Bot,         desc: 'AI agents' },
-            ].map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex flex-col items-center gap-2 px-3 py-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-blue-500/20 transition-all group text-center"
-              >
-                <div className="w-9 h-9 rounded-lg bg-white/[0.04] flex items-center justify-center group-hover:bg-blue-500/10 transition-colors">
-                  <item.icon className="w-4 h-4 text-slate-500 group-hover:text-blue-400 transition-colors" />
-                </div>
-                <div>
-                  <p className="text-sm text-white font-medium">{item.label}</p>
-                  <p className="text-[10px] text-slate-600 mt-0.5">{item.desc}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* ─── Recent Events ──────────────────────────────────────── */}
-      <motion.div variants={fadeUp}>
-        <div className={CARD}>
+      {/* ─── Bottom Section ─────────────────────────────────────── */}
+      <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Activity (spans 2 cols) */}
+        <div className={`${CARD} lg:col-span-2`}>
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Activity className="w-4 h-4 text-blue-400" /> Recent Events
+              <Activity className="w-4 h-4 text-blue-400" /> Recent Activity
             </h2>
             <Link href="/admin/dashboard/events" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
               View All <ArrowRight className="w-3 h-3" />
@@ -425,7 +446,7 @@ export default function DashboardOverview() {
               </div>
             ) : (
               <div className="space-y-1">
-                {data?.recentEvents.slice(0, 5).map(ev => {
+                {data?.recentEvents.slice(0, 8).map(ev => {
                   const sev = SEV[ev.severity as keyof typeof SEV] ?? { color: 'text-slate-400', bg: 'bg-white/[0.03]', dot: 'bg-slate-500' }
                   return (
                     <div key={ev.id} className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.03] transition-colors">
@@ -447,83 +468,32 @@ export default function DashboardOverview() {
             )}
           </div>
         </div>
-      </motion.div>
 
-      {/* ─── Connected Apps ─────────────────────────────────────── */}
-      <motion.div variants={fadeUp}>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Server className="w-4 h-4 text-cyan-400" /> Connected Apps
-          </h2>
-          <Link href="/admin/dashboard/apps" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
-            Manage <ArrowRight className="w-3 h-3" />
-          </Link>
+        {/* System Summary */}
+        <div className={CARD}>
+          <div className="px-5 py-3.5 border-b border-white/[0.06]">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-emerald-400" /> System Summary
+            </h2>
+          </div>
+          <div className="p-4 space-y-3">
+            {[
+              { label: 'Total Apps',       value: String(data?.metrics.totalProducts ?? 0) },
+              { label: 'Active Providers',  value: `${enabledProviders.length} / ${providers.length}` },
+              { label: 'Healthy Providers', value: String(healthyProviders.length) },
+              { label: 'Total Requests',    value: totalReqs.toLocaleString() },
+              { label: 'Error Rate',        value: totalReqs > 0 ? `${100 - successRate}%` : '0%' },
+              { label: 'Memory Entries',    value: (memory?.totalEntries ?? 0).toLocaleString() },
+              { label: 'Contacts',          value: String(data?.metrics.totalContacts ?? 0) },
+              { label: 'Waitlist',          value: String(data?.metrics.totalWaitlist ?? 0) },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-white/[0.04] last:border-0">
+                <span className="text-xs text-slate-500">{row.label}</span>
+                <span className="text-xs font-mono text-white">{row.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        {totalApps === 0 ? (
-          <div className={`${CARD} p-8 text-center`}>
-            <Server className="w-7 h-7 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No apps registered</p>
-            <Link href="/admin/dashboard/apps" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300 transition-colors">
-              Register your first app →
-            </Link>
-          </div>
-        ) : (
-          <div className={`${CARD} overflow-hidden`}>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/[0.06]">
-                    <th className="text-left text-[11px] text-slate-500 font-medium uppercase tracking-wider px-5 py-3">App Name</th>
-                    <th className="text-left text-[11px] text-slate-500 font-medium uppercase tracking-wider px-5 py-3">Status</th>
-                    <th className="text-left text-[11px] text-slate-500 font-medium uppercase tracking-wider px-5 py-3">Health</th>
-                    <th className="text-left text-[11px] text-slate-500 font-medium uppercase tracking-wider px-5 py-3">Category</th>
-                    <th className="text-right text-[11px] text-slate-500 font-medium uppercase tracking-wider px-5 py-3">Last Seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data?.productStats.map(app => {
-                    const health = app.integration?.healthStatus ?? 'no_integration'
-                    const healthCfg = health === 'healthy'
-                      ? { label: 'Healthy', color: 'text-emerald-400', dot: 'bg-emerald-400' }
-                      : health === 'degraded'
-                      ? { label: 'Degraded', color: 'text-amber-400', dot: 'bg-amber-400' }
-                      : health === 'error'
-                      ? { label: 'Error', color: 'text-red-400', dot: 'bg-red-400' }
-                      : { label: 'No Integration', color: 'text-slate-500', dot: 'bg-slate-600' }
-                    return (
-                      <tr key={app.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
-                        <td className="px-5 py-3"><span className="text-sm text-white font-medium">{app.name}</span></td>
-                        <td className="px-5 py-3">
-                          <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
-                            app.status === 'active' ? 'bg-emerald-400/10 text-emerald-400' :
-                            app.status === 'draft' ? 'bg-amber-400/10 text-amber-400' :
-                            'bg-white/[0.04] text-slate-500'
-                          }`}>{app.status}</span>
-                        </td>
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`w-1.5 h-1.5 rounded-full ${healthCfg.dot}`} />
-                            <span className={`text-xs font-mono ${healthCfg.color}`}>{healthCfg.label}</span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3">
-                          <span className="text-xs text-slate-500 font-mono">{app.integration ? 'integrated' : 'standalone'}</span>
-                        </td>
-                        <td className="px-5 py-3 text-right">
-                          <span className="text-xs text-slate-600 font-mono">
-                            {app.integration?.lastHeartbeatAt
-                              ? formatDistanceToNow(new Date(app.integration.lastHeartbeatAt), { addSuffix: true })
-                              : '—'}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </motion.div>
     </motion.div>
   )
