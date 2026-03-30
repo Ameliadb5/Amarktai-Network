@@ -28,7 +28,7 @@ function FadeUp({ children, delay = 0, className = '' }: { children: React.React
 
 const APPS = [
   {
-    name: 'Amarktai Chat',
+    suffix: 'Chat',
     icon: MessageSquare,
     description: 'Conversational AI assistant with persistent memory, multi-model routing, and deep context awareness across sessions.',
     features: ['Multi-model selection', 'Persistent conversations', 'Context-aware responses', 'File & image understanding'],
@@ -37,7 +37,7 @@ const APPS = [
     bg: 'bg-blue-500/10',
   },
   {
-    name: 'Amarktai Studio',
+    suffix: 'Studio',
     icon: Paintbrush,
     description: 'Creative workspace for generating, editing, and iterating on visual content powered by the intelligence layer.',
     features: ['Image generation', 'Style transfer', 'Iterative editing', 'Brand-consistent output'],
@@ -46,7 +46,7 @@ const APPS = [
     bg: 'bg-violet-500/10',
   },
   {
-    name: 'Amarktai Code',
+    suffix: 'Code',
     icon: Code2,
     description: 'AI-powered development environment with intelligent code generation, review, and refactoring capabilities.',
     features: ['Code generation', 'Automated review', 'Multi-language support', 'Codebase understanding'],
@@ -55,7 +55,7 @@ const APPS = [
     bg: 'bg-emerald-500/10',
   },
   {
-    name: 'Amarktai Voice',
+    suffix: 'Voice',
     icon: Mic,
     description: 'Voice interface layer enabling natural speech interaction across the entire ecosystem of applications.',
     features: ['Speech-to-text', 'Text-to-speech', 'Voice commands', 'Real-time transcription'],
@@ -64,7 +64,7 @@ const APPS = [
     bg: 'bg-amber-500/10',
   },
   {
-    name: 'Amarktai Agents',
+    suffix: 'Agents',
     icon: Bot,
     description: 'Autonomous task execution framework that plans, delegates, and completes multi-step workflows independently.',
     features: ['Task planning', 'Tool integration', 'Autonomous execution', 'Progress reporting'],
@@ -73,7 +73,7 @@ const APPS = [
     bg: 'bg-cyan-500/10',
   },
   {
-    name: 'Amarktai Search',
+    suffix: 'Search',
     icon: Search,
     description: 'Intelligent search across documents, data, and the web — returning synthesised answers, not just links.',
     features: ['Semantic search', 'Source synthesis', 'Document indexing', 'Real-time web results'],
@@ -122,7 +122,7 @@ export default function AppsPage() {
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {APPS.map((app, i) => (
-              <FadeUp key={app.name} delay={i * 0.06}>
+              <FadeUp key={app.suffix} delay={i * 0.06}>
                 <div
                   className={`glass-card rounded-2xl p-6 h-full border ${app.border} transition-colors duration-200 hover:border-opacity-60`}
                 >
@@ -130,7 +130,7 @@ export default function AppsPage() {
                     <app.icon className="w-5 h-5" />
                   </div>
                   <h3 className="font-heading text-lg font-semibold text-white mb-2">
-                    Amarkt<span className="text-blue-400">AI</span>{app.name.replace('Amarktai', '')}
+                    Amarkt<span className="text-blue-400">AI</span> {app.suffix}
                   </h3>
                   <p className="text-sm text-slate-400 leading-relaxed mb-5">
                     {app.description}
