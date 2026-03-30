@@ -60,6 +60,11 @@ export default function TermsPage() {
     <div className="min-h-screen bg-[#050816] text-white">
       <Header />
 
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <div className="ambient-drift absolute right-0 top-0 h-96 w-96 rounded-full bg-blue-600/5 blur-[140px]" />
+      </div>
+
+      <div className="relative z-10">
       <section className="pt-32 pb-10 px-6 text-center">
         <h1 className="font-heading text-5xl md:text-6xl font-extrabold tracking-tight mb-4">
           Terms of Service
@@ -104,6 +109,7 @@ export default function TermsPage() {
           </div>
         </div>
       </section>
+      </div>
 
       <Footer />
     </div>

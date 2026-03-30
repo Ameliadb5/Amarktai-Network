@@ -91,8 +91,8 @@ export default function AppsPage() {
       {/* ── Hero ─────────────────────────────────────── */}
       <section className="relative pt-40 pb-28 px-4 sm:px-6 lg:px-8 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-          <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-600/8 rounded-full blur-[120px]" />
-          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-violet-600/6 rounded-full blur-[100px]" />
+          <div className="ambient-drift absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-600/8 rounded-full blur-[120px]" />
+          <div className="ambient-drift absolute top-1/3 right-1/4 w-96 h-96 bg-violet-600/6 rounded-full blur-[100px]" style={{ animationDelay: '-6s' }} />
         </div>
 
         <div className="max-w-4xl mx-auto text-center relative z-10">

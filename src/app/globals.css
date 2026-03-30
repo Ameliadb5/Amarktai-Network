@@ -232,6 +232,38 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
 .animate-slide-up { animation: slide-up 0.5s ease-out forwards; }
 
+/* ─── Color Swirl / Accent System ────────────────── */
+.swirl-blue {
+  background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.12) 0%, transparent 70%);
+}
+.swirl-violet {
+  background: radial-gradient(ellipse at center, rgba(139, 92, 246, 0.10) 0%, transparent 70%);
+}
+.swirl-cyan {
+  background: radial-gradient(ellipse at center, rgba(34, 211, 238, 0.08) 0%, transparent 70%);
+}
+.swirl-emerald {
+  background: radial-gradient(ellipse at center, rgba(16, 185, 129, 0.08) 0%, transparent 70%);
+}
+
+/* ─── Page Ambient Animation ─────────────────────── */
+@keyframes drift-slow {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(20px, -15px) scale(1.05); }
+  66% { transform: translate(-15px, 10px) scale(0.98); }
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.ambient-drift {
+  animation: drift-slow 18s ease-in-out infinite;
+}
+.ambient-pulse {
+  animation: pulse-glow 4s ease-in-out infinite;
+}
+
 /* ─── Reduced Motion ─────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

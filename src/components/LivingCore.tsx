@@ -1,35 +1,65 @@
 'use client'
 import { useEffect, useRef } from 'react'
 
-interface LivingCoreProps {
-  className?: string
-}
+interface LivingCoreProps { className?: string }
 
-const BLUE = '#3b82f6'
-const CYAN = '#22d3ee'
-const NODE_COUNT = 14
-const CONNECT_DIST = 0.28 // fraction of min(w,h)
-
-interface Node { x: number; y: number; vx: number; vy: number; phase: number }
-interface Pulse { edge: number; t: number; speed: number }
-interface Ring { t: number; speed: number }
+const COLORS = { blue: '#3b82f6', cyan: '#22d3ee', violet: '#8b5cf6' }
 
 function rgba(hex: string, a: number): string {
   const v = (s: number, e: number) => parseInt(hex.slice(s, e), 16)
-  return `rgba(${v(1, 3)},${v(3, 5)},${v(5, 7)},${a})`
+  return `rgba(${v(1,3)},${v(3,5)},${v(5,7)},${a})`
 }
 
-function initNodes(): Node[] {
+interface Node { x: number; y: number; vx: number; vy: number; phase: number; color: string; size: number; layer: number }
+interface Pulse { fromIdx: number; toIdx: number; t: number; speed: number; color: string }
+
+function buildNetwork(): Node[] {
   const nodes: Node[] = []
-  for (let i = 0; i < NODE_COUNT; i++) {
-    const angle = (i / NODE_COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.4
-    const radius = 0.06 + Math.random() * 0.14
+  // Central core node
+  nodes.push({ x: 0.5, y: 0.5, vx: 0, vy: 0, phase: 0, color: COLORS.cyan, size: 1.8, layer: 0 })
+  // Inner ring — 6 nodes
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 + 0.3
+    const r = 0.16 + (Math.random() - 0.5) * 0.02
     nodes.push({
-      x: 0.5 + Math.cos(angle) * radius,
-      y: 0.5 + Math.sin(angle) * radius,
-      vx: (Math.random() - 0.5) * 0.00003,
-      vy: (Math.random() - 0.5) * 0.00003,
+      x: 0.5 + Math.cos(angle) * r,
+      y: 0.5 + Math.sin(angle) * r,
+      vx: (Math.random() - 0.5) * 0.000015,
+      vy: (Math.random() - 0.5) * 0.000015,
       phase: Math.random() * Math.PI * 2,
+      color: i % 2 === 0 ? COLORS.blue : COLORS.cyan,
+      size: 1.2,
+      layer: 1,
+    })
+  }
+  // Middle ring — 9 nodes
+  for (let i = 0; i < 9; i++) {
+    const angle = (i / 9) * Math.PI * 2 + 0.7
+    const r = 0.28 + (Math.random() - 0.5) * 0.03
+    nodes.push({
+      x: 0.5 + Math.cos(angle) * r,
+      y: 0.5 + Math.sin(angle) * r,
+      vx: (Math.random() - 0.5) * 0.00001,
+      vy: (Math.random() - 0.5) * 0.00001,
+      phase: Math.random() * Math.PI * 2,
+      color: i % 3 === 0 ? COLORS.violet : i % 3 === 1 ? COLORS.blue : COLORS.cyan,
+      size: 1.0,
+      layer: 2,
+    })
+  }
+  // Outer ring — 12 nodes
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2 + 1.1
+    const r = 0.38 + (Math.random() - 0.5) * 0.04
+    nodes.push({
+      x: 0.5 + Math.cos(angle) * r,
+      y: 0.5 + Math.sin(angle) * r,
+      vx: (Math.random() - 0.5) * 0.000008,
+      vy: (Math.random() - 0.5) * 0.000008,
+      phase: Math.random() * Math.PI * 2,
+      color: i % 4 === 0 ? COLORS.violet : COLORS.blue,
+      size: 0.8,
+      layer: 3,
     })
   }
   return nodes
@@ -37,12 +67,28 @@ function initNodes(): Node[] {
 
 function buildEdges(nodes: Node[]): [number, number][] {
   const edges: [number, number][] = []
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      const dx = nodes[i].x - nodes[j].x
-      const dy = nodes[i].y - nodes[j].y
-      if (Math.sqrt(dx * dx + dy * dy) < CONNECT_DIST) edges.push([i, j])
+  // center -> all inner
+  for (let i = 1; i <= 6; i++) edges.push([0, i])
+  // inner -> middle (each inner connects to ~2 middle nodes)
+  for (let i = 1; i <= 6; i++) {
+    for (let j = 7; j <= 15; j++) {
+      const a = nodes[i], b = nodes[j]
+      const d = Math.hypot(a.x - b.x, a.y - b.y)
+      if (d < 0.18) edges.push([i, j])
     }
+  }
+  // middle -> outer
+  for (let i = 7; i <= 15; i++) {
+    for (let j = 16; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j]
+      const d = Math.hypot(a.x - b.x, a.y - b.y)
+      if (d < 0.16) edges.push([i, j])
+    }
+  }
+  // adjacent inner ring connections
+  for (let i = 1; i <= 6; i++) {
+    const next = i === 6 ? 1 : i + 1
+    edges.push([i, next])
   }
   return edges
 }
@@ -58,101 +104,127 @@ export default function LivingCore({ className = '' }: LivingCoreProps) {
 
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-    const nodes = initNodes()
-    let edges = buildEdges(nodes)
-    const pulses: Pulse[] = edges.map((_, i) => ({
-      edge: i, t: Math.random(), speed: 0.0003 + Math.random() * 0.0002 }))
-    const rings: Ring[] = [{ t: 0, speed: 0.00015 }]
-    let animFrame = 0, lastTime = performance.now()
+    const nodes = buildNetwork()
+    const edges = buildEdges(nodes)
+
+    // Build pulses — one per edge, staggered
+    const pulses: Pulse[] = edges.map((e, i) => ({
+      fromIdx: e[0],
+      toIdx: e[1],
+      t: (i / edges.length),
+      speed: 0.00018 + Math.random() * 0.00012,
+      color: Math.random() < 0.4 ? COLORS.cyan : Math.random() < 0.6 ? COLORS.violet : COLORS.blue,
+    }))
+
+    let animFrame = 0
+    let lastTime = performance.now()
 
     function draw(now: number) {
       const dt = Math.min(now - lastTime, 50)
       lastTime = now
       const dpr = devicePixelRatio
-      const w = canvas!.width / dpr, h = canvas!.height / dpr
-      const s = Math.min(w, h), cx = w / 2, cy = h / 2
+      const w = canvas!.width / dpr
+      const h = canvas!.height / dpr
+      const s = Math.min(w, h)
+      const cx = w / 2, cy = h / 2
 
       ctx!.clearRect(0, 0, canvas!.width, canvas!.height)
 
-      // Central radial glow
-      const glowR = s * 0.35
-      const glow = ctx!.createRadialGradient(cx, cy, 0, cx, cy, glowR)
-      glow.addColorStop(0, rgba(BLUE, 0.08))
-      glow.addColorStop(0.5, rgba(CYAN, 0.03))
-      glow.addColorStop(1, rgba(BLUE, 0))
-      ctx!.fillStyle = glow
+      // Background radial glow (subtle)
+      const bgGlow = ctx!.createRadialGradient(cx, cy, 0, cx, cy, s * 0.55)
+      bgGlow.addColorStop(0, rgba(COLORS.blue, 0.06))
+      bgGlow.addColorStop(0.5, rgba(COLORS.violet, 0.02))
+      bgGlow.addColorStop(1, rgba(COLORS.blue, 0))
+      ctx!.fillStyle = bgGlow
       ctx!.fillRect(0, 0, w, h)
 
+      // Drift nodes slightly
       if (!prefersReduced) {
         for (const n of nodes) {
-          const drift = Math.sin(now * 0.0005 + n.phase) * 0.000008
-          n.x += (n.vx + drift) * dt; n.y += (n.vy + drift * 0.7) * dt
-          n.x += (0.5 - n.x) * 0.00002 * dt; n.y += (0.5 - n.y) * 0.00002 * dt
+          if (n.layer === 0) continue // core doesn't drift
+          const drift = Math.sin(now * 0.0004 + n.phase) * 0.000006
+          n.x += (n.vx + drift) * dt
+          n.y += (n.vy + drift * 0.8) * dt
+          // Gentle home pull toward original position — approximate with center pull weighted by layer
+          const homeR = n.layer === 1 ? 0.16 : n.layer === 2 ? 0.28 : 0.38
+          const dist = Math.hypot(n.x - 0.5, n.y - 0.5)
+          if (dist > homeR + 0.07) {
+            n.x += (0.5 - n.x) * 0.00003 * dt
+            n.y += (0.5 - n.y) * 0.00003 * dt
+          }
         }
       }
 
-      // Edges
-      const threshold = CONNECT_DIST * s
+      // Draw edges
       for (const [i, j] of edges) {
         const ax = nodes[i].x * w, ay = nodes[i].y * h
         const bx = nodes[j].x * w, by = nodes[j].y * h
-        const alpha = Math.max(0, 1 - Math.hypot(ax - bx, ay - by) / threshold) * 0.2
-        ctx!.beginPath(); ctx!.moveTo(ax, ay); ctx!.lineTo(bx, by)
-        ctx!.strokeStyle = rgba(BLUE, alpha); ctx!.lineWidth = 0.8; ctx!.stroke()
+        const dist = Math.hypot(ax - bx, ay - by)
+        const maxDist = 0.35 * s
+        const alpha = Math.max(0, 1 - dist / maxDist) * 0.18
+        ctx!.beginPath()
+        ctx!.moveTo(ax, ay)
+        ctx!.lineTo(bx, by)
+        ctx!.strokeStyle = rgba(COLORS.blue, alpha)
+        ctx!.lineWidth = 0.6
+        ctx!.stroke()
       }
 
-      // Pulses traveling along edges
+      // Draw pulses
       if (!prefersReduced) {
         for (const p of pulses) {
           p.t += p.speed * dt
-          if (p.t > 1) {
-            p.t -= 1
-            p.edge = Math.floor(Math.random() * edges.length)
-          }
-          const [i, j] = edges[p.edge] ?? edges[0]
-          const ax = nodes[i].x * w, ay = nodes[i].y * h
-          const bx = nodes[j].x * w, by = nodes[j].y * h
-          const px = ax + (bx - ax) * p.t, py = ay + (by - ay) * p.t
-          const pg = ctx!.createRadialGradient(px, py, 0, px, py, 4)
-          pg.addColorStop(0, rgba(CYAN, 0.6))
-          pg.addColorStop(1, rgba(CYAN, 0))
-          ctx!.beginPath(); ctx!.arc(px, py, 4, 0, Math.PI * 2)
-          ctx!.fillStyle = pg; ctx!.fill()
+          if (p.t > 1) p.t -= 1
+          const fn = nodes[p.fromIdx], tn = nodes[p.toIdx]
+          const px = (fn.x + (tn.x - fn.x) * p.t) * w
+          const py = (fn.y + (tn.y - fn.y) * p.t) * h
+          const pr = Math.max(2, s * 0.004)
+          const pg = ctx!.createRadialGradient(px, py, 0, px, py, pr * 2.5)
+          pg.addColorStop(0, rgba(p.color, 0.7))
+          pg.addColorStop(1, rgba(p.color, 0))
+          ctx!.beginPath()
+          ctx!.arc(px, py, pr * 2.5, 0, Math.PI * 2)
+          ctx!.fillStyle = pg
+          ctx!.fill()
         }
       }
 
-      // Concentric ring pulses
-      if (!prefersReduced) {
-        for (const ring of rings) {
-          ring.t += ring.speed * dt
-          if (ring.t > 1) ring.t -= 1
-          ctx!.beginPath(); ctx!.arc(cx, cy, ring.t * s * 0.4, 0, Math.PI * 2)
-          ctx!.strokeStyle = rgba(CYAN, (1 - ring.t) * 0.1); ctx!.lineWidth = 1; ctx!.stroke()
-        }
-        if (rings.length < 3 && Math.random() < 0.0003 * dt)
-          rings.push({ t: 0, speed: 0.00012 + Math.random() * 0.00008 })
-        while (rings.length > 1 && rings[rings.length - 1].t > 0.99) rings.pop()
-      }
-
-      // Nodes
-      const nodeR = Math.max(2, s * 0.006)
+      // Draw nodes
       for (let i = 0; i < nodes.length; i++) {
-        const nx = nodes[i].x * w, ny = nodes[i].y * h
-        const pulse = prefersReduced ? 0.5 : 0.5 + 0.5 * Math.sin(now * 0.002 + nodes[i].phase)
-        const color = i % 3 === 0 ? CYAN : BLUE
-        const og = ctx!.createRadialGradient(nx, ny, 0, nx, ny, nodeR * 4)
-        og.addColorStop(0, rgba(color, 0.15 * pulse))
-        og.addColorStop(1, rgba(color, 0))
-        ctx!.beginPath(); ctx!.arc(nx, ny, nodeR * 4, 0, Math.PI * 2)
-        ctx!.fillStyle = og; ctx!.fill()
-        ctx!.beginPath(); ctx!.arc(nx, ny, nodeR, 0, Math.PI * 2)
-        ctx!.fillStyle = rgba(color, 0.5 + 0.3 * pulse); ctx!.fill()
+        const n = nodes[i]
+        const nx = n.x * w, ny = n.y * h
+        const pulse = prefersReduced ? 0.5 : 0.5 + 0.5 * Math.sin(now * 0.0018 + n.phase)
+        const baseR = Math.max(2, s * 0.005) * n.size
+
+        // Outer glow
+        const og = ctx!.createRadialGradient(nx, ny, 0, nx, ny, baseR * 5)
+        og.addColorStop(0, rgba(n.color, 0.12 * pulse))
+        og.addColorStop(1, rgba(n.color, 0))
+        ctx!.beginPath()
+        ctx!.arc(nx, ny, baseR * 5, 0, Math.PI * 2)
+        ctx!.fillStyle = og
+        ctx!.fill()
+
+        // Core dot
+        ctx!.beginPath()
+        ctx!.arc(nx, ny, baseR, 0, Math.PI * 2)
+        ctx!.fillStyle = rgba(n.color, 0.55 + 0.3 * pulse)
+        ctx!.fill()
       }
 
-      // Rebuild edges periodically to account for drift
-      if (!prefersReduced && Math.random() < 0.001) edges = buildEdges(nodes)
+      // Central breathing ring
+      if (!prefersReduced) {
+        const ringPulse = 0.5 + 0.5 * Math.sin(now * 0.0008)
+        ctx!.beginPath()
+        ctx!.arc(cx, cy, s * 0.04 * (1 + ringPulse * 0.3), 0, Math.PI * 2)
+        ctx!.strokeStyle = rgba(COLORS.cyan, 0.15 * ringPulse)
+        ctx!.lineWidth = 1
+        ctx!.stroke()
+      }
+
       animFrame = requestAnimationFrame(draw)
     }
+
     animFrame = requestAnimationFrame(draw)
 
     function syncSize() {
@@ -163,15 +235,11 @@ export default function LivingCore({ className = '' }: LivingCoreProps) {
       canvas.height = Math.round(rect.height * dpr)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
-
     syncSize()
     const ro = new ResizeObserver(syncSize)
     ro.observe(canvas)
 
-    return () => {
-      cancelAnimationFrame(animFrame)
-      ro.disconnect()
-    }
+    return () => { cancelAnimationFrame(animFrame); ro.disconnect() }
   }, [])
 
   return (
