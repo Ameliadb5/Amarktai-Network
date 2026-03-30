@@ -35,7 +35,7 @@ const config: Config = {
       },
       keyframes: {
         float: {
-          '0%, 100%': { transform: 'translateY(0)' },
+          '0%, 100%': { transform: 'translateY(0px)' },
           '50%': { transform: 'translateY(-10px)' },
         },
         'fade-in': {
@@ -44,7 +44,7 @@ const config: Config = {
         },
         'slide-up': {
           from: { opacity: '0', transform: 'translateY(16px)' },
-          to: { opacity: '1', transform: 'translateY(0)' },
+          to: { opacity: '1', transform: 'translateY(0px)' },
         },
       },
     },
