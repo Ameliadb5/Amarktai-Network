@@ -413,14 +413,34 @@ export default function DashboardOverview() {
               )}
             </div>
 
-            {/* TODO: Capability gaps — wire to analysis API */}
+            {/* Capability gaps summary */}
             <div>
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                 <Puzzle className="w-3 h-3" /> Capability Gaps
               </p>
-              <div className="py-3 text-center rounded-lg bg-white/[0.02] border border-dashed border-white/[0.06]">
-                <p className="text-[11px] text-slate-600">Analysis coming soon</p>
-              </div>
+              {(() => {
+                const unconfigured = providers.filter(p => p.healthStatus === 'unconfigured' || !p.healthStatus)
+                if (unconfigured.length === 0) {
+                  return (
+                    <div className="py-3 text-center rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                      <p className="text-[11px] text-emerald-400/70">All providers configured</p>
+                    </div>
+                  )
+                }
+                return (
+                  <div className="space-y-1.5">
+                    {unconfigured.slice(0, 3).map(p => (
+                      <div key={p.providerKey} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        <span className="text-[11px] text-amber-400/80">{p.displayName}: API key not set</span>
+                      </div>
+                    ))}
+                    {unconfigured.length > 3 && (
+                      <p className="text-[10px] text-slate-600 pl-2">+{unconfigured.length - 3} more</p>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           </div>
         </div>
