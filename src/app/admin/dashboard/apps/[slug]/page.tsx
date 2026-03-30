@@ -261,7 +261,7 @@ export default function AppDetailPage() {
         {tab === 'AI Stack' && <AIStackTab app={app} />}
         {tab === 'Metrics' && <MetricsTab />}
         {tab === 'Learning' && <PlaceholderTab title="Learning" description="Learning insights and model optimization data will be available in Phase 2." icon={BookOpen} />}
-        {tab === 'Strategy' && <PlaceholderTab title="Strategy" description="App strategy configuration and goal tracking will be available in Phase 2." icon={Target} />}
+        {tab === 'Strategy' && <StrategyTab appSlug={app.slug} appName={app.name} appCategory={app.category} />}
         {tab === 'Events' && <PlaceholderTab title="Events" description="App-specific event timeline and audit log will be available in Phase 2." icon={FileText} />}
       </motion.div>
     </motion.div>
@@ -418,6 +418,177 @@ function MetricsTab() {
           Per-app metrics and analytics will be connected in Phase 2.
         </p>
       </div>
+    </div>
+  )
+}
+
+/* ── Tab: Strategy ────────────────────────────────────────── */
+interface StrategyData {
+  appSlug: string
+  strategyState: string
+  goals: Array<{ id: string; label: string; metric: string; targetValue: number; currentValue: number | null; direction: string; priority: string }>
+  kpis: Array<{ metric: string; label: string; targetValue: number; currentValue: number | null; unit: string; status: string }>
+  recommendations: Array<{ id: string; type: string; title: string; description: string; impact: string }>
+}
+
+function StrategyTab({ appSlug, appName, appCategory }: { appSlug: string; appName: string; appCategory: string }) {
+  const [strategy, setStrategy] = useState<StrategyData | null>(null)
+  const [stratLoading, setStratLoading] = useState(true)
+  const [stratError, setStratError] = useState<string | null>(null)
+
+  const loadStrategy = useCallback(async () => {
+    setStratLoading(true)
+    setStratError(null)
+    try {
+      const res = await fetch(`/api/admin/strategy?app=${appSlug}`)
+      if (res.status === 404) {
+        setStrategy(null)
+        return
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setStrategy(await res.json())
+    } catch (e) {
+      setStratError(e instanceof Error ? e.message : 'Failed to load strategy')
+    } finally {
+      setStratLoading(false)
+    }
+  }, [appSlug])
+
+  useEffect(() => { loadStrategy() }, [loadStrategy])
+
+  const initStrategy = async () => {
+    try {
+      const res = await fetch('/api/admin/strategy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'initialize', appSlug, appName, appType: appCategory || 'general' }),
+      })
+      if (res.ok) await loadStrategy()
+    } catch { /* ignore */ }
+  }
+
+  if (stratLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <RefreshCw className="w-4 h-4 text-blue-400 animate-spin" />
+        <span className="ml-2 text-xs text-slate-400">Loading strategy…</span>
+      </div>
+    )
+  }
+
+  if (stratError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <AlertCircle className="w-6 h-6 text-red-400" />
+        <p className="text-xs text-slate-400">{stratError}</p>
+        <button onClick={loadStrategy} className="text-xs text-blue-400 hover:text-blue-300">Retry</button>
+      </div>
+    )
+  }
+
+  if (!strategy) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="w-14 h-14 rounded-xl bg-white/[0.04] flex items-center justify-center">
+          <Target className="w-7 h-7 text-slate-600" />
+        </div>
+        <div className="text-center max-w-md">
+          <h3 className="text-sm font-semibold text-white mb-1">No Strategy Configured</h3>
+          <p className="text-xs text-slate-500 mb-4">Initialize a strategy to set goals, KPI targets, and get AI-driven recommendations for this app.</p>
+          <button
+            onClick={initStrategy}
+            className="px-4 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+          >
+            Initialize Strategy
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const KPI_STATUS_COLORS: Record<string, string> = {
+    achieved: 'text-emerald-400',
+    on_track: 'text-blue-400',
+    at_risk: 'text-amber-400',
+    behind: 'text-red-400',
+    unknown: 'text-slate-500',
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* KPIs */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white">KPI Targets</h3>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${strategy.strategyState === 'active' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-slate-600/10 text-slate-400'}`}>
+            {strategy.strategyState}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {strategy.kpis.map((kpi) => (
+            <div key={kpi.metric} className="bg-white/[0.02] rounded-lg p-4 space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">{kpi.label}</p>
+              <p className="text-lg font-bold text-white">{kpi.currentValue ?? '—'} <span className="text-xs text-slate-500">{kpi.unit}</span></p>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-500">Target: {kpi.targetValue} {kpi.unit}</span>
+                <span className={`text-[10px] font-medium ${KPI_STATUS_COLORS[kpi.status] ?? 'text-slate-500'}`}>
+                  {kpi.status.replace(/_/g, ' ')}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Goals */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
+        <h3 className="text-sm font-semibold text-white">Goals</h3>
+        <div className="space-y-3">
+          {strategy.goals.map((goal) => (
+            <div key={goal.id} className="flex items-center justify-between bg-white/[0.02] rounded-lg p-3">
+              <div className="space-y-0.5">
+                <p className="text-sm text-white">{goal.label}</p>
+                <p className="text-[10px] text-slate-500">
+                  {goal.direction} {goal.metric} → {goal.targetValue}
+                  {goal.currentValue !== null ? ` (current: ${goal.currentValue})` : ''}
+                </p>
+              </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                goal.priority === 'critical' ? 'bg-red-400/10 text-red-400' :
+                goal.priority === 'high' ? 'bg-amber-400/10 text-amber-400' :
+                'bg-slate-600/10 text-slate-400'
+              }`}>
+                {goal.priority}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recommendations */}
+      {strategy.recommendations.length > 0 && (
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
+          <h3 className="text-sm font-semibold text-white">Recommendations</h3>
+          <div className="space-y-3">
+            {strategy.recommendations.map((rec) => (
+              <div key={rec.id} className="bg-white/[0.02] rounded-lg p-4 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                    rec.impact === 'high' ? 'bg-red-400/10 text-red-400' :
+                    rec.impact === 'medium' ? 'bg-amber-400/10 text-amber-400' :
+                    'bg-slate-600/10 text-slate-400'
+                  }`}>
+                    {rec.impact} impact
+                  </span>
+                  <span className="text-[10px] text-slate-500">{rec.type}</span>
+                </div>
+                <p className="text-sm font-medium text-white">{rec.title}</p>
+                <p className="text-xs text-slate-400">{rec.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
