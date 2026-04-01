@@ -1,23 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
 
 /**
- * POST /api/brain/video — Video generation endpoint
+ * POST /api/brain/video — Video planning & scene decomposition endpoint
+ *
+ * This endpoint provides **video planning** capabilities:
+ *   - Script → scene decomposition
+ *   - Visual direction per scene
+ *   - Audio direction per scene
+ *   - Production metadata (style, duration, aspect ratio)
+ *
+ * It does **NOT** generate actual video files. Video generation
+ * (e.g. via Gemini Veo, Runway, Pika, Stability AI) is not yet
+ * integrated — no provider SDK processes the scenes into rendered
+ * video. The capability engine truthfully reports video_generation
+ * as unavailable.
  *
  * Accepts a JSON body with:
  *   - script (string, required) — the video script or description
  *   - style (string, optional) — visual style ('cinematic' | 'animated' | 'realistic' | 'marketing' | 'social_reel', default: 'cinematic')
  *   - duration (number, optional) — desired duration in seconds (default: 15)
  *   - aspectRatio (string, optional) — '16:9' | '9:16' | '1:1' (default: '16:9')
- *   - scenes (array, optional) — pre-defined scene list for the render pipeline
+ *   - scenes (array, optional) — pre-defined scene list
  *
- * Returns a video generation result with status and a link to the generated clip.
- * When no provider API key is configured, returns a stub response.
+ * Returns:
+ *   { capability: 'video_planning', executed: true, scenes, params }
  *
- * Pipeline: script → scene decomposition → render job submission
+ * Pipeline: script → scene decomposition → structured planning output
  */
 
-/** Scene in the script→scenes→render pipeline. */
+/** Scene in the script→scenes planning pipeline. */
 interface VideoScene {
   sceneNumber: number
   description: string
@@ -28,7 +39,7 @@ interface VideoScene {
 }
 
 /**
- * Decompose a script into scenes for the render pipeline.
+ * Decompose a script into scenes for the planning pipeline.
  * Returns 1-6 scenes depending on total duration.
  */
 function decomposeScriptToScenes(script: string, duration: number, style: string): VideoScene[] {
@@ -111,44 +122,16 @@ export async function POST(request: NextRequest) {
       ? providedScenes as VideoScene[]
       : decomposeScriptToScenes(script, duration, style)
 
-    // Check for provider API keys
-    // STRICT: return error when no video generation provider configured
-    const geminiKey = process.env.GEMINI_API_KEY;
-    const runwayKey = process.env.RUNWAY_API_KEY;
-    const pikaKey = process.env.PIKA_API_KEY;
-    const stabilityKey = process.env.STABILITY_API_KEY;
-
-    if (!geminiKey && !runwayKey && !pikaKey && !stabilityKey) {
-      // STRICT: Return error (not stub) — no video generation provider configured
-      return NextResponse.json({
-        error: 'No video generation provider configured. Set GEMINI_API_KEY (Veo), RUNWAY_API_KEY, PIKA_API_KEY, or STABILITY_API_KEY to enable video generation.',
-        executed: false,
-        capability: 'video_generation',
-        fallback_used: false,
-        scenes,
-      }, { status: 503 });
-    }
-
-    // ── Determine best provider ──────────────────────────────────────
-    const providerPriority = [
-      { key: 'gemini-veo', available: !!geminiKey },
-      { key: 'runway', available: !!runwayKey },
-      { key: 'pika', available: !!pikaKey },
-      { key: 'stability-ai', available: !!stabilityKey },
-    ]
-    const provider = providerPriority.find(p => p.available)?.key ?? 'unknown'
-
-    // Submit video generation job
-    const jobId = `vid_${randomUUID()}`;
-
+    // ── Return planning output ────────────────────────────────────────
+    // This is video PLANNING, not generation. The scenes are a structured
+    // storyboard — no actual video file is rendered.
     return NextResponse.json({
-      status: 'submitted',
+      capability: 'video_planning',
       executed: true,
-      jobId,
-      provider,
-      capability: 'video_generation',
       fallback_used: false,
-      message: 'Video generation job submitted. Poll for status using the jobId.',
+      message: 'Video planning complete. Scenes decomposed from script. Note: actual video generation (rendering) is not yet available — no provider integration is wired.',
+      generation_available: false,
+      generation_blocker: 'No video generation provider SDK is integrated. Candidates: Gemini Veo 2, Runway Gen-3, Pika, Stability AI Stable Video Diffusion. Provider API key alone is not sufficient — the rendering pipeline must be implemented.',
       params: {
         script: script.slice(0, 200),
         style,
@@ -156,7 +139,6 @@ export async function POST(request: NextRequest) {
         aspectRatio,
       },
       scenes,
-      estimatedCompletionSeconds: duration * 4,
     });
   } catch (err) {
     return NextResponse.json(

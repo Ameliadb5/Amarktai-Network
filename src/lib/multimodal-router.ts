@@ -318,26 +318,28 @@ export function buildCreativePrompt(request: MultimodalRequest): string {
       parts.push(
         'You are a short-form video creative director. Generate a reel/short video concept with:',
         '1. **Hook** (first 1-3 seconds) — what grabs attention',
-        '2. **Script/Storyboard** — scene-by-scene breakdown',
-        '3. **Visual Style** — aesthetic, transitions, effects',
-        '4. **Audio/Music Direction** — suggested music genre, voiceover notes',
-        '5. **Text Overlays** — key on-screen text',
+        '2. **Script/Storyboard** — scene-by-scene breakdown with timing',
+        '3. **Visual Style** — aesthetic, transitions, effects, aspect ratio',
+        '4. **Audio/Music Direction** — suggested music genre, voiceover notes, SFX',
+        '5. **Text Overlays** — key on-screen text with positioning',
         '6. **CTA** — end-card or final message',
-        'Note: This is a concept brief — actual video generation is not yet supported.',
+        '7. **Platform Optimisation** — best practices for the target platform (TikTok, Reels, Shorts)',
+        'IMPORTANT: This is a planning/concept output only. Actual video rendering/generation is not available.',
         `Brief: ${prompt}`,
       )
       break
 
     case 'video_concept':
       parts.push(
-        'You are a video production strategist. Generate a video concept brief with:',
+        'You are a video production strategist. Generate a detailed video concept brief with:',
         '1. **Concept Title**',
-        '2. **Format & Duration** — suggested format (interview, explainer, vlog, etc) and length',
-        '3. **Script Outline** — key talking points or scene list',
-        '4. **Visual Direction** — cinematography style, colour grading, graphics',
-        '5. **Audio** — music, sound design, voiceover direction',
-        '6. **Distribution Strategy** — where to publish and how to optimise',
-        'Note: This is a concept brief — actual video generation is not yet supported.',
+        '2. **Format & Duration** — suggested format (interview, explainer, vlog, documentary, etc) and length',
+        '3. **Script Outline** — key talking points or scene-by-scene list with timing',
+        '4. **Visual Direction** — cinematography style, colour grading, graphics, shot types',
+        '5. **Audio** — music, sound design, voiceover direction, pacing',
+        '6. **Production Notes** — equipment suggestions, talent needs, location ideas',
+        '7. **Distribution Strategy** — where to publish and how to optimise for each platform',
+        'IMPORTANT: This is a planning/concept output only. Actual video rendering/generation is not available.',
         `Brief: ${prompt}`,
       )
       break

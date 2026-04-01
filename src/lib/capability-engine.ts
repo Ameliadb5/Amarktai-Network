@@ -460,7 +460,7 @@ const BACKEND_ROUTE_EXISTS: Record<CapabilityClass, boolean> = {
   image_generation:          true,   // /api/brain/request (DALL-E / FLUX)
   image_editing:             true,   // /api/brain/request (DALL-E)
   video_planning:            true,   // /api/brain/request (AI text — always possible via chat models)
-  video_generation:          false,  // /api/brain/video route exists but returns stub — no real provider integration wired (Gemini Veo / Runway keys not processed)
+  video_generation:          false,  // BLOCKER: /api/brain/video returns planning data only — no provider SDK (Gemini Veo, Runway, Pika, Stability) is integrated to render scenes into actual video files. API key presence alone is not sufficient; a rendering pipeline must be implemented.
   voice_input:               true,   // /api/brain/stt + /api/voice/stt (Groq Whisper / OpenAI Whisper / Gemini Live / HuggingFace Whisper)
   voice_output:              true,   // /api/brain/tts + /api/voice/tts (Groq PlayAI / OpenAI TTS / Gemini TTS / HuggingFace MMS)
   realtime_voice:            false,  // BLOCKER: Next.js API routes do not support WebSocket connections required for bidirectional streaming voice. Requires a separate WebSocket server or edge runtime with streaming support.

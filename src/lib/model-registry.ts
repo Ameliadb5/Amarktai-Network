@@ -185,7 +185,7 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     supports_reranking: false,
     supports_vision: true,
     supports_image_generation: false,
-    supports_video_planning: false,
+    supports_video_planning: true,
     supports_agent_planning: true,
     context_window: 128_000,
     latency_tier: 'medium',
@@ -194,7 +194,7 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     health_status: 'configured',
     fallback_priority: 1,
     validator_eligible: true,
-    specialist_domains: ['finance', 'crypto', 'marketing', 'general', 'analysis'],
+    specialist_domains: ['finance', 'crypto', 'marketing', 'general', 'analysis', 'video_planning'],
   },
   {
     provider: 'openai',
@@ -1112,7 +1112,7 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     supports_reranking: false,
     supports_vision: true,
     supports_image_generation: false,
-    supports_video_planning: false,
+    supports_video_planning: true,
     supports_agent_planning: false,
     context_window: 1_000_000,
     latency_tier: 'ultra_low',
@@ -1121,7 +1121,7 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     health_status: 'configured',
     fallback_priority: 2,
     validator_eligible: false,
-    specialist_domains: ['chat', 'multimodal', 'real-time', 'general'],
+    specialist_domains: ['chat', 'multimodal', 'real-time', 'general', 'video_planning'],
   },
 
   // ── Groq — expanded ───────────────────────────────────────────────────────
@@ -1597,7 +1597,7 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     supports_reranking: false,
     supports_vision: true,
     supports_image_generation: false,
-    supports_video_planning: false,
+    supports_video_planning: true,
     supports_agent_planning: true,
     context_window: 200_000,
     latency_tier: 'medium',
@@ -1606,7 +1606,7 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     health_status: 'configured',
     fallback_priority: 2,
     validator_eligible: true,
-    specialist_domains: ['math', 'coding', 'reasoning', 'science', 'security'],
+    specialist_domains: ['math', 'coding', 'reasoning', 'science', 'security', 'video_planning'],
   },
 
   // ── xAI / Grok — expanded ────────────────────────────────────────────────
@@ -1719,7 +1719,7 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     supports_reranking: false,
     supports_vision: true,
     supports_image_generation: false,
-    supports_video_planning: false,
+    supports_video_planning: true,
     supports_agent_planning: false,
     context_window: 1_000_000,
     latency_tier: 'low',
@@ -1728,7 +1728,7 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     health_status: 'configured',
     fallback_priority: 2,
     validator_eligible: false,
-    specialist_domains: ['chat', 'multimodal', 'quick-tasks', 'real-time'],
+    specialist_domains: ['chat', 'multimodal', 'quick-tasks', 'real-time', 'video_planning'],
   },
   {
     provider: 'gemini',
