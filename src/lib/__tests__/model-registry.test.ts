@@ -233,9 +233,10 @@ describe('Model Registry', () => {
       expect(snapshot.get('groq')?.status).toBe('degraded')
     })
 
-    it('isProviderUsable returns true when cache is empty (backwards compatible)', () => {
-      expect(isProviderUsable('openai')).toBe(true)
-      expect(isProviderUsable('nonexistent')).toBe(true)
+    it('isProviderUsable returns false when cache is empty (strict — prevents false availability)', () => {
+      // When no health data is recorded yet, providers are considered unconfigured
+      expect(isProviderUsable('openai')).toBe(false)
+      expect(isProviderUsable('nonexistent')).toBe(false)
     })
 
     it('isProviderUsable returns true for healthy or configured providers', () => {
@@ -268,9 +269,9 @@ describe('Model Registry', () => {
       expect(isProviderDegraded('groq')).toBe(true)
     })
 
-    it('getModelEffectiveHealth returns static health when cache is empty', () => {
+    it('getModelEffectiveHealth returns unconfigured when cache is empty', () => {
       const model = getModelById('openai', 'gpt-4o')!
-      expect(getModelEffectiveHealth(model)).toBe('configured')
+      expect(getModelEffectiveHealth(model)).toBe('unconfigured')
     })
 
     it('getModelEffectiveHealth returns provider health when cache is populated', () => {
@@ -279,10 +280,10 @@ describe('Model Registry', () => {
       expect(getModelEffectiveHealth(model)).toBe('healthy')
     })
 
-    it('getUsableModels returns all enabled models when cache is empty', () => {
+    it('getUsableModels returns zero models when cache is empty (strict mode)', () => {
       const usable = getUsableModels()
-      const enabled = getEnabledModels()
-      expect(usable.length).toBe(enabled.length)
+      // When no provider health data exists, all providers are unconfigured
+      expect(usable.length).toBe(0)
     })
 
     it('getUsableModels excludes models from unhealthy providers', () => {

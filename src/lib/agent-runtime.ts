@@ -150,8 +150,8 @@ const AGENT_DEFINITIONS: ReadonlyMap<AgentType, AgentDefinition> = new Map<Agent
       requiredPermissions: ['agent:retrieval'],
       canHandoff: [],
       memoryEnabled: false,
-      defaultProvider: 'cohere',
-      defaultModel: 'command-r-plus',
+      defaultProvider: 'openai',
+      defaultModel: 'gpt-4o',
     },
   ],
   [
@@ -165,8 +165,8 @@ const AGENT_DEFINITIONS: ReadonlyMap<AgentType, AgentDefinition> = new Map<Agent
       requiredPermissions: ['agent:creative'],
       canHandoff: [],
       memoryEnabled: false,
-      defaultProvider: 'anthropic',
-      defaultModel: 'claude-sonnet-4-20250514',
+      defaultProvider: 'gemini',
+      defaultModel: 'gemini-2.0-flash',
     },
   ],
   [

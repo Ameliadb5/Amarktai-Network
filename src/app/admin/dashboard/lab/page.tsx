@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   FlaskConical, Play, Loader2, Copy, Check, Gauge, CheckCircle, XCircle,
-  Zap, Info, RefreshCw, Route,
+  Zap, Info, RefreshCw, Route, AlertCircle, ShieldAlert,
 } from 'lucide-react'
 
 const CAPABILITIES = [
@@ -22,9 +22,19 @@ interface ProviderOption {
   healthStatus: string
 }
 
+interface CapabilityEntry {
+  capability: string
+  available: boolean
+  reason: string | null
+  routeExists: boolean
+}
+
 interface TestResult {
   success: boolean
+  executed: boolean
   output: string | null
+  capability: string[]
+  capabilityRoutes?: Array<{ capability: string; available: boolean; reason: string | null }>
   routedProvider: string | null
   routedModel: string | null
   executionMode: string | null
@@ -32,6 +42,7 @@ interface TestResult {
   validationUsed: boolean
   consensusUsed: boolean
   fallbackUsed: boolean
+  fallback_used: boolean
   routingReason?: string
   warnings: string[]
   error: string | null
@@ -44,6 +55,8 @@ export default function LabPage() {
   const [forceProvider, setForceProvider] = useState<string>('auto')
   const [providers, setProviders] = useState<ProviderOption[]>([])
   const [loadingProviders, setLoadingProviders] = useState(true)
+  const [capabilityStatus, setCapabilityStatus] = useState<CapabilityEntry[]>([])
+  const [loadingCaps, setLoadingCaps] = useState(true)
   const [result, setResult] = useState<TestResult | null>(null)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,7 +86,25 @@ export default function LabPage() {
     }
   }, [])
 
-  useEffect(() => { loadProviders() }, [loadProviders])
+  const loadCapabilities = useCallback(async () => {
+    setLoadingCaps(true)
+    try {
+      const res = await fetch('/api/admin/routing')
+      if (res.ok) {
+        const data = await res.json()
+        setCapabilityStatus(data.capabilities ?? [])
+      }
+    } catch {
+      // best-effort
+    } finally {
+      setLoadingCaps(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadProviders()
+    loadCapabilities()
+  }, [loadProviders, loadCapabilities])
 
   const handleRun = async () => {
     if (!prompt.trim()) return
@@ -95,14 +126,17 @@ export default function LabPage() {
       })
       const data = await res.json().catch(() => ({}))
       // Throw for network-level errors that have no usable routing metadata.
-      // When the response contains routedProvider (even on 4xx/5xx), we still
-      // render the routing decision panel rather than just showing a generic error.
-      if (!res.ok && data.routedProvider == null) {
+      // When the response contains routedProvider or capability data (even on 4xx/5xx),
+      // we still render the routing decision panel rather than just showing a generic error.
+      if (!res.ok && data.routedProvider == null && !(Array.isArray(data.capability) && data.capability.length > 0)) {
         throw new Error(data.error || `HTTP ${res.status}`)
       }
       setResult({
         success: data.success ?? res.ok,
+        executed: data.executed ?? (data.success ?? false),
         output: data.output ?? null,
+        capability: Array.isArray(data.capability) ? data.capability : [],
+        capabilityRoutes: data.capabilityRoutes,
         routedProvider: data.routedProvider ?? null,
         routedModel: data.routedModel ?? null,
         executionMode: data.executionMode ?? null,
@@ -110,6 +144,7 @@ export default function LabPage() {
         validationUsed: data.validationUsed ?? false,
         consensusUsed: data.consensusUsed ?? false,
         fallbackUsed: data.fallbackUsed ?? false,
+        fallback_used: data.fallback_used ?? false,
         routingReason: data.routingReason,
         warnings: Array.isArray(data.warnings) ? data.warnings : [],
         error: data.error ?? null,
@@ -129,12 +164,71 @@ export default function LabPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const availableCount = capabilityStatus.filter(c => c.available).length
+  const unavailableCount = capabilityStatus.filter(c => !c.available).length
+
   return (
     <motion.div initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.06 } } }} className="space-y-8">
       {/* Header */}
       <motion.div variants={fadeUp}>
         <h1 className="text-2xl font-bold text-white font-heading">Lab</h1>
-        <p className="text-sm text-slate-400 mt-1">Admin test environment — capability-first routing with real provider selection</p>
+        <p className="text-sm text-slate-400 mt-1">Real execution system — capability-first routing through the capability engine</p>
+      </motion.div>
+
+      {/* Capability Status Panel */}
+      <motion.div variants={fadeUp} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-blue-400" />
+            <h2 className="text-sm font-semibold text-white">Capability Map</h2>
+            <span className="text-[10px] text-slate-500 font-mono ml-2">
+              {availableCount} available · {unavailableCount} unavailable
+            </span>
+          </div>
+          <button onClick={loadCapabilities} disabled={loadingCaps} className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1">
+            <RefreshCw className={`w-2.5 h-2.5 ${loadingCaps ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+
+        {loadingCaps ? (
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Loading capabilities…
+          </div>
+        ) : capabilityStatus.length === 0 ? (
+          <p className="text-xs text-slate-500">No capability data available.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {capabilityStatus.map((cap) => (
+              <div
+                key={cap.capability}
+                className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs ${
+                  cap.available
+                    ? 'bg-emerald-500/5 border-emerald-500/10'
+                    : 'bg-white/[0.02] border-white/[0.06]'
+                }`}
+              >
+                {cap.available ? (
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                )}
+                <div className="min-w-0">
+                  <p className={`font-mono font-medium ${cap.available ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    {cap.capability}
+                  </p>
+                  {!cap.available && cap.reason && (
+                    <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">{cap.reason}</p>
+                  )}
+                  {!cap.routeExists && (
+                    <p className="text-[10px] text-amber-400 mt-0.5">No backend route</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </motion.div>
 
       <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -159,7 +253,7 @@ export default function LabPage() {
               onChange={(e) => setForceProvider(e.target.value)}
               className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
             >
-              <option value="auto" className="bg-[#0a0f1a] text-white">⚡ Auto-Route (best available)</option>
+              <option value="auto" className="bg-[#0a0f1a] text-white">⚡ Auto-Route (capability engine)</option>
               {providers.map((p) => (
                 <option key={p.key} value={p.key} className="bg-[#0a0f1a] text-white">
                   {p.label} ({p.healthStatus})
@@ -167,7 +261,7 @@ export default function LabPage() {
               ))}
             </select>
             {forceProvider === 'auto' && (
-              <p className="text-[10px] text-slate-500">The system selects the best configured provider for this task type.</p>
+              <p className="text-[10px] text-slate-500">Routes through the capability engine: classify → resolve → execute.</p>
             )}
             {providers.length === 0 && !loadingProviders && (
               <p className="text-[10px] text-amber-400">No enabled providers found. Configure keys in Operations → Providers.</p>
@@ -229,17 +323,27 @@ export default function LabPage() {
             )}
           </div>
 
-          {/* Routing Metadata */}
+          {/* Structured Execution Response */}
           {result && (
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 space-y-1.5">
               <div className="flex items-center gap-1.5 mb-2">
                 <Route className="w-3 h-3 text-blue-400" />
-                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Routing Decision</span>
-                {result.success
+                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Execution Result</span>
+                {result.executed
                   ? <CheckCircle className="w-3 h-3 text-emerald-400 ml-auto" />
                   : <XCircle className="w-3 h-3 text-red-400 ml-auto" />}
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <span className="text-slate-500">Executed</span>
+                <span className={`font-mono ${result.executed ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {result.executed ? 'true' : 'false'}
+                </span>
+                {result.capability.length > 0 && (
+                  <>
+                    <span className="text-slate-500">Capability</span>
+                    <span className="text-blue-400 font-mono truncate">{result.capability.join(', ')}</span>
+                  </>
+                )}
                 <span className="text-slate-500">Provider</span>
                 <span className={`font-mono truncate ${result.routedProvider ? 'text-white' : 'text-slate-600'}`}>
                   {result.routedProvider ?? '—'}
@@ -252,25 +356,36 @@ export default function LabPage() {
                 <span className="text-slate-300 font-mono">{result.executionMode ?? '—'}</span>
                 <span className="text-slate-500">Latency</span>
                 <span className="text-slate-300 font-mono">{result.latencyMs}ms</span>
+                <span className="text-slate-500">Fallback</span>
+                <span className={`font-mono ${result.fallback_used ? 'text-amber-400' : 'text-slate-500'}`}>
+                  {result.fallback_used ? 'true' : 'false'}
+                </span>
                 {result.confidenceScore !== null && (
                   <>
                     <span className="text-slate-500">Confidence</span>
                     <span className="text-slate-300 font-mono">{Math.round(result.confidenceScore * 100)}%</span>
                   </>
                 )}
-                {result.fallbackUsed && (
-                  <>
-                    <span className="text-slate-500">Fallback</span>
-                    <span className="text-amber-400 font-mono">used</span>
-                  </>
-                )}
-                {result.validationUsed && (
-                  <>
-                    <span className="text-slate-500">Validation</span>
-                    <span className="text-blue-400 font-mono">yes</span>
-                  </>
-                )}
               </div>
+
+              {/* Capability route details when unavailable */}
+              {result.capabilityRoutes && result.capabilityRoutes.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-white/[0.04] space-y-1">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Capability Routes</p>
+                  {result.capabilityRoutes.map((r, i) => (
+                    <div key={i} className="flex items-start gap-1.5">
+                      {r.available
+                        ? <CheckCircle className="w-3 h-3 text-emerald-400 mt-0.5 shrink-0" />
+                        : <AlertCircle className="w-3 h-3 text-red-400 mt-0.5 shrink-0" />}
+                      <div>
+                        <span className="text-[11px] text-white font-mono">{r.capability}</span>
+                        {r.reason && <p className="text-[10px] text-red-400/80">{r.reason}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {result.routingReason && (
                 <div className="mt-2 pt-2 border-t border-white/[0.04]">
                   <div className="flex items-start gap-1.5">
@@ -300,7 +415,12 @@ export default function LabPage() {
                 <p className="text-sm text-red-400">{error}</p>
               </div>
             ) : result?.error && !result.output ? (
-              <p className="text-sm text-red-400">{result.error}</p>
+              <div className="space-y-2">
+                <p className="text-sm text-red-400">{result.error}</p>
+                {!result.executed && (
+                  <p className="text-xs text-slate-500">The capability engine could not execute this request. Check the capability map above for available capabilities.</p>
+                )}
+              </div>
             ) : result?.output ? (
               <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{result.output}</pre>
             ) : (

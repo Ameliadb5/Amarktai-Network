@@ -143,7 +143,7 @@ export default function DashboardOverview() {
   const healthyProviders  = providers.filter(p => p.healthStatus === 'healthy')
   const enabledProviders  = providers.filter(p => p.enabled)
   const unconfiguredProvs = providers.filter(p => p.healthStatus === 'unconfigured')
-  const totalApps  = data?.productStats.length ?? 0
+  const totalApps  = data?.productStats?.length ?? 0
   const totalReqs  = data?.brainStats?.totalRequests ?? 0
   const successReqs = data?.brainStats?.successCount ?? 0
   const errorReqs  = data?.brainStats?.errorCount ?? 0
@@ -152,7 +152,7 @@ export default function DashboardOverview() {
   const systemHealth = totalReqs > 0
     ? Math.round(((successReqs / totalReqs) * 0.7 + (healthyProviders.length > 0 ? 0.3 : 0)) * 100)
     : healthyProviders.length > 0 ? 85 : enabledProviders.length > 0 ? 50 : 0
-  const alertEvents = data?.recentEvents.filter(e => e.severity === 'critical' || e.severity === 'error') ?? []
+  const alertEvents = (data?.recentEvents ?? []).filter(e => e.severity === 'critical' || e.severity === 'error')
   const errorEvents = alertEvents.slice(0, 6)
 
   /* ── Loading state ───────────────────────────────────────────── */
@@ -254,7 +254,7 @@ export default function DashboardOverview() {
                 </Link>
               </div>
             ) : (
-              data?.productStats.map(app => {
+              data?.productStats?.map(app => {
                 const cfg = appStatusCfg(app.status, app.integration?.healthStatus)
                 return (
                   <div key={app.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.03] transition-colors">
@@ -459,14 +459,14 @@ export default function DashboardOverview() {
             </Link>
           </div>
           <div className="p-4">
-            {(data?.recentEvents.length ?? 0) === 0 ? (
+            {(data?.recentEvents?.length ?? 0) === 0 ? (
               <div className="py-8 text-center">
                 <Activity className="w-6 h-6 text-slate-700 mx-auto mb-2" />
                 <p className="text-sm text-slate-500">No events logged yet</p>
               </div>
             ) : (
               <div className="space-y-1">
-                {data?.recentEvents.slice(0, 8).map(ev => {
+                {(data?.recentEvents ?? []).slice(0, 8).map(ev => {
                   const sev = SEV[ev.severity as keyof typeof SEV] ?? { color: 'text-slate-400', bg: 'bg-white/[0.03]', dot: 'bg-slate-500' }
                   return (
                     <div key={ev.id} className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.03] transition-colors">
@@ -498,14 +498,14 @@ export default function DashboardOverview() {
           </div>
           <div className="p-4 space-y-3">
             {[
-              { label: 'Total Apps',       value: String(data?.metrics.totalProducts ?? 0) },
+              { label: 'Total Apps',       value: String(data?.metrics?.totalProducts ?? 0) },
               { label: 'Active Providers',  value: `${enabledProviders.length} / ${providers.length}` },
               { label: 'Healthy Providers', value: String(healthyProviders.length) },
               { label: 'Total Requests',    value: totalReqs.toLocaleString() },
               { label: 'Error Rate',        value: totalReqs > 0 ? `${100 - successRate}%` : '0%' },
               { label: 'Memory Entries',    value: (memory?.totalEntries ?? 0).toLocaleString() },
-              { label: 'Contacts',          value: String(data?.metrics.totalContacts ?? 0) },
-              { label: 'Waitlist',          value: String(data?.metrics.totalWaitlist ?? 0) },
+              { label: 'Contacts',          value: String(data?.metrics?.totalContacts ?? 0) },
+              { label: 'Waitlist',          value: String(data?.metrics?.totalWaitlist ?? 0) },
             ].map(row => (
               <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-white/[0.04] last:border-0">
                 <span className="text-xs text-slate-500">{row.label}</span>

@@ -14,7 +14,10 @@ import {
   classifyCapabilities,
   resolveCapabilityRoutes,
   getCapabilityStatus,
+  getDetailedCapabilityStatus,
+  isCapabilityAvailable,
   CAPABILITY_MAP,
+  BACKEND_ROUTE_EXISTS,
   type CapabilityClass,
 } from '../capability-engine'
 import {
@@ -80,6 +83,21 @@ describe('Capability Engine', () => {
       expect(caps).toContain('video_generation')
     })
 
+    it('classifies video planning tasks', () => {
+      const caps = classifyCapabilities('media', 'plan a video storyboard for marketing')
+      expect(caps).toContain('video_planning')
+    })
+
+    it('classifies video planning from reel/animation patterns', () => {
+      const caps = classifyCapabilities('content', 'create a reel animation for instagram')
+      expect(caps).toContain('video_planning')
+    })
+
+    it('classifies voice output / TTS tasks', () => {
+      const caps = classifyCapabilities('media', 'text to speech for this article')
+      expect(caps).toContain('voice_output')
+    })
+
     it('classifies summarization tasks', () => {
       const caps = classifyCapabilities('summarize', 'summarize this article briefly')
       expect(caps).toContain('summarization')
@@ -116,7 +134,8 @@ describe('Capability Engine', () => {
         adultMode: false,
       })
       expect(result.routes[0].available).toBe(false)
-      expect(result.routes[0].missingMessage).toContain('adult mode')
+      // Backend route guard fires first since no reliable provider exists
+      expect(result.routes[0].missingMessage).toContain('Route not implemented')
     })
 
     it('respects execution preference', () => {
@@ -159,6 +178,163 @@ describe('Capability Engine', () => {
       for (const cap of allCaps) {
         expect(typeof status[cap]).toBe('boolean')
       }
+    })
+  })
+
+  describe('backend route existence', () => {
+    it('has a route entry for every capability class', () => {
+      const allCaps = Object.keys(CAPABILITY_MAP) as CapabilityClass[]
+      for (const cap of allCaps) {
+        expect(typeof BACKEND_ROUTE_EXISTS[cap]).toBe('boolean')
+      }
+    })
+
+    it('marks realtime_voice as having no backend route', () => {
+      expect(BACKEND_ROUTE_EXISTS.realtime_voice).toBe(false)
+    })
+
+    it('marks video_generation as having no backend route', () => {
+      expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(false)
+    })
+
+    it('marks reranking as having no backend route', () => {
+      expect(BACKEND_ROUTE_EXISTS.reranking).toBe(false)
+    })
+
+    it('marks adult_18plus_image as having no backend route', () => {
+      expect(BACKEND_ROUTE_EXISTS.adult_18plus_image).toBe(false)
+    })
+
+    it('marks general_chat as having a backend route', () => {
+      expect(BACKEND_ROUTE_EXISTS.general_chat).toBe(true)
+    })
+
+    it('marks voice_input as having a backend route', () => {
+      expect(BACKEND_ROUTE_EXISTS.voice_input).toBe(true)
+    })
+
+    it('marks voice_output as having a backend route', () => {
+      expect(BACKEND_ROUTE_EXISTS.voice_output).toBe(true)
+    })
+
+    it('marks image_generation as having a backend route', () => {
+      expect(BACKEND_ROUTE_EXISTS.image_generation).toBe(true)
+    })
+
+    it('marks video_planning as having a backend route (always possible via chat)', () => {
+      expect(BACKEND_ROUTE_EXISTS.video_planning).toBe(true)
+    })
+
+    it('marks video_generation as having no backend route (no real provider wired)', () => {
+      expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(false)
+    })
+  })
+
+  describe('isCapabilityAvailable', () => {
+    it('returns false for capabilities without backend routes', () => {
+      expect(isCapabilityAvailable('realtime_voice')).toBe(false)
+      expect(isCapabilityAvailable('video_generation')).toBe(false)
+      expect(isCapabilityAvailable('reranking')).toBe(false)
+      expect(isCapabilityAvailable('adult_18plus_image')).toBe(false)
+    })
+  })
+
+  describe('resolveCapabilityRoutes — backend route guard', () => {
+    it('blocks capabilities without backend routes with specific message', () => {
+      const result = resolveCapabilityRoutes({
+        capabilities: ['realtime_voice'],
+      })
+      expect(result.routes[0].available).toBe(false)
+      expect(result.routes[0].missingMessage).toContain('Route not implemented')
+    })
+
+    it('blocks video_generation with route not implemented message', () => {
+      const result = resolveCapabilityRoutes({
+        capabilities: ['video_generation'],
+      })
+      expect(result.routes[0].available).toBe(false)
+      expect(result.routes[0].missingMessage).toContain('Route not implemented')
+    })
+
+    it('blocks reranking with route not implemented message', () => {
+      const result = resolveCapabilityRoutes({
+        capabilities: ['reranking'],
+      })
+      expect(result.routes[0].available).toBe(false)
+      expect(result.routes[0].missingMessage).toContain('Route not implemented')
+    })
+  })
+
+  describe('getDetailedCapabilityStatus', () => {
+    it('returns entries for all capability classes', () => {
+      const entries = getDetailedCapabilityStatus()
+      const allCaps = Object.keys(CAPABILITY_MAP) as CapabilityClass[]
+      expect(entries.length).toBe(allCaps.length)
+    })
+
+    it('each entry has capability, available, reason, and routeExists fields', () => {
+      const entries = getDetailedCapabilityStatus()
+      for (const entry of entries) {
+        expect(typeof entry.capability).toBe('string')
+        expect(typeof entry.available).toBe('boolean')
+        expect(typeof entry.routeExists).toBe('boolean')
+        if (!entry.available) {
+          expect(typeof entry.reason).toBe('string')
+          expect(entry.reason!.length).toBeGreaterThan(0)
+        } else {
+          expect(entry.reason).toBeNull()
+        }
+      }
+    })
+
+    it('unavailable capabilities without routes have "Route not implemented" reason', () => {
+      const entries = getDetailedCapabilityStatus()
+      const noRouteEntries = entries.filter(e => !e.routeExists)
+      for (const entry of noRouteEntries) {
+        expect(entry.available).toBe(false)
+        expect(entry.reason).toContain('Route not implemented')
+      }
+    })
+
+    it('marks realtime_voice, video_generation, reranking, adult_18plus as unavailable', () => {
+      const entries = getDetailedCapabilityStatus()
+      const mustBeUnavailable = ['realtime_voice', 'video_generation', 'reranking', 'adult_18plus_image']
+      for (const capName of mustBeUnavailable) {
+        const entry = entries.find(e => e.capability === capName)
+        expect(entry).toBeDefined()
+        expect(entry!.available).toBe(false)
+        expect(entry!.reason).toBeTruthy()
+      }
+    })
+
+    it('video_planning exists as a capability class', () => {
+      const entries = getDetailedCapabilityStatus()
+      const planning = entries.find(e => e.capability === 'video_planning')
+      expect(planning).toBeDefined()
+      expect(planning!.routeExists).toBe(true)
+    })
+
+    it('video_generation is truthfully marked unavailable (no real provider)', () => {
+      const entries = getDetailedCapabilityStatus()
+      const gen = entries.find(e => e.capability === 'video_generation')
+      expect(gen).toBeDefined()
+      expect(gen!.available).toBe(false)
+      expect(gen!.routeExists).toBe(false)
+      expect(gen!.reason).toContain('Route not implemented')
+    })
+
+    it('voice_input route exists and is truthfully tracked', () => {
+      const entries = getDetailedCapabilityStatus()
+      const stt = entries.find(e => e.capability === 'voice_input')
+      expect(stt).toBeDefined()
+      expect(stt!.routeExists).toBe(true)
+    })
+
+    it('voice_output route exists and is truthfully tracked', () => {
+      const entries = getDetailedCapabilityStatus()
+      const tts = entries.find(e => e.capability === 'voice_output')
+      expect(tts).toBeDefined()
+      expect(tts!.routeExists).toBe(true)
     })
   })
 })
@@ -535,10 +711,10 @@ describe('HuggingFace Fallback', () => {
     it('handles capability with no HF models', () => {
       const result = getHfFallback('deep_reasoning')
       expect(result.capability).toBe('deep_reasoning')
-      // deep_reasoning has no HF fallback models
-      if (!result.available) {
-        expect(result.reason).toContain('No HuggingFace fallback')
-      }
+      // deep_reasoning has no HF fallback models — result is unavailable
+      // either because HF is not configured or because no models are cataloged
+      expect(result.available).toBe(false)
+      expect(result.reason).toBeTruthy()
     })
   })
 

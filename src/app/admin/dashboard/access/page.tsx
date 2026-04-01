@@ -363,7 +363,7 @@ export default function AccessPage() {
               </li>
               <li className="flex items-center justify-between text-xs">
                 <span className="text-slate-400">Active apps</span>
-                <span className="text-white font-mono">{data.memory.appSlugs.length}</span>
+                <span className="text-white font-mono">{(data.memory.appSlugs ?? []).length}</span>
               </li>
               {data.memory.error && (
                 <li className="flex items-center gap-1.5 text-xs text-rose-400">

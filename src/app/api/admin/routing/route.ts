@@ -7,7 +7,7 @@ import {
   setProviderHealth,
   type ProviderHealthStatus,
 } from '@/lib/model-registry'
-import { getCapabilityStatus } from '@/lib/capability-engine'
+import { getDetailedCapabilityStatus } from '@/lib/capability-engine'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -56,7 +56,7 @@ export async function GET() {
 
     const allModels = getModelRegistry()
     const usableModels = getUsableModels()
-    const capabilityStatus = getCapabilityStatus()
+    const detailedCapabilities = getDetailedCapabilityStatus()
 
     // Build a summary of routing capabilities from truly usable models
     const providerSet = new Set<string>()
@@ -103,9 +103,11 @@ export async function GET() {
       }
     })
 
-    const capabilityEntries = Object.entries(capabilityStatus).map(([capability, available]) => ({
-      capability,
-      available,
+    const capabilityEntries = detailedCapabilities.map((entry) => ({
+      capability: entry.capability,
+      available: entry.available,
+      reason: entry.reason,
+      routeExists: entry.routeExists,
     }))
 
     return NextResponse.json({

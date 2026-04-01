@@ -7,7 +7,7 @@ import Link from 'next/link'
 import {
   ArrowLeft, RefreshCw, AlertCircle, CheckCircle, Clock, WifiOff,
   LayoutDashboard, Brain, BarChart3, BookOpen, Target, FileText,
-  Activity, Cpu, Users, Zap, Globe,
+  Activity, Cpu, Users, Zap, Globe, Shield,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -53,7 +53,7 @@ const HEALTH: Record<string, { color: string; icon: typeof CheckCircle; label: s
   offline:  { color: 'text-slate-500',   icon: WifiOff,     label: 'Offline' },
 }
 
-const TABS = ['Overview', 'AI Stack', 'Metrics', 'Learning', 'Strategy', 'Events'] as const
+const TABS = ['Overview', 'AI Stack', 'Metrics', 'Learning', 'Strategy', 'Events', 'Safety'] as const
 type Tab = (typeof TABS)[number]
 const TAB_ICONS: Record<Tab, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
   Overview:  LayoutDashboard,
@@ -62,6 +62,7 @@ const TAB_ICONS: Record<Tab, React.ComponentType<React.SVGProps<SVGSVGElement>>>
   Learning:  BookOpen,
   Strategy:  Target,
   Events:    FileText,
+  Safety:    Shield,
 }
 
 const fadeUp = {
@@ -263,6 +264,7 @@ export default function AppDetailPage() {
         {tab === 'Learning' && <AppLearningTab appSlug={app.slug} />}
         {tab === 'Strategy' && <StrategyTab appSlug={app.slug} appName={app.name} appCategory={app.category} />}
         {tab === 'Events' && <AppEventsTab appSlug={app.slug} />}
+        {tab === 'Safety' && <SafetyTab appSlug={app.slug} />}
       </motion.div>
     </motion.div>
   )
@@ -527,7 +529,7 @@ function StrategyTab({ appSlug, appName, appCategory }: { appSlug: string; appNa
           </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {strategy.kpis.map((kpi) => (
+          {(strategy.kpis ?? []).map((kpi) => (
             <div key={kpi.metric} className="bg-white/[0.02] rounded-lg p-4 space-y-1">
               <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">{kpi.label}</p>
               <p className="text-lg font-bold text-white">{kpi.currentValue ?? '—'} <span className="text-xs text-slate-500">{kpi.unit}</span></p>
@@ -546,7 +548,7 @@ function StrategyTab({ appSlug, appName, appCategory }: { appSlug: string; appNa
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
         <h3 className="text-sm font-semibold text-white">Goals</h3>
         <div className="space-y-3">
-          {strategy.goals.map((goal) => (
+          {(strategy.goals ?? []).map((goal) => (
             <div key={goal.id} className="flex items-center justify-between bg-white/[0.02] rounded-lg p-3">
               <div className="space-y-0.5">
                 <p className="text-sm text-white">{goal.label}</p>
@@ -568,11 +570,11 @@ function StrategyTab({ appSlug, appName, appCategory }: { appSlug: string; appNa
       </div>
 
       {/* Recommendations */}
-      {strategy.recommendations.length > 0 && (
+      {(strategy.recommendations ?? []).length > 0 && (
         <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
           <h3 className="text-sm font-semibold text-white">Recommendations</h3>
           <div className="space-y-3">
-            {strategy.recommendations.map((rec) => (
+            {(strategy.recommendations ?? []).map((rec) => (
               <div key={rec.id} className="bg-white/[0.02] rounded-lg p-4 space-y-1">
                 <div className="flex items-center gap-2">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full ${
@@ -671,11 +673,11 @@ function AppLearningTab({ appSlug }: { appSlug: string }) {
       </div>
 
       {/* Insights */}
-      {data.insights.length > 0 && (
+      {(data?.insights ?? []).length > 0 && (
         <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
           <h3 className="text-sm font-semibold text-white">Insights</h3>
           <div className="space-y-3">
-            {data.insights.map((insight) => (
+            {(data?.insights ?? []).map((insight) => (
               <div key={insight.id} className="bg-white/[0.02] rounded-lg p-4 space-y-1">
                 <p className="text-sm font-medium text-white">{insight.title}</p>
                 <p className="text-xs text-slate-400">{insight.description}</p>
@@ -790,6 +792,188 @@ function AppEventsTab({ appSlug }: { appSlug: string }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+/* ── Tab: Safety ────────────────────────────────────────── */
+
+interface SafetyConfig {
+  appSlug: string
+  safeMode: boolean
+  adultMode: boolean
+  note: string
+}
+
+function SafetyTab({ appSlug }: { appSlug: string }) {
+  const [config, setConfig] = useState<SafetyConfig | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saveMsg, setSaveMsg] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/app-safety?appSlug=${encodeURIComponent(appSlug)}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setConfig(await res.json())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load safety config')
+    } finally {
+      setLoading(false)
+    }
+  }, [appSlug])
+
+  useEffect(() => { load() }, [load])
+
+  const updateConfig = async (updates: { safeMode?: boolean; adultMode?: boolean }) => {
+    setSaving(true)
+    setSaveMsg(null)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/app-safety', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appSlug, ...updates }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error ?? 'Failed to update')
+        return
+      }
+      setConfig(json)
+      setSaveMsg('Saved')
+      setTimeout(() => setSaveMsg(null), 2000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <RefreshCw className="w-4 h-4 text-blue-400 animate-spin" />
+        <span className="ml-2 text-xs text-slate-400">Loading safety config…</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Safety Policy */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Shield className="w-4 h-4 text-blue-400" />
+          <h3 className="text-sm font-semibold text-white">Content Safety Policy</h3>
+          {saveMsg && <span className="text-[10px] text-emerald-400 ml-auto">{saveMsg}</span>}
+        </div>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-400/20 rounded-lg px-4 py-2 text-xs text-red-300">
+            {error}
+          </div>
+        )}
+
+        {/* Safe Mode Toggle */}
+        <div className="flex items-center justify-between py-3 border-b border-white/[0.06]">
+          <div>
+            <p className="text-sm text-white">Safe Mode</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              When enabled, all content passes through strict safety filters.
+            </p>
+          </div>
+          <button
+            onClick={() => updateConfig({ safeMode: !config?.safeMode })}
+            disabled={saving}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              config?.safeMode ? 'bg-emerald-500' : 'bg-slate-600'
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              config?.safeMode ? 'translate-x-6' : 'translate-x-1'
+            }`} />
+          </button>
+        </div>
+
+        {/* Adult Mode Toggle */}
+        <div className="flex items-center justify-between py-3 border-b border-white/[0.06]">
+          <div>
+            <p className="text-sm text-white">Adult Mode (18+)</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Allows lawful adult 18+ content. Requires Safe Mode OFF.
+            </p>
+            <p className="text-[10px] text-red-400/60 mt-0.5">
+              CSAM, violence, and self-harm are ALWAYS blocked.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              if (config?.safeMode && !config?.adultMode) {
+                setError('Disable Safe Mode first before enabling Adult Mode.')
+                return
+              }
+              updateConfig({ adultMode: !config?.adultMode })
+            }}
+            disabled={saving || (config?.safeMode ?? false)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              config?.adultMode ? 'bg-amber-500' : 'bg-slate-600'
+            } ${config?.safeMode ? 'opacity-40 cursor-not-allowed' : ''}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              config?.adultMode ? 'translate-x-6' : 'translate-x-1'
+            }`} />
+          </button>
+        </div>
+
+        {/* Current Status */}
+        <div className="pt-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${config?.safeMode ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <span className="text-xs text-slate-300">
+              Safe Mode: <strong>{config?.safeMode ? 'ON' : 'OFF'}</strong>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${config?.adultMode ? 'bg-amber-400' : 'bg-slate-600'}`} />
+            <span className="text-xs text-slate-300">
+              Adult Mode: <strong>{config?.adultMode ? 'ENABLED' : 'DISABLED'}</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Always-blocked content notice */}
+      <div className="bg-red-500/5 border border-red-400/10 rounded-xl p-6">
+        <h4 className="text-xs font-semibold text-red-300 uppercase tracking-wider mb-3">Always Blocked Content</h4>
+        <ul className="space-y-1.5 text-xs text-red-300/80">
+          <li>• CSAM (child sexual abuse material) — zero tolerance</li>
+          <li>• Non-consensual intimate imagery</li>
+          <li>• Violence/gore promotion or instructions</li>
+          <li>• Self-harm/suicide encouragement</li>
+          <li>• Terrorism/extremism content</li>
+          <li>• Any illegal content under applicable law</li>
+        </ul>
+        <p className="mt-3 text-[10px] text-slate-500">
+          These categories are blocked regardless of Safe Mode or Adult Mode settings. No exceptions.
+        </p>
+      </div>
+
+      {/* Capability status */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6">
+        <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Adult 18+ Image Capability</h4>
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-red-400" />
+          <span className="text-xs text-slate-300">UNAVAILABLE — No reliable provider supports unrestricted adult content generation.</span>
+        </div>
+        <p className="mt-2 text-[10px] text-slate-500">
+          Even with Adult Mode enabled, image generation for adult content requires a provider that supports it.
+          Currently no registered provider meets this requirement. This is truthful — we do not fake availability.
+        </p>
+      </div>
     </div>
   )
 }

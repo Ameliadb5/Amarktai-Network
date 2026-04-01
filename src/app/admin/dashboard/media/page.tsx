@@ -95,10 +95,10 @@ export default function MediaPage() {
       {/* Stats strip */}
       <motion.div variants={fadeUp} className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Modalities', value: data?.stats.availableModalities ?? 0 },
-          { label: 'Active Routes', value: data?.stats.activeRoutes ?? 0 },
-          { label: 'Providers', value: data?.stats.supportedProviders ?? 0 },
-          { label: 'Requests', value: data?.stats.requestVolume ?? 0 },
+          { label: 'Modalities', value: data?.stats?.availableModalities ?? 0 },
+          { label: 'Active Routes', value: data?.stats?.activeRoutes ?? 0 },
+          { label: 'Providers', value: data?.stats?.supportedProviders ?? 0 },
+          { label: 'Requests', value: data?.stats?.requestVolume ?? 0 },
         ].map((s) => (
           <div key={s.label} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">{s.label}</p>
@@ -139,7 +139,7 @@ export default function MediaPage() {
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono mb-1">Providers</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {cap.providers.length > 0 ? cap.providers.map((p) => (
+                      {(cap.providers ?? []).length > 0 ? (cap.providers ?? []).map((p) => (
                         <span key={p} className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">{p}</span>
                       )) : <span className="text-xs text-slate-600">None connected</span>}
                     </div>
@@ -147,7 +147,7 @@ export default function MediaPage() {
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono mb-1">Models</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {cap.models.length > 0 ? cap.models.map((m) => (
+                      {(cap.models ?? []).length > 0 ? (cap.models ?? []).map((m) => (
                         <span key={m} className="text-xs px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-300 border border-white/[0.06]">{m}</span>
                       )) : <span className="text-xs text-slate-600">No models</span>}
                     </div>
@@ -211,8 +211,8 @@ export default function MediaPage() {
                     <tr key={c.modality}>
                       <td className="py-3 pr-4 text-white font-medium capitalize">{c.modality}</td>
                       <td className={`py-3 pr-4 ${st.color}`}>{st.label}</td>
-                      <td className="py-3 pr-4 text-slate-400">{c.providers.join(', ') || '—'}</td>
-                      <td className="py-3 text-slate-400">{c.models.length}</td>
+                      <td className="py-3 pr-4 text-slate-400">{(c.providers ?? []).join(', ') || '—'}</td>
+                      <td className="py-3 text-slate-400">{(c.models ?? []).length}</td>
                     </tr>
                   )
                 })}
