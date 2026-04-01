@@ -116,6 +116,9 @@ export interface ModelEntry {
   /** Can plan or decompose video-production workflows. */
   supports_video_planning: boolean;
 
+  /** Can transcribe speech / audio to text (STT). */
+  supports_stt?: boolean;
+
   /** Can generate speech / audio from text (TTS). */
   supports_tts?: boolean;
 
@@ -836,6 +839,138 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     fallback_priority: 2,
     validator_eligible: false,
     specialist_domains: ['voice', 'tts', 'friends', 'travel', 'marketing', 'secure'],
+  },
+
+  // ── OpenAI — speech-to-text ─────────────────────────────────────────────
+
+  {
+    provider: 'openai',
+    provider_tier: 'premium',
+    model_id: 'whisper-1',
+    model_name: 'Whisper-1',
+    family: 'Whisper',
+    primary_role: 'voice_interaction',
+    secondary_roles: [],
+    supports_chat: false,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: true,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_stt: true,
+    supports_voice_interaction: true,
+    supports_agent_planning: false,
+    context_window: 25_000, // ~30 min audio at whisper rates
+    latency_tier: 'medium',
+    cost_tier: 'medium',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 1,
+    validator_eligible: false,
+    specialist_domains: ['voice', 'stt', 'transcription', 'multilingual'],
+  },
+
+  // ── Groq — speech-to-text (low cost) ────────────────────────────────────
+
+  {
+    provider: 'groq',
+    provider_tier: 'backbone',
+    model_id: 'whisper-large-v3',
+    model_name: 'Whisper Large v3 (Groq)',
+    family: 'Whisper',
+    primary_role: 'voice_interaction',
+    secondary_roles: [],
+    supports_chat: false,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: true,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_stt: true,
+    supports_voice_interaction: true,
+    supports_agent_planning: false,
+    context_window: 25_000, // ~30 min audio at whisper rates
+    latency_tier: 'ultra_low',
+    cost_tier: 'very_low',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 1,
+    validator_eligible: false,
+    specialist_domains: ['voice', 'stt', 'transcription', 'multilingual'],
+  },
+  {
+    provider: 'groq',
+    provider_tier: 'backbone',
+    model_id: 'distil-whisper-large-v3-en',
+    model_name: 'Distil-Whisper Large v3 EN (Groq)',
+    family: 'Whisper',
+    primary_role: 'voice_interaction',
+    secondary_roles: [],
+    supports_chat: false,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: false,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_stt: true,
+    supports_voice_interaction: true,
+    supports_agent_planning: false,
+    context_window: 25_000, // ~30 min audio at whisper rates
+    latency_tier: 'ultra_low',
+    cost_tier: 'free',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 2,
+    validator_eligible: false,
+    specialist_domains: ['voice', 'stt', 'transcription', 'english'],
+  },
+
+  // ── Groq — text-to-speech (low cost) ────────────────────────────────────
+
+  {
+    provider: 'groq',
+    provider_tier: 'backbone',
+    model_id: 'playai-tts',
+    model_name: 'PlayAI TTS (Groq)',
+    family: 'PlayAI',
+    primary_role: 'tts',
+    secondary_roles: [],
+    supports_chat: false,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: true,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_tts: true,
+    supports_agent_planning: false,
+    context_window: 4_096,
+    latency_tier: 'ultra_low',
+    cost_tier: 'very_low',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 1,
+    validator_eligible: false,
+    specialist_domains: ['voice', 'tts', 'fast_tts'],
   },
 
   // ── Gemini (Google) ───────────────────────────────────────────────────────

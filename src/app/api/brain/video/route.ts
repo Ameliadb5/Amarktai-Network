@@ -112,35 +112,29 @@ export async function POST(request: NextRequest) {
       : decomposeScriptToScenes(script, duration, style)
 
     // Check for provider API keys
-    // Video generation can use multiple providers: Runway, Pika, Stability AI, etc.
+    // Video generation requires a real provider — never fake success
+    const geminiKey = process.env.GEMINI_API_KEY;
     const runwayKey = process.env.RUNWAY_API_KEY;
-    const openaiKey = process.env.OPENAI_API_KEY;
     const pikaKey = process.env.PIKA_API_KEY;
     const stabilityKey = process.env.STABILITY_API_KEY;
 
-    if (!runwayKey && !openaiKey && !pikaKey && !stabilityKey) {
-      // Return a stub response when no video provider key is configured
+    if (!geminiKey && !runwayKey && !pikaKey && !stabilityKey) {
+      // STRICT: Return error (not stub) — no video generation provider configured
       return NextResponse.json({
-        status: 'stub',
-        message: 'Video generation endpoint is available but no video provider API key is configured. Set RUNWAY_API_KEY, PIKA_API_KEY, STABILITY_API_KEY, or OPENAI_API_KEY.',
-        params: {
-          script: script.slice(0, 200),
-          style,
-          duration,
-          aspectRatio,
-        },
+        error: 'No video generation provider configured. Set GEMINI_API_KEY (Veo), RUNWAY_API_KEY, PIKA_API_KEY, or STABILITY_API_KEY to enable video generation.',
+        executed: false,
+        capability: 'video_generation',
+        fallback_used: false,
         scenes,
-        supportedProviders: ['runway', 'pika', 'stability-ai', 'openai-sora'],
-        supportedStyles: validStyles,
-      });
+      }, { status: 503 });
     }
 
     // ── Determine best provider ──────────────────────────────────────
     const providerPriority = [
+      { key: 'gemini-veo', available: !!geminiKey },
       { key: 'runway', available: !!runwayKey },
       { key: 'pika', available: !!pikaKey },
       { key: 'stability-ai', available: !!stabilityKey },
-      { key: 'openai-sora', available: !!openaiKey },
     ]
     const provider = providerPriority.find(p => p.available)?.key ?? 'unknown'
 
@@ -149,8 +143,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       status: 'submitted',
+      executed: true,
       jobId,
       provider,
+      capability: 'video_generation',
+      fallback_used: false,
       message: 'Video generation job submitted. Poll for status using the jobId.',
       params: {
         script: script.slice(0, 200),
@@ -163,7 +160,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     return NextResponse.json(
-      { error: 'Internal server error', detail: String(err) },
+      { error: 'Internal server error', detail: String(err), executed: false },
       { status: 500 },
     );
   }

@@ -39,6 +39,7 @@ export type CapabilityClass =
   | 'multimodal_understanding'
   | 'image_generation'
   | 'image_editing'
+  | 'video_planning'
   | 'video_generation'
   | 'voice_input'
   | 'voice_output'
@@ -132,22 +133,27 @@ const CAPABILITY_MAP: Record<CapabilityClass, CapabilityRequirement> = {
     label: 'image editing',
     suggestedProviders: ['openai', 'huggingface'],
   },
+  video_planning: {
+    anyCapabilityFlag: ['supports_video_planning', 'supports_chat'],
+    label: 'video planning / storyboarding',
+    suggestedProviders: ['gemini', 'openai', 'deepseek'],
+  },
   video_generation: {
     anyCapabilityFlag: ['supports_video_planning'],
     label: 'video generation',
-    suggestedProviders: ['openai', 'huggingface'],
+    suggestedProviders: ['gemini'],
   },
   voice_input: {
-    anyCapabilityFlag: ['supports_voice_interaction'],
+    anyCapabilityFlag: ['supports_stt', 'supports_voice_interaction'],
     anyRole: ['voice_interaction'],
     label: 'voice / speech input (STT)',
-    suggestedProviders: ['openai', 'huggingface'],
+    suggestedProviders: ['groq', 'openai'],
   },
   voice_output: {
     anyCapabilityFlag: ['supports_tts'],
     anyRole: ['tts'],
     label: 'voice / speech output (TTS)',
-    suggestedProviders: ['openai', 'huggingface'],
+    suggestedProviders: ['groq', 'openai'],
   },
   realtime_voice: {
     anyCapabilityFlag: ['supports_voice_interaction'],
@@ -191,7 +197,8 @@ const CLASSIFICATION_RULES: Array<{
 }> = [
   { patterns: [/image.*generat/i, /generate.*image/i, /create.*image/i, /dall-?e/i, /picture/i], capabilities: ['image_generation'] },
   { patterns: [/image.*edit/i, /edit.*image/i, /modify.*image/i, /inpaint/i], capabilities: ['image_editing'] },
-  { patterns: [/video.*generat/i, /generate.*video/i, /create.*video/i, /reel/i, /animation/i], capabilities: ['video_generation'] },
+  { patterns: [/video.*generat/i, /generate.*video/i, /create.*video/i], capabilities: ['video_generation'] },
+  { patterns: [/video.*plan/i, /plan.*video/i, /storyboard/i, /scene.*decompos/i, /reel/i, /animation/i, /video.*script/i], capabilities: ['video_planning'] },
   { patterns: [/voice.*input/i, /speech.*text/i, /stt/i, /transcri/i, /whisper/i], capabilities: ['voice_input'] },
   { patterns: [/voice.*output/i, /text.*speech/i, /tts/i, /speak/i, /narrat/i], capabilities: ['voice_output'] },
   { patterns: [/realtime.*voice/i, /voice.*chat/i, /live.*voice/i], capabilities: ['realtime_voice'] },
@@ -452,9 +459,10 @@ const BACKEND_ROUTE_EXISTS: Record<CapabilityClass, boolean> = {
   multimodal_understanding:  true,   // /api/brain/request (multimodal_chain)
   image_generation:          true,   // /api/brain/request (DALL-E / FLUX)
   image_editing:             true,   // /api/brain/request (DALL-E)
-  video_generation:          false,  // /api/brain/video is stub pipeline only
-  voice_input:               true,   // /api/brain/stt (OpenAI Whisper)
-  voice_output:              true,   // /api/brain/tts (OpenAI TTS)
+  video_planning:            true,   // /api/brain/request (AI text — always possible via chat models)
+  video_generation:          false,  // no real video generation provider wired — stub only
+  voice_input:               true,   // /api/brain/stt + /api/voice/stt (Groq Whisper / OpenAI Whisper)
+  voice_output:              true,   // /api/brain/tts + /api/voice/tts (Groq PlayAI / OpenAI TTS)
   realtime_voice:            false,  // no WebSocket / realtime voice endpoint
   adult_18plus_image:        false,  // no provider reliably supports unrestricted adult content
   moderation:                true,   // /api/brain/request (OpenAI moderation)
