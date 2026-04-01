@@ -532,7 +532,7 @@ function buildMissingMessage(
 
 export function isCapabilityAvailable(cap: CapabilityClass): boolean {
   // Fast-path: if no backend route exists, capability is never available
-  if (!BACKEND_ROUTE_EXISTS[cap]) return false;
+  if (!(cap in BACKEND_ROUTE_EXISTS) || !BACKEND_ROUTE_EXISTS[cap]) return false;
   const result = resolveCapabilityRoutes({ capabilities: [cap] });
   return result.allSatisfied;
 }

@@ -7,7 +7,6 @@ import { orchestrate } from '@/lib/orchestrator'
 import {
   classifyCapabilities,
   resolveCapabilityRoutes,
-  type CapabilityClass,
 } from '@/lib/capability-engine'
 
 const testSchema = z.object({
@@ -45,13 +44,13 @@ export async function POST(request: NextRequest) {
   const capabilities = classifyCapabilities(body.taskType, body.message)
 
   // Step 2: Resolve capability routes to check availability
-  const capabilityRoutes = resolveCapabilityRoutes({ capabilities: capabilities as CapabilityClass[] })
+  const capabilityRoutes = resolveCapabilityRoutes({ capabilities })
   const unavailable = capabilityRoutes.routes.filter(r => !r.available)
 
   // If required capabilities are unavailable and no direct provider override, return error
   if (unavailable.length > 0 && !body.providerKey) {
     const latencyMs = Date.now() - start
-    const reasons = unavailable.map(r => r.missingMessage).filter(Boolean)
+    const reasons = unavailable.map(r => r.missingMessage ?? 'Capability unavailable').filter(Boolean)
     return NextResponse.json(
       {
         success: false,

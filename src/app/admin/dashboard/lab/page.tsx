@@ -128,7 +128,7 @@ export default function LabPage() {
       // Throw for network-level errors that have no usable routing metadata.
       // When the response contains routedProvider or capability data (even on 4xx/5xx),
       // we still render the routing decision panel rather than just showing a generic error.
-      if (!res.ok && data.routedProvider == null && !data.capability) {
+      if (!res.ok && data.routedProvider == null && !(Array.isArray(data.capability) && data.capability.length > 0)) {
         throw new Error(data.error || `HTTP ${res.status}`)
       }
       setResult({

@@ -19,7 +19,6 @@ import {
   CAPABILITY_MAP,
   BACKEND_ROUTE_EXISTS,
   type CapabilityClass,
-  type CapabilityStatusEntry,
 } from '../capability-engine'
 import {
   initializeStrategy,
