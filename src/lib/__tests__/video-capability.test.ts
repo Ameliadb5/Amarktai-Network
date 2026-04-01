@@ -51,7 +51,7 @@ describe('Video Planning Truth', () => {
   it('video_planning models exist with supports_video_planning flag', () => {
     const all = getModelRegistry()
     const planningModels = all.filter((m) => 'supports_video_planning' in m && m.supports_video_planning)
-    expect(planningModels.length).toBeGreaterThanOrEqual(4) // Gemini 1.5 Pro, 2.5 Pro, 2.0 Flash, 2.5 Flash, GPT-4o, o4-mini
+    expect(planningModels.length).toBeGreaterThanOrEqual(6) // GPT-4o, o4-mini, Gemini 1.5 Pro, 2.0 Flash, 2.5 Pro, 2.5 Flash
   })
 
   it('video_planning models span multiple providers', () => {
@@ -73,7 +73,7 @@ describe('Video Planning Truth', () => {
   it('Gemini models with video planning have specialist domain flag', () => {
     const gemini = getModelsByProvider('gemini')
     const planningModels = gemini.filter((m) => 'supports_video_planning' in m && m.supports_video_planning)
-    expect(planningModels.length).toBeGreaterThanOrEqual(2) // 1.5 Pro, 2.5 Pro, + 2.0 Flash, 2.5 Flash
+    expect(planningModels.length).toBeGreaterThanOrEqual(4) // 1.5 Pro, 2.5 Pro, 2.0 Flash, 2.5 Flash
   })
 
   it('OpenAI models with video planning include GPT-4o', () => {
