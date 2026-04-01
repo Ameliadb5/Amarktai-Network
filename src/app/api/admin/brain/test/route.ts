@@ -8,11 +8,13 @@ import {
   classifyCapabilities,
   resolveCapabilityRoutes,
 } from '@/lib/capability-engine'
+import { getAppSafetyConfig } from '@/lib/content-filter'
 
 const testSchema = z.object({
   message: z.string().min(1).max(16_000),
   taskType: z.string().default('chat'),
   providerKey: z.string().optional(), // override routing if specified
+  appSlug: z.string().optional(),     // app context for safety/adult mode
 })
 
 /**
@@ -44,7 +46,13 @@ export async function POST(request: NextRequest) {
   const capabilities = classifyCapabilities(body.taskType, body.message)
 
   // Step 2: Resolve capability routes to check availability
-  const capabilityRoutes = resolveCapabilityRoutes({ capabilities })
+  // Pass adult mode flag from app safety config if app context provided
+  const safetyConfig = body.appSlug ? getAppSafetyConfig(body.appSlug) : undefined
+  const capabilityRoutes = resolveCapabilityRoutes({
+    capabilities,
+    adultMode: safetyConfig?.adultMode,
+    safeMode: safetyConfig?.safeMode,
+  })
   const unavailable = capabilityRoutes.routes.filter(r => !r.available)
 
   // If required capabilities are unavailable and no direct provider override, return error

@@ -300,20 +300,40 @@ function LearningTab({ data }: { data: unknown }) {
 
 /* ── agents tab ────────────────────────────────────────────── */
 
-interface AgentEntry { id?: string; name?: string; type?: string; description?: string; capabilities?: string[]; status?: string }
+interface AgentEntry {
+  id?: string; name?: string; type?: string; description?: string; capabilities?: string[];
+  readiness?: 'READY' | 'PARTIAL' | 'NOT_CONNECTED'; auditReasons?: string[];
+  defaultProvider?: string; defaultModel?: string; providerHealth?: string;
+  providerCallable?: boolean; providerRegistered?: boolean; modelExists?: boolean;
+  canHandoff?: string[]; memoryEnabled?: boolean;
+}
 interface AgentStatus { configuredAgents?: number; runningTasks?: number; completedTasks?: number; failedTasks?: number; totalTasks?: number }
+interface AuditSummary { total?: number; ready?: number; partial?: number; notConnected?: number; auditedAt?: string }
+
+const READINESS_STYLE: Record<string, { dot: string; label: string; text: string }> = {
+  READY:         { dot: 'bg-emerald-400', label: 'Ready',         text: 'text-emerald-400' },
+  PARTIAL:       { dot: 'bg-amber-400',   label: 'Partial',       text: 'text-amber-400' },
+  NOT_CONNECTED: { dot: 'bg-red-400',     label: 'Not Connected', text: 'text-red-400' },
+}
 
 function AgentsTab({ data }: { data: unknown }) {
-  const d = data as { agents?: AgentEntry[]; status?: AgentStatus } | null
+  const d = data as { agents?: AgentEntry[]; status?: AgentStatus; audit?: AuditSummary } | null
   const agents = d?.agents ?? []
   const status = d?.status
+  const audit = d?.audit
 
   if (!agents.length) {
     return <Placeholder icon={Cpu} message="No agents configured." />
   }
 
+  const auditStats = audit ? [
+    { label: 'Total', value: audit.total ?? agents.length },
+    { label: 'Ready', value: audit.ready ?? 0, color: 'text-emerald-400' },
+    { label: 'Partial', value: audit.partial ?? 0, color: 'text-amber-400' },
+    { label: 'Not Connected', value: audit.notConnected ?? 0, color: 'text-red-400' },
+  ] : null
+
   const runtimeStats = status ? [
-    { label: 'Configured', value: status.configuredAgents ?? agents.length },
     { label: 'Running', value: status.runningTasks ?? 0 },
     { label: 'Completed', value: status.completedTasks ?? 0 },
     { label: 'Failed', value: status.failedTasks ?? 0 },
@@ -322,8 +342,21 @@ function AgentsTab({ data }: { data: unknown }) {
 
   return (
     <div className="space-y-4">
+      {/* Audit summary */}
+      {auditStats && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {auditStats.map((s, i) => (
+            <motion.div key={s.label} className={INNER} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+              <p className="text-[11px] uppercase tracking-wider text-white/30">{s.label}</p>
+              <p className={`mt-1 text-xl font-semibold ${'color' in s ? s.color : 'text-white/90'}`}>{s.value}</p>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Runtime stats */}
       {runtimeStats && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {runtimeStats.map((s, i) => (
             <motion.div key={s.label} className={INNER} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
               <p className="text-[11px] uppercase tracking-wider text-white/30">{s.label}</p>
@@ -333,32 +366,63 @@ function AgentsTab({ data }: { data: unknown }) {
         </div>
       )}
 
+      {/* Agent cards with real readiness status */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {agents.map((a, i) => (
-          <motion.div key={a.id ?? i} className={`${CARD} p-5`}
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-            <div className="flex items-start gap-3">
-              <Bot className="mt-0.5 h-5 w-5 shrink-0 text-blue-400/60" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-white/80 truncate">{a.name ?? `Agent ${i + 1}`}</p>
-                  <StatusDot color={a.status === 'active' || a.status === 'running' ? 'bg-emerald-400' : 'bg-white/20'} />
-                </div>
-                <p className="text-xs text-white/30">{a.type ?? 'general'}</p>
-                {a.description && <p className="mt-2 text-xs text-white/40 line-clamp-2">{a.description}</p>}
-                {a.capabilities && a.capabilities.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {a.capabilities.map(cap => (
-                      <span key={cap} className="rounded-md bg-blue-500/10 border border-blue-400/20 px-2 py-0.5 text-[10px] text-blue-300/80">
-                        {cap}
-                      </span>
-                    ))}
+        {agents.map((a, i) => {
+          const style = READINESS_STYLE[a.readiness ?? 'NOT_CONNECTED'] ?? READINESS_STYLE.NOT_CONNECTED
+          return (
+            <motion.div key={a.id ?? i} className={`${CARD} p-5`}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+              <div className="flex items-start gap-3">
+                <Bot className="mt-0.5 h-5 w-5 shrink-0 text-blue-400/60" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-white/80 truncate">{a.name ?? `Agent ${i + 1}`}</p>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${style.text} bg-white/[0.04]`}>
+                      <span className={`inline-block h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                      {style.label}
+                    </span>
                   </div>
-                )}
+                  <p className="text-xs text-white/30">{a.type ?? 'general'}</p>
+
+                  {/* Provider / model info */}
+                  <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-white/30">
+                    {a.defaultProvider && (
+                      <span className="flex items-center gap-1">
+                        <Cpu className="h-3 w-3" /> {a.defaultProvider}
+                        {a.providerCallable === false && <span className="text-red-400">(no call impl)</span>}
+                      </span>
+                    )}
+                    {a.defaultModel && (
+                      <span>{a.defaultModel}{a.modelExists === false ? ' ⚠' : ''}</span>
+                    )}
+                  </div>
+
+                  {a.description && <p className="mt-2 text-xs text-white/40 line-clamp-2">{a.description}</p>}
+
+                  {/* Audit reasons (shown for non-READY) */}
+                  {a.readiness !== 'READY' && a.auditReasons && a.auditReasons.length > 0 && (
+                    <div className="mt-2 space-y-0.5">
+                      {a.auditReasons.map((r, ri) => (
+                        <p key={ri} className="text-[10px] text-amber-300/60">⚠ {r}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {a.capabilities && a.capabilities.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {a.capabilities.map(cap => (
+                        <span key={cap} className="rounded-md bg-blue-500/10 border border-blue-400/20 px-2 py-0.5 text-[10px] text-blue-300/80">
+                          {cap}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          )
+        })}
       </div>
     </div>
   )
