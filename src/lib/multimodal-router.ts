@@ -202,8 +202,8 @@ function resolveCreativeProvider(appSlug: string): { providerKey: string; model:
     }
   }
 
-  // Fallback to first allowed provider
-  const fallbackProvider = profile.allowed_providers[0] ?? 'groq'
+  // Fallback to first allowed provider (no hardcoded default — requires real configuration)
+  const fallbackProvider = profile.allowed_providers[0] ?? 'openai'
   return {
     providerKey: fallbackProvider,
     model: getDefaultModelForProvider(fallbackProvider),

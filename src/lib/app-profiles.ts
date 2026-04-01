@@ -370,8 +370,8 @@ export const DEFAULT_APP_PROFILES: ReadonlyMap<string, AppProfile> = new Map<str
     escalation_rules: [{
       when_complexity: ['complex'],
       when_task_types: ['health', 'diagnosis', 'recommendation', 'report'],
-      escalate_to_provider: 'groq',
-      escalate_to_model: 'llama-3.3-70b-versatile',
+      escalate_to_provider: 'deepseek',
+      escalate_to_model: 'deepseek-chat',
     }],
     validator_rules: [{
       when_task_types: ['health', 'diagnosis'],

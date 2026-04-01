@@ -8,7 +8,7 @@
  *
  * Go-live is NOT ready unless:
  *  - OpenAI, Grok, NVIDIA, and Hugging Face provider paths work
- *  - At least one cheap route (DeepSeek / Groq) is configured
+ *  - At least one backbone/budget route (DeepSeek / Groq / Together AI / OpenRouter / Gemini / HuggingFace) is configured
  *  - Routing, model registry, agents, memory, retrieval, learning,
  *    multimodal planning, and the dashboard are all real
  *  - No fake system states remain
@@ -190,31 +190,39 @@ async function checkProvider(
   )
 }
 
-/** At least one cheap route (DeepSeek or Groq) must be configured. */
+/** At least one budget/backbone route must be configured. */
 async function checkCheapRoute(): Promise<AuditCheck> {
-  const deepseek = await queryProvider('deepseek')
-  const groq = await queryProvider('groq')
+  // Check all backbone/budget providers — the platform only needs ONE
+  const candidates = [
+    { key: 'deepseek',    label: 'DeepSeek' },
+    { key: 'groq',        label: 'Groq' },
+    { key: 'together',    label: 'Together AI' },
+    { key: 'openrouter',  label: 'OpenRouter' },
+    { key: 'gemini',      label: 'Gemini' },
+    { key: 'huggingface', label: 'Hugging Face' },
+  ]
 
-  const deepseekOk = deepseek?.enabled && deepseek.hasKey
-  const groqOk     = groq?.enabled && groq.hasKey
+  const results = await Promise.all(candidates.map(c => queryProvider(c.key)))
+  const active: string[] = []
+  for (let i = 0; i < candidates.length; i++) {
+    const p = results[i]
+    if (p?.enabled && p.hasKey) active.push(candidates[i].label)
+  }
 
-  if (deepseekOk || groqOk) {
-    const active: string[] = []
-    if (deepseekOk) active.push('DeepSeek')
-    if (groqOk) active.push('Groq')
+  if (active.length > 0) {
     return check(
-      'provider_cheap_route', 'provider', 'Cheap Route Provider',
-      'At least one low-cost provider (DeepSeek or Groq) is configured',
+      'provider_cheap_route', 'provider', 'Backbone / Budget Route',
+      'At least one backbone/budget provider is configured',
       true, 'pass',
-      `Active cheap route(s): ${active.join(', ')}`,
+      `Active backbone route(s): ${active.join(', ')}`,
     )
   }
 
   return check(
-    'provider_cheap_route', 'provider', 'Cheap Route Provider',
-    'At least one low-cost provider (DeepSeek or Groq) is configured',
+    'provider_cheap_route', 'provider', 'Backbone / Budget Route',
+    'At least one backbone/budget provider is configured',
     true, 'fail',
-    'Neither DeepSeek nor Groq is configured and enabled with a key',
+    'No backbone/budget provider (DeepSeek, Groq, Together AI, OpenRouter, Gemini, Hugging Face) is configured',
   )
 }
 

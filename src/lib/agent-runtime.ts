@@ -300,8 +300,8 @@ const AGENT_DEFINITIONS: ReadonlyMap<AgentType, AgentDefinition> = new Map<Agent
       requiredPermissions: ['agent:support_community'],
       canHandoff: ['security', 'validator'],
       memoryEnabled: true,
-      defaultProvider: 'groq',
-      defaultModel: 'llama-3.3-70b-versatile',
+      defaultProvider: 'openai',
+      defaultModel: 'gpt-4o-mini',
     },
   ],
   [

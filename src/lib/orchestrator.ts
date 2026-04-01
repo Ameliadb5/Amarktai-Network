@@ -35,7 +35,12 @@
 
 import { callProvider, type ProviderCallResult } from '@/lib/brain'
 import { prisma } from '@/lib/prisma'
-import { getDefaultModelForProvider } from '@/lib/model-registry'
+import {
+  getDefaultModelForProvider,
+  getModelRegistry,
+  setProviderHealth,
+  type ProviderHealthStatus,
+} from '@/lib/model-registry'
 import { routeRequest, type RoutingDecision } from '@/lib/routing-engine'
 import { createAgentTask, executeAgent, handoffTask, isAgentPermitted } from '@/lib/agent-runtime'
 import { retrieve, type RetrievalResult } from '@/lib/retrieval-engine'
@@ -213,6 +218,34 @@ async function loadAvailableProviders(): Promise<AvailableProvider[]> {
       healthStatus: p.healthStatus,
       isHealthy: p.healthStatus === 'healthy',
     }))
+}
+
+/**
+ * Sync the model-registry provider health cache from DB-loaded providers.
+ *
+ * IMPORTANT: This **must** be called before any call to `routeRequest()` or
+ * `decideExecution()` so that `getUsableModels()` / `isProviderUsable()` return
+ * results that reflect actual DB configuration rather than the static registry
+ * defaults (which mark every known model as enabled/configured).
+ *
+ * Marks each DB-configured provider with its real health status, and marks
+ * every other known provider key (from the static registry) as 'unconfigured'.
+ */
+function syncProviderHealthCache(available: AvailableProvider[]): void {
+  const configuredKeys = new Set(available.map(p => p.providerKey))
+
+  // Mark configured providers with their real DB health status
+  for (const p of available) {
+    setProviderHealth(p.providerKey, p.healthStatus as ProviderHealthStatus)
+  }
+
+  // Mark all other known provider keys as unconfigured
+  const allProviderKeys = new Set(getModelRegistry().map(m => m.provider))
+  for (const key of Array.from(allProviderKeys)) {
+    if (!configuredKeys.has(key)) {
+      setProviderHealth(key, 'unconfigured')
+    }
+  }
 }
 
 // ── Decision Engine (delegates to routing-engine) ─────────────────────────────
@@ -414,6 +447,8 @@ export interface OrchestrationResult {
   errors: string[]
   latencyMs: number
   classification: ClassificationResult
+  /** Human-readable explanation of why this provider/model was chosen. */
+  routingReason?: string
 }
 
 /**
@@ -435,7 +470,13 @@ export async function orchestrate(opts: {
   // 1. Classify
   const classification = classifyTask(appCategory, taskType, message)
 
-  // 2. Build routing context with signal detection
+  // 2. Load DB providers FIRST and sync the model-registry health cache so that
+  //    getUsableModels() / isProviderUsable() reflect real configured state before
+  //    any routing decision is made.
+  const available = await loadAvailableProviders()
+  syncProviderHealthCache(available)
+
+  // 3. Build routing context with signal detection
   const isMultimodal = detectMultimodal(appCategory, taskType)
   const isRetrieval = detectRetrieval(taskType, message)
 
@@ -449,13 +490,10 @@ export async function orchestrate(opts: {
     requiresMultimodal: isMultimodal,
   }
 
-  // 3. Route via the routing-engine (single source of truth)
+  // 4. Route via the routing-engine (now health-aware — only configured providers considered)
   const routingDecision = routeRequest(routingCtx)
 
-  // 4. Also load DB providers for fallback
-  const available = await loadAvailableProviders()
-
-  // 5. Build decision from routing-engine result
+  // 5. Build decision from routing-engine result (also uses health-aware cache internally)
   const decision = await decideExecution(classification, available, appSlug)
 
   // Override the execution mode with the routing engine's mode when it returns valid models
@@ -484,6 +522,7 @@ export async function orchestrate(opts: {
       errors: ['No AI provider is available — all providers are unconfigured or disabled'],
       latencyMs: Date.now() - start,
       classification,
+      routingReason: decision.reason,
     }
   }
 
