@@ -338,15 +338,15 @@ describe('Agent Readiness After Provider Upgrades', () => {
  * ================================================================ */
 
 describe('Capability Map — No Fake Badges', () => {
-  it('all 23 capabilities are in BACKEND_ROUTE_EXISTS', () => {
+  it('all 26 capabilities are in BACKEND_ROUTE_EXISTS', () => {
     const caps = Object.keys(BACKEND_ROUTE_EXISTS)
-    expect(caps.length).toBe(23)
+    expect(caps.length).toBe(26)
   })
 
-  it('exactly 19 capabilities have backend routes', () => {
+  it('exactly 22 capabilities have backend routes', () => {
     const available = Object.entries(BACKEND_ROUTE_EXISTS)
       .filter(([, v]) => v === true)
-    expect(available.length).toBe(19)
+    expect(available.length).toBe(22)
   })
 
   it('exactly 4 capabilities have no backend route', () => {
@@ -364,7 +364,7 @@ describe('Capability Map — No Fake Badges', () => {
 
   it('getDetailedCapabilityStatus returns status for all capabilities', () => {
     const status = getDetailedCapabilityStatus()
-    expect(status.length).toBe(23)
+    expect(status.length).toBe(26)
     for (const entry of status) {
       expect(typeof entry.available).toBe('boolean')
       expect(typeof entry.routeExists).toBe('boolean')

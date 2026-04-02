@@ -29,6 +29,13 @@ const HF_FALLBACK_MODELS: Partial<Record<CapabilityClass, HfFallbackSpec[]>> = {
     { model: 'stabilityai/stable-diffusion-xl-base-1.0', label: 'SDXL Base', notes: 'High-quality general image generation' },
     { model: 'runwayml/stable-diffusion-v1-5', label: 'SD v1.5', notes: 'Fast and reliable image generation' },
   ],
+  // suggestive_image_generation uses safe-prompt-enforced diffusion models.
+  // Prompts are validated and sanitized by validateSuggestivePrompt() before
+  // being sent to any provider. No nudity or explicit content is allowed.
+  suggestive_image_generation: [
+    { model: 'stabilityai/stable-diffusion-xl-base-1.0', label: 'SDXL Base', notes: 'Fashion/lifestyle image generation with safe-prompt enforcement' },
+    { model: 'stabilityai/stable-diffusion-2-1', label: 'SD 2.1', notes: 'Reliable fallback with controlled prompts' },
+  ],
   embeddings: [
     { model: 'sentence-transformers/all-MiniLM-L6-v2', label: 'MiniLM-L6', notes: 'Fast sentence embeddings' },
     { model: 'BAAI/bge-base-en-v1.5', label: 'BGE Base', notes: 'High-quality embeddings' },
