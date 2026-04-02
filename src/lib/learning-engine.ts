@@ -39,6 +39,18 @@ export interface ProviderPerformance {
   failureCount: number
   lastSuccess: Date | null
   lastFailure: Date | null
+  /**
+   * True when the sample size is too small to draw reliable conclusions.
+   * Operators should treat metrics with low_sample=true as indicative only.
+   */
+  lowSample: boolean
+  /**
+   * True when this provider's recorded traffic is exclusively from internal
+   * admin/lab contexts (app slugs starting with `__`).
+   * Metrics from internal-only traffic should not be extrapolated to
+   * represent production performance.
+   */
+  internalOnly: boolean
 }
 
 export interface AppLearningState {
@@ -112,11 +124,27 @@ export async function logRouteOutcome(outcome: RouteOutcome): Promise<boolean> {
 
 // ── Provider Performance ─────────────────────────────────────────────
 
+/** App slugs that represent internal admin/lab contexts rather than production apps. */
+const INTERNAL_APP_SLUG_PREFIXES = ['__']
+
+/**
+ * Returns true when the given app slug belongs to an internal/admin context.
+ * Internal traffic should not be treated as representative of production usage.
+ */
+export function isInternalAppSlug(appSlug: string): boolean {
+  return INTERNAL_APP_SLUG_PREFIXES.some(prefix => appSlug.startsWith(prefix))
+}
+
+/** Minimum request count required before performance metrics are considered reliable. */
+const LOW_SAMPLE_THRESHOLD = 10
+
 /**
  * Compute real provider performance metrics from BrainEvent history.
  *
  * Groups events by routed_provider, calculating success rate, average
  * latency, failure count, and last success/failure timestamps.
+ * Also flags entries with low sample sizes and internal-only traffic
+ * so operators can properly contextualize the data.
  *
  * When providerKey is supplied, returns a single-element array (or empty
  * if the provider has no recorded events).
@@ -130,6 +158,7 @@ export async function getProviderPerformance(providerKey?: string): Promise<Prov
     const events = await prisma.brainEvent.findMany({
       where,
       select: {
+        appSlug: true,
         routedProvider: true,
         success: true,
         latencyMs: true,
@@ -170,6 +199,12 @@ export async function getProviderPerformance(providerKey?: string): Promise<Prov
         ? failureEvents.reduce((latest, e) => (e.timestamp > latest.timestamp ? e : latest)).timestamp
         : null
 
+      // Determine whether all traffic is from internal/admin contexts
+      const productionEvents = providerEvents.filter(
+        e => e.appSlug && !isInternalAppSlug(e.appSlug)
+      )
+      const internalOnly = productionEvents.length === 0
+
       results.push({
         providerKey: key,
         totalRequests: total,
@@ -178,6 +213,8 @@ export async function getProviderPerformance(providerKey?: string): Promise<Prov
         failureCount: failures,
         lastSuccess,
         lastFailure,
+        lowSample: total < LOW_SAMPLE_THRESHOLD,
+        internalOnly,
       })
     }
 
@@ -272,6 +309,9 @@ export async function getAppLearningState(appSlug: string): Promise<AppLearningS
  *   - instruction_refinement: suggestions for improving app instructions
  *
  * All insights are derived from real data — nothing is fabricated.
+ * Internal/admin app slugs (e.g. __admin_test__, __dashboard__) are
+ * excluded from production insights and labelled separately so operators
+ * are not misled by test/lab traffic.
  */
 export async function generateInsights(): Promise<LearningInsight[]> {
   const insights: LearningInsight[] = []
@@ -294,10 +334,14 @@ export async function generateInsights(): Promise<LearningInsight[]> {
 
     if (events.length === 0) return insights
 
-    // ── Provider performance insights ──
+    // Separate production traffic from internal/admin traffic
+    const productionEvents = events.filter(e => !e.appSlug || !isInternalAppSlug(e.appSlug))
+    const internalEvents   = events.filter(e => e.appSlug  &&  isInternalAppSlug(e.appSlug))
 
-    const byProvider = new Map<string, typeof events>()
-    for (const ev of events) {
+    // ── Provider performance insights (production traffic only) ──
+
+    const byProvider = new Map<string, typeof productionEvents>()
+    for (const ev of productionEvents) {
       if (!ev.routedProvider) continue
       const list = byProvider.get(ev.routedProvider) ?? []
       list.push(ev)
@@ -306,10 +350,11 @@ export async function generateInsights(): Promise<LearningInsight[]> {
 
     for (const [provider, providerEvents] of byProvider) {
       const total = providerEvents.length
-      if (total < 5) continue // need minimum sample size
+      if (total < 5) continue // need minimum sample size for production insights
 
       const successes = providerEvents.filter((e) => e.success).length
       const rate = successes / total
+      const sampleNote = total < LOW_SAMPLE_THRESHOLD ? ` (low sample: ${total} requests — treat as indicative only)` : ''
 
       // High-performing provider
       if (rate >= 0.95) {
@@ -328,7 +373,7 @@ export async function generateInsights(): Promise<LearningInsight[]> {
           type: 'performance',
           scope: 'ecosystem',
           title: `${provider} has ${Math.round(rate * 100)}% success rate`,
-          description: `Provider ${provider} has achieved a ${Math.round(rate * 100)}% success rate across ${total} requests. Consider making it primary for ${domain} tasks.`,
+          description: `Provider ${provider} has achieved a ${Math.round(rate * 100)}% success rate across ${total} production requests${sampleNote}. Consider making it primary for ${domain} tasks.`,
           confidence: Math.min(total / 50, 1),
           createdAt: now,
         })
@@ -340,7 +385,7 @@ export async function generateInsights(): Promise<LearningInsight[]> {
           type: 'performance',
           scope: 'ecosystem',
           title: `${provider} success rate is low (${Math.round(rate * 100)}%)`,
-          description: `Provider ${provider} has only a ${Math.round(rate * 100)}% success rate across ${total} requests. Consider deprioritizing or investigating failures.`,
+          description: `Provider ${provider} has only a ${Math.round(rate * 100)}% success rate across ${total} production requests. Consider deprioritizing or investigating failures.`,
           confidence: Math.min(total / 30, 1),
           createdAt: now,
         })
@@ -374,10 +419,10 @@ export async function generateInsights(): Promise<LearningInsight[]> {
       }
     }
 
-    // ── App-level preference and optimization insights ──
+    // ── App-level preference and optimization insights (production apps only) ──
 
-    const byApp = new Map<string, typeof events>()
-    for (const ev of events) {
+    const byApp = new Map<string, typeof productionEvents>()
+    for (const ev of productionEvents) {
       if (!ev.appSlug) continue
       const list = byApp.get(ev.appSlug) ?? []
       list.push(ev)
@@ -386,6 +431,10 @@ export async function generateInsights(): Promise<LearningInsight[]> {
 
     for (const [app, appEvents] of byApp) {
       if (appEvents.length < 5) continue
+
+      const sampleNote = appEvents.length < LOW_SAMPLE_THRESHOLD
+        ? ` (low sample: ${appEvents.length} requests)`
+        : ''
 
       // Task type concentration — suggest specialist routing
       const taskCounts = new Map<string, number>()
@@ -406,7 +455,7 @@ export async function generateInsights(): Promise<LearningInsight[]> {
             scope: 'app',
             appSlug: app,
             title: `App "${app}" primarily uses "${topTask}" tasks`,
-            description: `${Math.round(concentration * 100)}% of ${app}'s ${appEvents.length} requests are "${topTask}" tasks. Suggest specialist routing for this task type to improve performance.`,
+            description: `${Math.round(concentration * 100)}% of ${app}'s ${appEvents.length} requests${sampleNote} are "${topTask}" tasks. Suggest specialist routing for this task type to improve performance.`,
             confidence: Math.min(appEvents.length / 20, 1),
             createdAt: now,
           })
@@ -426,7 +475,7 @@ export async function generateInsights(): Promise<LearningInsight[]> {
           scope: 'app',
           appSlug: app,
           title: `App "${app}" prefers "${topMode[0]}" execution mode`,
-          description: `${Math.round((topMode[1] / appEvents.length) * 100)}% of requests use "${topMode[0]}" mode. Consider setting this as the default for improved routing.`,
+          description: `${Math.round((topMode[1] / appEvents.length) * 100)}% of requests use "${topMode[0]}" mode${sampleNote}. Consider setting this as the default for improved routing.`,
           confidence: Math.min(appEvents.length / 20, 1),
           createdAt: now,
         })
@@ -464,6 +513,21 @@ export async function generateInsights(): Promise<LearningInsight[]> {
           createdAt: now,
         })
       }
+    }
+
+    // ── Internal/admin traffic summary insight ──
+    // Inform operators that internal traffic exists but is not included in
+    // the production insights above to avoid misleading them.
+    if (internalEvents.length > 0) {
+      const internalApps = [...new Set(internalEvents.map(e => e.appSlug).filter(Boolean))]
+      insights.push({
+        type: 'performance',
+        scope: 'ecosystem',
+        title: `${internalEvents.length} internal/admin requests excluded from production insights`,
+        description: `${internalEvents.length} requests from internal/admin contexts (${internalApps.slice(0, 3).join(', ')}${internalApps.length > 3 ? '…' : ''}) are not included in the production insights above. This traffic is from admin tests and lab sessions, not real deployed apps.`,
+        confidence: 1,
+        createdAt: now,
+      })
     }
 
     return insights

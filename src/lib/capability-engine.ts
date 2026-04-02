@@ -606,17 +606,46 @@ export interface CapabilityStatusEntry {
   available: boolean;
   reason: string | null;
   routeExists: boolean;
+  /**
+   * True when the capability is structurally implemented and has a backend
+   * route, but is blocked by app-level settings (e.g. suggestive mode,
+   * adult mode) rather than a missing provider or missing route.
+   *
+   * When blockedBySettings=true, the UI should show "Blocked by settings"
+   * and explain how to unblock (e.g. enable suggestive mode in app settings).
+   * This avoids fragile text-parsing of the reason field in the UI.
+   */
+  blockedBySettings: boolean;
 }
+
+/** Set of capability classes that are gated by app/safety settings. */
+const SETTINGS_GATED_CAPABILITIES = new Set<CapabilityClass>([
+  'suggestive_image_generation',
+  'suggestive_video_planning',
+  'adult_18plus_image',
+])
 
 export function getDetailedCapabilityStatus(): CapabilityStatusEntry[] {
   const all = Object.keys(CAPABILITY_MAP) as CapabilityClass[];
   const result = resolveCapabilityRoutes({ capabilities: all });
-  return result.routes.map((route) => ({
-    capability: route.capability,
-    available: route.available,
-    reason: route.available ? null : (route.missingMessage ?? 'Unknown reason'),
-    routeExists: BACKEND_ROUTE_EXISTS[route.capability] ?? false,
-  }));
+  return result.routes.map((route) => {
+    const routeExists = BACKEND_ROUTE_EXISTS[route.capability] ?? false;
+    // A capability is blocked by settings when:
+    //   - it is NOT available
+    //   - the route EXISTS (it is implemented)
+    //   - it is in the settings-gated set (adult/suggestive modes)
+    const blockedBySettings =
+      !route.available &&
+      routeExists &&
+      SETTINGS_GATED_CAPABILITIES.has(route.capability);
+    return {
+      capability: route.capability,
+      available: route.available,
+      reason: route.available ? null : (route.missingMessage ?? 'Unknown reason'),
+      routeExists,
+      blockedBySettings,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

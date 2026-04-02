@@ -90,7 +90,11 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 
 /* ── routing tab ───────────────────────────────────────────── */
 
-interface RouteRow { taskType?: string; model?: string; provider?: string; reasoning?: string; status?: string }
+interface RouteRow {
+  taskType?: string; model?: string; provider?: string
+  reasoning?: string; status?: string; mode?: string
+  costEstimate?: string; latencyEstimate?: string
+}
 
 function RoutingTab({ data }: { data: unknown }) {
   const d = data as { routes?: RouteRow[]; decisions?: RouteRow[]; stats?: Record<string, number> } | null
@@ -98,8 +102,23 @@ function RoutingTab({ data }: { data: unknown }) {
 
   if (!rows.length) return <Placeholder icon={Route} message="No routing decisions recorded yet." />
 
+  const noRouteCount = rows.filter(r => r.status === 'no_route' || r.status === 'error').length
+  const activeCount  = rows.filter(r => r.status === 'active').length
+
   return (
     <div className="space-y-4">
+      {/* Routing health banner */}
+      {noRouteCount > 0 && (
+        <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-300/80">
+          ⚠ {noRouteCount} of {rows.length} sample tasks have no route. This means no configured provider can serve those task types under the current app profile. Check that a provider is configured and enabled with a valid API key.
+        </div>
+      )}
+      {noRouteCount === 0 && rows.length > 0 && (
+        <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 px-4 py-3 text-xs text-emerald-300/80">
+          ✓ All {activeCount} sample task types have an active route under the current provider configuration.
+        </div>
+      )}
+
       {d?.stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {Object.entries(d.stats).slice(0, 4).map(([k, v], i) => (
@@ -124,19 +143,25 @@ function RoutingTab({ data }: { data: unknown }) {
               </tr>
             </thead>
             <tbody>
-              {rows.slice(0, 20).map((r, i) => (
-                <motion.tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition"
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}>
-                  <td className="px-4 py-3 text-white/70">{r.taskType ?? '—'}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-blue-300/80">{r.model ?? '—'}</td>
-                  <td className="px-4 py-3 text-white/50">{r.provider ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <StatusDot color={r.status === 'active' ? 'bg-emerald-400' : r.status === 'error' ? 'bg-red-400' : 'bg-white/20'} />
-                    <span className="ml-2 text-white/50">{r.status ?? 'idle'}</span>
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-white/30 max-w-xs truncate">{r.reasoning ?? '—'}</td>
-                </motion.tr>
-              ))}
+              {rows.slice(0, 20).map((r, i) => {
+                const isActive   = r.status === 'active'
+                const isNoRoute  = r.status === 'no_route'
+                const isError    = r.status === 'error'
+                const dotColor   = isActive ? 'bg-emerald-400' : isNoRoute ? 'bg-amber-400' : isError ? 'bg-red-400' : 'bg-white/20'
+                return (
+                  <motion.tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}>
+                    <td className="px-4 py-3 text-white/70">{r.taskType ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-blue-300/80">{r.model ?? '—'}</td>
+                    <td className="px-4 py-3 text-white/50">{r.provider ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <StatusDot color={dotColor} />
+                      <span className={`ml-2 text-white/50 ${isNoRoute ? 'text-amber-300/70' : ''}`}>{r.status ?? 'idle'}</span>
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-white/30 max-w-xs truncate">{r.reasoning ?? '—'}</td>
+                  </motion.tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -149,21 +174,40 @@ function RoutingTab({ data }: { data: unknown }) {
 
 function MemoryTab({ data }: { data: unknown }) {
   const d = data as {
-    status?: string; stats?: { total?: number; namespaces?: string[]; appSlugs?: string[] }
+    // API response fields from /api/admin/memory → getMemoryStatus()
+    statusLabel?: string; status?: string
+    totalEntries?: number; stats?: { total?: number; namespaces?: string[]; appSlugs?: string[] }
     entries?: unknown[]; total?: number
+    appSlugs?: string[]
+    available?: boolean
+    error?: string | null
   } | null
 
-  const status = d?.status ?? 'unknown'
-  const total = d?.stats?.total ?? d?.total ?? d?.entries?.length ?? 0
-  const namespaces = d?.stats?.namespaces ?? d?.stats?.appSlugs ?? []
+  // statusLabel is the canonical field; status is a legacy fallback
+  const statusLabel = d?.statusLabel ?? d?.status ?? 'unknown'
+  // totalEntries is the canonical field returned by the API
+  const total = d?.totalEntries ?? d?.stats?.total ?? d?.total ?? d?.entries?.length ?? 0
+  // appSlugs is returned at the top level by the API
+  const namespaces = d?.appSlugs ?? d?.stats?.namespaces ?? d?.stats?.appSlugs ?? []
 
-  const statusColor = status === 'saving' ? 'bg-emerald-400' : status === 'not_configured' ? 'bg-amber-400' : 'bg-white/20'
+  const statusColor =
+    statusLabel === 'saving'         ? 'bg-emerald-400' :
+    statusLabel === 'empty'          ? 'bg-blue-400' :
+    statusLabel === 'not_configured' ? 'bg-amber-400' :
+    statusLabel === 'error'          ? 'bg-red-400' :
+    'bg-white/20'
+
+  const statusDisplay =
+    statusLabel === 'saving'         ? 'active' :
+    statusLabel === 'empty'          ? 'empty' :
+    statusLabel === 'not_configured' ? 'not configured' :
+    statusLabel.replace(/_/g, ' ')
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {[
-          { label: 'Status', value: status.replace(/_/g, ' '), extra: <StatusDot color={statusColor} /> },
+          { label: 'Status', value: statusDisplay, extra: <StatusDot color={statusColor} /> },
           { label: 'Total Entries', value: total },
           { label: 'Namespaces', value: namespaces.length },
         ].map((c, i) => (
@@ -189,7 +233,18 @@ function MemoryTab({ data }: { data: unknown }) {
         </div>
       )}
 
-      {total === 0 && <Placeholder icon={Database} message="No memory entries stored yet." />}
+      {d?.error && (
+        <div className={`${CARD} p-4`}>
+          <p className="text-xs text-amber-300/80">⚠ {d.error}</p>
+        </div>
+      )}
+
+      {total === 0 && statusLabel !== 'not_configured' && (
+        <Placeholder icon={Database} message="No memory entries stored yet. Memory is configured and ready." />
+      )}
+      {statusLabel === 'not_configured' && (
+        <Placeholder icon={Database} message="Memory storage is not configured. Run database migrations to enable the memory layer." />
+      )}
     </div>
   )
 }
@@ -197,7 +252,11 @@ function MemoryTab({ data }: { data: unknown }) {
 /* ── learning tab ──────────────────────────────────────────── */
 
 interface LearningInsight { type?: string; title?: string; description?: string; impact?: string }
-interface ProviderPerf { providerKey?: string; totalRequests?: number; successRate?: number; avgLatencyMs?: number; failureCount?: number }
+interface ProviderPerf {
+  providerKey?: string; totalRequests?: number; successRate?: number
+  avgLatencyMs?: number; failureCount?: number
+  lowSample?: boolean; internalOnly?: boolean
+}
 
 function LearningTab({ data }: { data: unknown }) {
   const d = data as {
@@ -238,6 +297,7 @@ function LearningTab({ data }: { data: unknown }) {
         <div className={`${CARD} overflow-hidden`}>
           <div className="px-5 pt-4 pb-2">
             <p className="text-xs font-medium uppercase tracking-wider text-white/30">Provider Performance</p>
+            <p className="mt-0.5 text-[11px] text-white/20">Production traffic only. ⚠ = low sample (&lt;10 requests). 🔬 = internal/admin traffic only.</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -254,8 +314,14 @@ function LearningTab({ data }: { data: unknown }) {
                 {performance.map((p, i) => (
                   <motion.tr key={p.providerKey ?? i} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition"
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}>
-                    <td className="px-4 py-3 font-mono text-xs text-blue-300/80">{p.providerKey ?? '—'}</td>
-                    <td className="px-4 py-3 text-white/70">{p.totalRequests ?? 0}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-blue-300/80">
+                      {p.providerKey ?? '—'}
+                      {p.internalOnly && <span className="ml-1 text-[10px] text-purple-300/60">🔬 internal</span>}
+                    </td>
+                    <td className="px-4 py-3 text-white/70">
+                      {p.totalRequests ?? 0}
+                      {p.lowSample && <span className="ml-1 text-[10px] text-amber-300/60">⚠ low sample</span>}
+                    </td>
                     <td className="px-4 py-3 text-white/70">{p.successRate != null ? `${(p.successRate * 100).toFixed(1)}%` : '—'}</td>
                     <td className="px-4 py-3 text-white/50">{p.avgLatencyMs != null ? `${Math.round(p.avgLatencyMs)}ms` : '—'}</td>
                     <td className="px-4 py-3 text-white/50">{p.failureCount ?? 0}</td>
@@ -430,7 +496,36 @@ function AgentsTab({ data }: { data: unknown }) {
 
 /* ── capabilities tab ──────────────────────────────────────── */
 
-interface CapabilityEntry { capability?: string; available?: boolean }
+interface CapabilityEntry {
+  capability?: string
+  available?: boolean
+  reason?: string | null
+  routeExists?: boolean
+  blockedBySettings?: boolean
+}
+
+/**
+ * Classify a capability entry into one of four truth states:
+ *   NOT_IMPLEMENTED   — no backend route exists for this capability
+ *   BLOCKED_BY_SETTINGS — route exists but blocked by app/safety settings
+ *   UNAVAILABLE       — route exists, not blocked, but no usable provider/model
+ *   AVAILABLE         — route exists and usable with current configuration
+ */
+function classifyCapability(cap: CapabilityEntry): 'AVAILABLE' | 'BLOCKED_BY_SETTINGS' | 'UNAVAILABLE' | 'NOT_IMPLEMENTED' {
+  if (cap.available) return 'AVAILABLE'
+  if (!cap.routeExists) return 'NOT_IMPLEMENTED'
+  // Use the explicit blockedBySettings flag from the API (preferred)
+  // to avoid fragile reason-text parsing.
+  if (cap.blockedBySettings) return 'BLOCKED_BY_SETTINGS'
+  return 'UNAVAILABLE'
+}
+
+const CAP_STYLE = {
+  AVAILABLE:           { dot: 'bg-emerald-400', text: 'text-emerald-400/70', label: 'Available' },
+  BLOCKED_BY_SETTINGS: { dot: 'bg-amber-400',   text: 'text-amber-400/70',   label: 'Blocked by settings' },
+  UNAVAILABLE:         { dot: 'bg-red-400',      text: 'text-red-400/70',     label: 'Unavailable' },
+  NOT_IMPLEMENTED:     { dot: 'bg-white/20',     text: 'text-white/30',       label: 'Not implemented' },
+} as const
 
 function CapabilitiesTab({ routingData }: { routingData: unknown }) {
   const d = routingData as { capabilities?: CapabilityEntry[] } | null
@@ -440,40 +535,54 @@ function CapabilitiesTab({ routingData }: { routingData: unknown }) {
     return <Placeholder icon={Zap} message="Capability status unavailable." />
   }
 
-  const available = capabilities.filter(c => c.available).length
-  const unavailable = capabilities.length - available
+  const available   = capabilities.filter(c => c.available).length
+  const blocked     = capabilities.filter(c => classifyCapability(c) === 'BLOCKED_BY_SETTINGS').length
+  const unavailable = capabilities.filter(c => classifyCapability(c) === 'UNAVAILABLE').length
+  const notImpl     = capabilities.filter(c => classifyCapability(c) === 'NOT_IMPLEMENTED').length
 
   const stats = [
-    { label: 'Total', value: capabilities.length },
-    { label: 'Available', value: available },
-    { label: 'Unavailable', value: unavailable },
+    { label: 'Total',            value: capabilities.length },
+    { label: 'Available',        value: available,   color: 'text-emerald-400' },
+    { label: 'Blocked',          value: blocked,     color: 'text-amber-400' },
+    { label: 'Unavailable',      value: unavailable, color: 'text-red-400' },
+    { label: 'Not Implemented',  value: notImpl,     color: 'text-white/30' },
   ]
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
         {stats.map((s, i) => (
           <motion.div key={s.label} className={INNER} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
             <p className="text-[11px] uppercase tracking-wider text-white/30">{s.label}</p>
-            <p className="mt-1 text-xl font-semibold text-white/90">{s.value}</p>
+            <p className={`mt-1 text-xl font-semibold ${'color' in s ? s.color : 'text-white/90'}`}>{s.value}</p>
           </motion.div>
         ))}
       </div>
 
       <div className={`${CARD} p-5`}>
-        <p className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">Capability Map</p>
+        <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/30">Capability Map</p>
+        <p className="mb-3 text-[11px] text-white/20">
+          Status reflects current runtime configuration (configured providers and app settings).
+        </p>
         <div className="space-y-2">
-          {capabilities.map((cap, i) => (
-            <motion.div key={cap.capability ?? i}
-              className="flex items-center gap-3 rounded-xl bg-white/[0.02] border border-white/[0.04] px-4 py-3"
-              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-              <StatusDot color={cap.available ? 'bg-emerald-400' : 'bg-red-400'} />
-              <span className="text-sm text-white/60">{(cap.capability ?? 'unknown').replace(/_/g, ' ')}</span>
-              <span className={`ml-auto text-[10px] font-medium ${cap.available ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
-                {cap.available ? 'Available' : 'Unavailable'}
-              </span>
-            </motion.div>
-          ))}
+          {capabilities.map((cap, i) => {
+            const state = classifyCapability(cap)
+            const style = CAP_STYLE[state]
+            return (
+              <motion.div key={cap.capability ?? i}
+                className="rounded-xl bg-white/[0.02] border border-white/[0.04] px-4 py-3"
+                initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.025 }}>
+                <div className="flex items-center gap-3">
+                  <StatusDot color={style.dot} />
+                  <span className="text-sm text-white/60 flex-1">{(cap.capability ?? 'unknown').replace(/_/g, ' ')}</span>
+                  <span className={`text-[10px] font-medium ${style.text}`}>{style.label}</span>
+                </div>
+                {!cap.available && cap.reason && (
+                  <p className="mt-1.5 pl-5 text-[11px] text-white/25 leading-snug">{cap.reason}</p>
+                )}
+              </motion.div>
+            )
+          })}
         </div>
       </div>
     </div>

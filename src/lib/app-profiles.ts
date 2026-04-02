@@ -390,6 +390,92 @@ export const DEFAULT_APP_PROFILES: ReadonlyMap<string, AppProfile> = new Map<str
     logging_privacy_rules: BASIC_PRIVACY_RULES,
   }],
 
+  // ── Admin Dashboard / Internal contexts ───────────────────────────────
+  // These profiles must allow ALL configured providers so that the
+  // routing and intelligence tabs reflect the real runtime truth rather
+  // than showing "no route" when a non-backbone provider (e.g. OpenAI)
+  // is the only one configured.
+
+  ['__dashboard__', {
+    app_id: '__dashboard__',
+    app_name: 'Admin Dashboard',
+    app_type: 'admin',
+    domain: 'admin',
+
+    default_routing_mode: 'direct',
+
+    // Open to all providers so routing truth matches provider configuration.
+    allowed_providers: [...ALL_PROVIDERS, 'gemini'],
+    // Empty = all models from allowed_providers are eligible (see isModelAllowed).
+    allowed_models: [],
+    preferred_models: ['gpt-4o', 'gpt-4o-mini', 'llama-3.3-70b-versatile', 'deepseek-chat'],
+
+    escalation_rules: [],
+    validator_rules: [],
+
+    agent_permissions: FULL_AGENT_PERMISSIONS,
+    multimodal_permissions: ['vision', 'image_generation'],
+
+    memory_namespace: 'dashboard',
+    retrieval_namespace: 'dashboard',
+
+    budget_sensitivity: 'low',
+    latency_sensitivity: 'low',
+    logging_privacy_rules: STRICT_PRIVACY_RULES,
+  }],
+
+  ['__admin_test__', {
+    app_id: '__admin_test__',
+    app_name: 'Admin Test',
+    app_type: 'admin',
+    domain: 'admin',
+
+    default_routing_mode: 'direct',
+
+    allowed_providers: [...ALL_PROVIDERS, 'gemini'],
+    allowed_models: [],
+    preferred_models: ['gpt-4o', 'gpt-4o-mini', 'llama-3.3-70b-versatile', 'deepseek-chat'],
+
+    escalation_rules: [],
+    validator_rules: [],
+
+    agent_permissions: FULL_AGENT_PERMISSIONS,
+    multimodal_permissions: ['vision', 'image_generation'],
+
+    memory_namespace: 'admin_test',
+    retrieval_namespace: 'admin_test',
+
+    budget_sensitivity: 'low',
+    latency_sensitivity: 'low',
+    logging_privacy_rules: STRICT_PRIVACY_RULES,
+  }],
+
+  ['__admin__', {
+    app_id: '__admin__',
+    app_name: 'Admin',
+    app_type: 'admin',
+    domain: 'admin',
+
+    default_routing_mode: 'direct',
+
+    allowed_providers: [...ALL_PROVIDERS, 'gemini'],
+    allowed_models: [],
+    preferred_models: ['gpt-4o', 'gpt-4o-mini', 'llama-3.3-70b-versatile', 'deepseek-chat'],
+
+    escalation_rules: [],
+    validator_rules: [],
+
+    agent_permissions: FULL_AGENT_PERMISSIONS,
+    multimodal_permissions: ['vision'],
+
+    memory_namespace: 'admin',
+    retrieval_namespace: 'admin',
+
+    budget_sensitivity: 'low',
+    latency_sensitivity: 'low',
+    logging_privacy_rules: STRICT_PRIVACY_RULES,
+  }],
+
   // ── Amarktai Online (general purpose) ──────────────────────────────────
 
   ['amarktai-online', {
@@ -452,8 +538,16 @@ export function isProviderAllowed(profile: AppProfile, providerKey: string): boo
   return profile.allowed_providers.includes(providerKey);
 }
 
-/** Check whether a model ID is in the profile's allowed list. */
+/**
+ * Check whether a model ID is in the profile's allowed list.
+ *
+ * When `allowed_models` is empty (`[]`), all models from the profile's
+ * `allowed_providers` are permitted. This is the intended behaviour for
+ * admin/dashboard profiles where restricting to a fixed model list would
+ * produce misleading "no route" results whenever new models are added.
+ */
 export function isModelAllowed(profile: AppProfile, modelId: string): boolean {
+  if (profile.allowed_models.length === 0) return true; // open-access profile
   return profile.allowed_models.includes(modelId);
 }
 

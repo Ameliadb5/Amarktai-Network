@@ -108,6 +108,7 @@ export async function GET() {
       available: entry.available,
       reason: entry.reason,
       routeExists: entry.routeExists,
+      blockedBySettings: entry.blockedBySettings,
     }))
 
     return NextResponse.json({
