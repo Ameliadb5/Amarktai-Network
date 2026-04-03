@@ -136,6 +136,14 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     supportedCapabilityFamilies: ['chat', 'reasoning', 'code'],
     sortOrder: 9,
   },
+  {
+    key: 'replicate',
+    displayName: 'Replicate',
+    defaultBaseUrl: 'https://api.replicate.com',
+    healthCheckSupported: true,
+    supportedCapabilityFamilies: ['video_generation', 'image_generation'],
+    sortOrder: 10,
+  },
 ] as const;
 
 /**

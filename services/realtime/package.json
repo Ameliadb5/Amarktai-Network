@@ -1,0 +1,18 @@
+{
+  "name": "@amarktai/realtime-service",
+  "version": "1.0.0",
+  "description": "AmarktAI Network — Realtime voice WebSocket service. Bridges client audio streams to the OpenAI Realtime API.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "dotenv": "^16.4.5"
+  },
+  "license": "UNLICENSED"
+}

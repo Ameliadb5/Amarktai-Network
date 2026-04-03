@@ -20,6 +20,7 @@ import {
   BACKEND_ROUTE_EXISTS,
   type CapabilityClass,
 } from '../capability-engine'
+import { clearProviderHealthCache } from '../model-registry'
 import {
   initializeStrategy,
   getAppStrategy,
@@ -189,16 +190,16 @@ describe('Capability Engine', () => {
       }
     })
 
-    it('marks realtime_voice as having no backend route', () => {
-      expect(BACKEND_ROUTE_EXISTS.realtime_voice).toBe(false)
+    it('marks realtime_voice as having a backend route (session endpoint exists)', () => {
+      expect(BACKEND_ROUTE_EXISTS.realtime_voice).toBe(true)
     })
 
-    it('marks video_generation as having no backend route', () => {
-      expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(false)
+    it('marks video_generation as having a backend route (async job pipeline exists)', () => {
+      expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(true)
     })
 
-    it('marks reranking as having no backend route', () => {
-      expect(BACKEND_ROUTE_EXISTS.reranking).toBe(false)
+    it('marks reranking as having a backend route (standalone API exists)', () => {
+      expect(BACKEND_ROUTE_EXISTS.reranking).toBe(true)
     })
 
     it('marks adult_18plus_image as having no backend route', () => {
@@ -225,40 +226,63 @@ describe('Capability Engine', () => {
       expect(BACKEND_ROUTE_EXISTS.video_planning).toBe(true)
     })
 
-    it('marks video_generation as having no backend route (no real provider wired)', () => {
-      expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(false)
+    it('marks video_generation as having a backend route (async job pipeline)', () => {
+      expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(true)
     })
   })
 
   describe('isCapabilityAvailable', () => {
-    it('returns false for capabilities without backend routes', () => {
-      expect(isCapabilityAvailable('realtime_voice')).toBe(false)
-      expect(isCapabilityAvailable('video_generation')).toBe(false)
-      expect(isCapabilityAvailable('reranking')).toBe(false)
+    it('returns false for adult_18plus_image (no backend route)', () => {
       expect(isCapabilityAvailable('adult_18plus_image')).toBe(false)
+    })
+    it('returns false for realtime_voice when REALTIME_SERVICE_URL not set', () => {
+      // Without REALTIME_SERVICE_URL, realtime_voice is unavailable even though route exists
+      delete process.env.REALTIME_SERVICE_URL
+      expect(isCapabilityAvailable('realtime_voice')).toBe(false)
+    })
+    it('returns false for video_generation when no provider configured', () => {
+      // Without a video generation provider, video_generation is unavailable
+      clearProviderHealthCache()
+      expect(isCapabilityAvailable('video_generation')).toBe(false)
+    })
+    it('returns false for reranking when no provider configured', () => {
+      clearProviderHealthCache()
+      expect(isCapabilityAvailable('reranking')).toBe(false)
     })
   })
 
   describe('resolveCapabilityRoutes — backend route guard', () => {
-    it('blocks capabilities without backend routes with specific message', () => {
+    it('blocks realtime_voice when REALTIME_SERVICE_URL not set (service not running)', () => {
+      delete process.env.REALTIME_SERVICE_URL
       const result = resolveCapabilityRoutes({
         capabilities: ['realtime_voice'],
       })
       expect(result.routes[0].available).toBe(false)
-      expect(result.routes[0].missingMessage).toContain('Route not implemented')
+      expect(result.routes[0].missingMessage).toContain('REALTIME_SERVICE_URL')
     })
 
-    it('blocks video_generation with route not implemented message', () => {
+    it('blocks video_generation when no video provider is configured', () => {
+      clearProviderHealthCache()
       const result = resolveCapabilityRoutes({
         capabilities: ['video_generation'],
       })
       expect(result.routes[0].available).toBe(false)
-      expect(result.routes[0].missingMessage).toContain('Route not implemented')
+      expect(result.routes[0].missingMessage).toContain('No provider configured')
     })
 
-    it('blocks reranking with route not implemented message', () => {
+    it('blocks reranking when no reranking provider is configured', () => {
+      clearProviderHealthCache()
       const result = resolveCapabilityRoutes({
         capabilities: ['reranking'],
+      })
+      expect(result.routes[0].available).toBe(false)
+      expect(result.routes[0].missingMessage).toContain('No provider configured')
+    })
+
+    it('blocks adult_18plus_image with Route not implemented message', () => {
+      const result = resolveCapabilityRoutes({
+        capabilities: ['adult_18plus_image'],
+        adultMode: true,
       })
       expect(result.routes[0].available).toBe(false)
       expect(result.routes[0].missingMessage).toContain('Route not implemented')
@@ -296,8 +320,11 @@ describe('Capability Engine', () => {
       }
     })
 
-    it('marks realtime_voice, video_generation, reranking, adult_18plus as unavailable', () => {
+    it('marks realtime_voice, video_generation, reranking as unavailable without provider/service config', () => {
+      delete process.env.REALTIME_SERVICE_URL
+      clearProviderHealthCache()
       const entries = getDetailedCapabilityStatus()
+      // These are unavailable without configuration (routes exist, providers don't)
       const mustBeUnavailable = ['realtime_voice', 'video_generation', 'reranking', 'adult_18plus_image']
       for (const capName of mustBeUnavailable) {
         const entry = entries.find(e => e.capability === capName)
@@ -314,13 +341,14 @@ describe('Capability Engine', () => {
       expect(planning!.routeExists).toBe(true)
     })
 
-    it('video_generation is truthfully marked unavailable (no real provider)', () => {
+    it('video_generation truthfully has a route but is unavailable without provider', () => {
+      clearProviderHealthCache()
       const entries = getDetailedCapabilityStatus()
       const gen = entries.find(e => e.capability === 'video_generation')
       expect(gen).toBeDefined()
       expect(gen!.available).toBe(false)
-      expect(gen!.routeExists).toBe(false)
-      expect(gen!.reason).toContain('Route not implemented')
+      expect(gen!.routeExists).toBe(true)  // Route now exists (/api/brain/video-generate)
+      expect(gen!.reason).toContain('No provider configured')
     })
 
     it('voice_input route exists and is truthfully tracked', () => {

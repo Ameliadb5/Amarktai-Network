@@ -322,3 +322,26 @@ model GitHubPushLog {
   @@index([pushedAt])
   @@map("github_push_logs")
 }
+
+model VideoGenerationJob {
+  id          String   @id @default(cuid())
+  provider    String
+  modelId     String   @map("model_id")
+  prompt      String
+  style       String?
+  duration    Int?
+  aspectRatio String?  @map("aspect_ratio")
+  appSlug     String?  @map("app_slug")
+  status      String   @default("pending") // pending | processing | succeeded | failed
+  providerJobId String? @map("provider_job_id")
+  resultUrl   String?  @map("result_url")
+  resultMeta  String?  @map("result_meta") // JSON metadata from provider
+  errorMessage String? @map("error_message")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([appSlug])
+  @@index([createdAt])
+  @@map("video_generation_jobs")
+}

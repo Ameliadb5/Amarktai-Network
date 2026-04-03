@@ -51,7 +51,8 @@ export type CapabilityClass =
   | 'deep_research'
   | 'scraping_extraction'
   | 'suggestive_image_generation'
-  | 'suggestive_video_planning';
+  | 'suggestive_video_planning'
+  | 'suggestive_video_generation';
 
 export type ExecutionPreference = 'cheap' | 'balanced' | 'premium';
 
@@ -142,9 +143,9 @@ const CAPABILITY_MAP: Record<CapabilityClass, CapabilityRequirement> = {
     suggestedProviders: ['gemini', 'openai', 'deepseek'],
   },
   video_generation: {
-    anyCapabilityFlag: ['supports_video_planning'],
+    anyCapabilityFlag: ['supports_video_generation'],
     label: 'video generation',
-    suggestedProviders: ['gemini'],
+    suggestedProviders: ['replicate', 'huggingface'],
   },
   voice_input: {
     anyCapabilityFlag: ['supports_stt', 'supports_voice_interaction'],
@@ -203,6 +204,11 @@ const CAPABILITY_MAP: Record<CapabilityClass, CapabilityRequirement> = {
     label: 'suggestive video planning (non-explicit)',
     suggestedProviders: ['openai', 'gemini'],
   },
+  suggestive_video_generation: {
+    anyCapabilityFlag: ['supports_video_generation'],
+    label: 'suggestive video generation (non-explicit, prompt-guarded)',
+    suggestedProviders: ['huggingface', 'replicate'],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -237,6 +243,7 @@ const CLASSIFICATION_RULES: Array<{
   { patterns: [/deep.*research/i, /multi[- ]step.*research/i, /thorough.*research/i, /in[- ]depth.*research/i], capabilities: ['deep_research'] },
   { patterns: [/scrap/i, /extract/i, /parse.*page/i], capabilities: ['scraping_extraction'] },
   { patterns: [/suggestive.*image/i, /image.*suggestive/i, /lingerie/i, /swimwear/i, /swimsuit/i, /bikini/i, /fashion.*model/i, /model.*pose/i], capabilities: ['suggestive_image_generation'] },
+  { patterns: [/suggestive.*video.*gen/i, /generate.*suggestive.*video/i, /fashion.*video.*gen/i], capabilities: ['suggestive_video_generation'] },
   { patterns: [/suggestive.*video/i, /video.*suggestive/i, /fashion.*video/i, /model.*video/i, /beach.*video/i, /gym.*reel/i], capabilities: ['suggestive_video_planning'] },
 ];
 
@@ -375,6 +382,16 @@ export function resolveCapabilityRoutes(
       continue;
     }
 
+    // Realtime voice requires separate WebSocket service to be running
+    if (cap === 'realtime_voice' && !process.env.REALTIME_SERVICE_URL) {
+      const msg =
+        'Realtime voice service not configured: set REALTIME_SERVICE_URL to the running WebSocket service (see services/realtime/). ' +
+        'The session endpoint (/api/realtime/session) exists but the streaming service must be running separately.';
+      routes.push({ capability: cap, models: [], available: false, missingMessage: msg });
+      missingCapabilities.push(msg);
+      continue;
+    }
+
     // Adult capability guard: adult_18plus_image requires explicit adult mode
     if (cap === 'adult_18plus_image' && !request.adultMode) {
       routes.push({
@@ -392,7 +409,7 @@ export function resolveCapabilityRoutes(
 
     // Suggestive capability guard: requires safeMode=false AND suggestiveMode=true
     if (
-      (cap === 'suggestive_image_generation' || cap === 'suggestive_video_planning') &&
+      (cap === 'suggestive_image_generation' || cap === 'suggestive_video_planning' || cap === 'suggestive_video_generation') &&
       !request.suggestiveMode
     ) {
       routes.push({
@@ -490,7 +507,7 @@ const BACKEND_ROUTE_EXISTS: Record<CapabilityClass, boolean> = {
   coding:                    true,   // /api/brain/request
   retrieval:                 true,   // /api/brain/request (retrieval_chain)
   embeddings:                true,   // /api/brain/request (embedding pipeline)
-  reranking:                 false,  // internal retrieval only — no standalone API
+  reranking:                 true,   // /api/brain/rerank (HuggingFace cross-encoder / NVIDIA)
   summarization:             true,   // /api/brain/request
   classification:            true,   // /api/brain/request
   validation:                true,   // /api/brain/request
@@ -499,18 +516,19 @@ const BACKEND_ROUTE_EXISTS: Record<CapabilityClass, boolean> = {
   image_generation:          true,   // /api/brain/request (DALL-E / FLUX)
   image_editing:             true,   // /api/brain/request (DALL-E)
   video_planning:            true,   // /api/brain/request (AI text — always possible via chat models)
-  video_generation:          false,  // BLOCKER: /api/brain/video returns planning data only — no provider SDK (Gemini Veo, Runway, Pika, Stability) is integrated to render scenes into actual video files. API key presence alone is not sufficient; a rendering pipeline must be implemented.
+  video_generation:          true,   // /api/brain/video-generate (async job pipeline — Replicate / HuggingFace)
   voice_input:               true,   // /api/brain/stt + /api/voice/stt (Groq Whisper / OpenAI Whisper / Gemini Live / HuggingFace Whisper)
   voice_output:              true,   // /api/brain/tts + /api/voice/tts (Groq PlayAI / OpenAI TTS / Gemini TTS / HuggingFace MMS)
-  realtime_voice:            false,  // BLOCKER: Next.js API routes do not support WebSocket connections required for bidirectional streaming voice. Requires a separate WebSocket server or edge runtime with streaming support.
-  adult_18plus_image:        false,  // BLOCKER: No provider route is integrated for lawful adult 18+ image generation. Requires: (1) a provider with policy-compliant adult content support, (2) an API route to invoke it, (3) per-app adult mode gating, (4) content filter enforcement. All four conditions must be met before this can be set to true.
+  realtime_voice:            true,   // /api/realtime/session (session config) + separate WS service (services/realtime)
+  adult_18plus_image:        false,  // NOT IMPLEMENTED: no policy-compliant provider integrated; use suggestive_image_generation instead
   moderation:                true,   // /api/brain/request (OpenAI moderation)
   app_analysis:              true,   // /api/brain/request
   research_search:           true,   // /api/brain/request + /api/brain/research
   deep_research:             true,   // /api/brain/research (multi-step reasoning)
   scraping_extraction:       true,   // /api/brain/request
-  suggestive_image_generation: true, // /api/brain/suggestive-image (prompt-guarded, safeMode+suggestiveMode gated)
-  suggestive_video_planning:   true, // /api/brain/suggestive-video (planning only, no generation)
+  suggestive_image_generation:  true, // /api/brain/suggestive-image (prompt-guarded, safeMode+suggestiveMode gated)
+  suggestive_video_planning:    true, // /api/brain/suggestive-video (planning only, no generation)
+  suggestive_video_generation:  true, // /api/brain/suggestive-video-gen (HuggingFace text-to-video, prompt-guarded)
 };
 
 // ---------------------------------------------------------------------------
@@ -598,6 +616,24 @@ export function getCapabilityStatus(): Record<CapabilityClass, boolean> {
 }
 
 // ---------------------------------------------------------------------------
+// Settings-gated capabilities (require per-app mode enablement)
+// ---------------------------------------------------------------------------
+
+/**
+ * Capabilities that are gated by per-app settings rather than provider/infrastructure
+ * availability. A capability in this set is 'blocked by settings' when the required
+ * app-level mode is not enabled (e.g. suggestiveMode=true required, or adultMode=true
+ * required). This is distinct from UNAVAILABLE (no provider/route) and is exposed
+ * as the `blockedBySettings` field on CapabilityStatusEntry for clean UI rendering.
+ */
+const SETTINGS_GATED_CAPABILITIES: ReadonlySet<CapabilityClass> = new Set([
+  'suggestive_image_generation',
+  'suggestive_video_planning',
+  'suggestive_video_generation',
+  'adult_18plus_image',
+]);
+
+// ---------------------------------------------------------------------------
 // Detailed capability status with reasons
 // ---------------------------------------------------------------------------
 
@@ -606,6 +642,8 @@ export interface CapabilityStatusEntry {
   available: boolean;
   reason: string | null;
   routeExists: boolean;
+  /** True when the capability is gated by app-level settings (not a provider/infrastructure issue). */
+  blockedBySettings: boolean;
 }
 
 export function getDetailedCapabilityStatus(): CapabilityStatusEntry[] {
@@ -616,10 +654,11 @@ export function getDetailedCapabilityStatus(): CapabilityStatusEntry[] {
     available: route.available,
     reason: route.available ? null : (route.missingMessage ?? 'Unknown reason'),
     routeExists: BACKEND_ROUTE_EXISTS[route.capability] ?? false,
+    blockedBySettings: !route.available && SETTINGS_GATED_CAPABILITIES.has(route.capability),
   }));
 }
 
 // ---------------------------------------------------------------------------
 // Exports for testing
 // ---------------------------------------------------------------------------
-export { CAPABILITY_MAP, BACKEND_ROUTE_EXISTS };
+export { CAPABILITY_MAP, BACKEND_ROUTE_EXISTS, SETTINGS_GATED_CAPABILITIES };

@@ -26,6 +26,7 @@ describe('Integration Verification', () => {
     setProviderHealth('grok', 'configured')
     setProviderHealth('huggingface', 'configured')
     setProviderHealth('nvidia', 'configured')
+    setProviderHealth('replicate', 'configured')
   }
 
   beforeEach(() => {

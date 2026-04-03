@@ -16,10 +16,12 @@ import {
   getModelRegistry,
   getModelsByProvider,
   getEnabledModels,
+  clearProviderHealthCache,
 } from '../model-registry'
 import {
   resolveCapabilityRoutes,
   BACKEND_ROUTE_EXISTS,
+  CAPABILITY_MAP,
   classifyCapabilities,
   getDetailedCapabilityStatus,
 } from '../capability-engine'
@@ -117,8 +119,8 @@ describe('Expanded Voice Stack', () => {
       expect(BACKEND_ROUTE_EXISTS.voice_output).toBe(true)
     })
 
-    it('realtime_voice has NO backend route (truthful)', () => {
-      expect(BACKEND_ROUTE_EXISTS.realtime_voice).toBe(false)
+    it('realtime_voice has a backend route (session endpoint + WS service)', () => {
+      expect(BACKEND_ROUTE_EXISTS.realtime_voice).toBe(true)
     })
 
     it('voice_input resolves with at least one model', () => {
@@ -178,8 +180,8 @@ describe('Video Stack Truth', () => {
     expect(BACKEND_ROUTE_EXISTS.video_planning).toBe(true)
   })
 
-  it('video_generation has NO backend route (truthful)', () => {
-    expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(false)
+  it('video_generation has a backend route (async job pipeline)', () => {
+    expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(true)
   })
 
   it('video_planning resolution does not claim it is generation', () => {
@@ -187,10 +189,11 @@ describe('Video Stack Truth', () => {
     expect(result.routes[0].capability).toBe('video_planning')
   })
 
-  it('video_generation is blocked by backend route guard', () => {
+  it('video_generation is unavailable without a video provider configured', () => {
+    clearProviderHealthCache()
     const result = resolveCapabilityRoutes({ capabilities: ['video_generation'] })
     expect(result.routes[0].available).toBe(false)
-    expect(result.routes[0].missingMessage).toContain('Route not implemented')
+    expect(result.routes[0].missingMessage).toContain('No provider configured')
   })
 
   it('classifyCapabilities can identify video tasks', () => {
@@ -338,33 +341,30 @@ describe('Agent Readiness After Provider Upgrades', () => {
  * ================================================================ */
 
 describe('Capability Map — No Fake Badges', () => {
-  it('all 26 capabilities are in BACKEND_ROUTE_EXISTS', () => {
+  it('all capabilities are in BACKEND_ROUTE_EXISTS (count matches CAPABILITY_MAP)', () => {
     const caps = Object.keys(BACKEND_ROUTE_EXISTS)
-    expect(caps.length).toBe(26)
+    const mapKeys = Object.keys(CAPABILITY_MAP)
+    expect(caps.length).toBe(mapKeys.length)
   })
 
-  it('exactly 22 capabilities have backend routes', () => {
+  it('at least 26 capabilities have backend routes (previously blocked ones now implemented)', () => {
     const available = Object.entries(BACKEND_ROUTE_EXISTS)
       .filter(([, v]) => v === true)
-    expect(available.length).toBe(22)
+    expect(available.length).toBeGreaterThanOrEqual(26)
   })
 
-  it('exactly 4 capabilities have no backend route', () => {
+  it('exactly 1 capability has no backend route (adult_18plus_image — NOT IMPLEMENTED)', () => {
     const unavailable = Object.entries(BACKEND_ROUTE_EXISTS)
       .filter(([, v]) => v === false)
-    expect(unavailable.length).toBe(4)
+    expect(unavailable.length).toBe(1)
     const names = unavailable.map(([k]) => k).sort()
-    expect(names).toEqual([
-      'adult_18plus_image',
-      'realtime_voice',
-      'reranking',
-      'video_generation',
-    ])
+    expect(names).toEqual(['adult_18plus_image'])
   })
 
   it('getDetailedCapabilityStatus returns status for all capabilities', () => {
     const status = getDetailedCapabilityStatus()
-    expect(status.length).toBe(26)
+    const mapKeys = Object.keys(CAPABILITY_MAP)
+    expect(status.length).toBe(mapKeys.length)
     for (const entry of status) {
       expect(typeof entry.available).toBe('boolean')
       expect(typeof entry.routeExists).toBe('boolean')
@@ -375,7 +375,7 @@ describe('Capability Map — No Fake Badges', () => {
   it('capabilities without routes show as unavailable', () => {
     const status = getDetailedCapabilityStatus()
     const noRoute = status.filter((s) => !s.routeExists)
-    expect(noRoute.length).toBe(4)
+    expect(noRoute.length).toBe(1) // only adult_18plus_image
     for (const entry of noRoute) {
       expect(entry.available).toBe(false)
     }

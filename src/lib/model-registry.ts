@@ -53,6 +53,7 @@ export type ModelRole =
   | 'multilingual'
   | 'vision'
   | 'image_generation'
+  | 'video_generation'
   | 'tts'
   | 'voice_interaction';
 
@@ -115,6 +116,9 @@ export interface ModelEntry {
 
   /** Can plan or decompose video-production workflows. */
   supports_video_planning: boolean;
+
+  /** Can render / generate actual video files from prompts or scenes. */
+  supports_video_generation?: boolean;
 
   /** Can transcribe speech / audio to text (STT). */
   supports_stt?: boolean;
@@ -2375,6 +2379,167 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     validator_eligible: false,
     specialist_domains: ['voice', 'tts', 'french', 'fallback'],
   },
+
+  // ── OpenAI Realtime (Layer 1 – Premium) ─────────────────────────────────
+
+  {
+    provider: 'openai',
+    provider_tier: 'premium',
+    model_id: 'gpt-4o-realtime-preview',
+    model_name: 'GPT-4o Realtime Preview',
+    family: 'GPT-4',
+    primary_role: 'voice_interaction',
+    secondary_roles: ['chat'],
+    supports_chat: true,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: true,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_stt: true,
+    supports_tts: true,
+    supports_voice_interaction: true,
+    supports_agent_planning: false,
+    context_window: 128_000,
+    latency_tier: 'ultra_low',
+    cost_tier: 'high',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 1,
+    validator_eligible: false,
+    specialist_domains: ['voice', 'realtime', 'stt', 'tts', 'streaming'],
+  },
+
+  // ── Replicate (Layer 2 – Backbone / Video Generation) ───────────────────
+
+  {
+    provider: 'replicate',
+    provider_tier: 'backbone',
+    model_id: 'wan-ai/wan2.1-t2v-480p',
+    model_name: 'Wan2.1 Text-to-Video 480p',
+    family: 'Wan',
+    primary_role: 'video_generation',
+    secondary_roles: [],
+    supports_chat: false,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: false,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_video_generation: true,
+    supports_agent_planning: false,
+    context_window: 512,
+    latency_tier: 'high',
+    cost_tier: 'medium',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 1,
+    validator_eligible: false,
+    specialist_domains: ['video', 'video_generation', 'text-to-video'],
+  },
+  {
+    provider: 'replicate',
+    provider_tier: 'backbone',
+    model_id: 'minimax/video-01',
+    model_name: 'MiniMax Video-01',
+    family: 'MiniMax',
+    primary_role: 'video_generation',
+    secondary_roles: [],
+    supports_chat: false,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: false,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_video_generation: true,
+    supports_agent_planning: false,
+    context_window: 512,
+    latency_tier: 'high',
+    cost_tier: 'medium',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 2,
+    validator_eligible: false,
+    specialist_domains: ['video', 'video_generation', 'text-to-video'],
+  },
+
+  // ── HuggingFace Video Generation ─────────────────────────────────────────
+
+  {
+    provider: 'huggingface',
+    provider_tier: 'backbone',
+    model_id: 'cerspense/zeroscope_v2_576w',
+    model_name: 'ZeroScope V2 576w (HuggingFace)',
+    family: 'ZeroScope',
+    primary_role: 'video_generation',
+    secondary_roles: [],
+    supports_chat: false,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: false,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_video_generation: true,
+    supports_agent_planning: false,
+    context_window: 256,
+    latency_tier: 'high',
+    cost_tier: 'free',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 3,
+    validator_eligible: false,
+    specialist_domains: ['video', 'video_generation', 'text-to-video', 'suggestive', 'fashion', 'lifestyle'],
+  },
+  {
+    provider: 'huggingface',
+    provider_tier: 'backbone',
+    model_id: 'damo-vilab/text-to-video-ms-1.7b',
+    model_name: 'Text-to-Video MS 1.7B (HuggingFace)',
+    family: 'ModelScope',
+    primary_role: 'video_generation',
+    secondary_roles: [],
+    supports_chat: false,
+    supports_reasoning: false,
+    supports_code: false,
+    supports_tool_use: false,
+    supports_multilingual: false,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_video_generation: true,
+    supports_agent_planning: false,
+    context_window: 256,
+    latency_tier: 'high',
+    cost_tier: 'free',
+    enabled: true,
+    health_status: 'configured',
+    fallback_priority: 4,
+    validator_eligible: false,
+    specialist_domains: ['video', 'video_generation', 'text-to-video', 'fallback'],
+  },
 ] as const satisfies readonly ModelEntry[];
 
 // ── Boolean capability keys (used for type-safe filtering) ──────────────
@@ -2624,6 +2789,7 @@ const DEFAULT_MODEL_MAP: Record<string, string> = {
   huggingface: 'meta-llama/Llama-3-8b-chat-hf',
   nvidia: 'nvidia/llama-3.1-nemotron-70b-instruct',
   gemini: 'gemini-1.5-flash',
+  replicate: 'wan-ai/wan2.1-t2v-480p',
 };
 
 /**

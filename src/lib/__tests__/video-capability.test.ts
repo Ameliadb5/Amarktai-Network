@@ -12,10 +12,11 @@
  *  - HF fallback does NOT claim video generation support
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   getModelRegistry,
   getModelsByProvider,
+  clearProviderHealthCache,
 } from '../model-registry'
 import {
   resolveCapabilityRoutes,
@@ -89,8 +90,10 @@ describe('Video Planning Truth', () => {
  * ================================================================ */
 
 describe('Video Generation Truth', () => {
-  it('video_generation has NO backend route', () => {
-    expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(false)
+  beforeEach(() => clearProviderHealthCache())
+
+  it('video_generation has a backend route (async job pipeline)', () => {
+    expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(true)
   })
 
   it('video_generation is labeled as generation, not planning', () => {
@@ -99,18 +102,20 @@ describe('Video Generation Truth', () => {
     expect(map.video_generation.label).not.toContain('planning')
   })
 
-  it('video_generation is blocked by backend route guard', () => {
+  it('video_generation is unavailable without a configured video provider', () => {
+    clearProviderHealthCache()
     const result = resolveCapabilityRoutes({ capabilities: ['video_generation'] })
     expect(result.routes[0].available).toBe(false)
-    expect(result.routes[0].missingMessage).toContain('Route not implemented')
+    expect(result.routes[0].missingMessage).toContain('No provider configured')
   })
 
-  it('video_generation shows unavailable in detailed status', () => {
+  it('video_generation shows routeExists=true but unavailable without provider', () => {
+    clearProviderHealthCache()
     const status = getDetailedCapabilityStatus()
     const gen = status.find((s) => s.capability === 'video_generation')
     expect(gen).toBeDefined()
     expect(gen!.available).toBe(false)
-    expect(gen!.routeExists).toBe(false)
+    expect(gen!.routeExists).toBe(true)  // Route now exists
   })
 
   it('video_planning and video_generation are separate capabilities', () => {
@@ -118,7 +123,6 @@ describe('Video Generation Truth', () => {
     const genResult = resolveCapabilityRoutes({ capabilities: ['video_generation'] })
     expect(planResult.routes[0].capability).toBe('video_planning')
     expect(genResult.routes[0].capability).toBe('video_generation')
-    // One available, one not
     expect(planResult.routes[0].capability).not.toBe(genResult.routes[0].capability)
   })
 })
@@ -169,9 +173,9 @@ describe('Video Classification Rules', () => {
  * ================================================================ */
 
 describe('Planning vs Generation Are Not Merged', () => {
-  it('video_planning and video_generation have different BACKEND_ROUTE_EXISTS values', () => {
+  it('video_planning and video_generation both have backend routes (both implemented)', () => {
     expect(BACKEND_ROUTE_EXISTS.video_planning).toBe(true)
-    expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(false)
+    expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(true)
   })
 
   it('video_planning and video_generation have different labels', () => {
@@ -179,10 +183,10 @@ describe('Planning vs Generation Are Not Merged', () => {
     expect(map.video_planning.label).not.toBe(map.video_generation.label)
   })
 
-  it('video_generation requires supports_video_planning flag only', () => {
+  it('video_generation requires supports_video_generation flag (not supports_video_planning)', () => {
     const map = CAPABILITY_MAP as Record<string, { anyCapabilityFlag?: string[] }>
-    expect(map.video_generation.anyCapabilityFlag).toEqual(['supports_video_planning'])
-    // It does NOT include supports_chat — generation needs specialist models
+    expect(map.video_generation.anyCapabilityFlag).toEqual(['supports_video_generation'])
+    expect(map.video_generation.anyCapabilityFlag).not.toContain('supports_video_planning')
   })
 
   it('video_planning accepts supports_chat as a qualifying flag', () => {
@@ -191,14 +195,15 @@ describe('Planning vs Generation Are Not Merged', () => {
     expect(map.video_planning.anyCapabilityFlag).toContain('supports_video_planning')
   })
 
-  it('detailed status shows planning available, generation unavailable', () => {
+  it('detailed status shows both planning and generation have routes', () => {
+    clearProviderHealthCache()
     const status = getDetailedCapabilityStatus()
     const plan = status.find((s) => s.capability === 'video_planning')
     const gen = status.find((s) => s.capability === 'video_generation')
     expect(plan).toBeDefined()
     expect(gen).toBeDefined()
     expect(plan!.routeExists).toBe(true)
-    expect(gen!.routeExists).toBe(false)
+    expect(gen!.routeExists).toBe(true)
   })
 })
 
@@ -207,8 +212,9 @@ describe('Planning vs Generation Are Not Merged', () => {
  * ================================================================ */
 
 describe('HF Fallback Has No Video Generation Claims', () => {
-  it('HF fallback catalog does NOT include video_generation', () => {
-    expect(HF_FALLBACK_MODELS.video_generation).toBeUndefined()
+  it('HF fallback catalog includes video_generation (HF has zeroscope and text-to-video models)', () => {
+    expect(HF_FALLBACK_MODELS.video_generation).toBeDefined()
+    expect(HF_FALLBACK_MODELS.video_generation!.length).toBeGreaterThan(0)
   })
 
   it('HF fallback catalog does NOT include video_planning', () => {

@@ -36,6 +36,18 @@ const HF_FALLBACK_MODELS: Partial<Record<CapabilityClass, HfFallbackSpec[]>> = {
     { model: 'stabilityai/stable-diffusion-xl-base-1.0', label: 'SDXL Base', notes: 'Fashion/lifestyle image generation with safe-prompt enforcement' },
     { model: 'stabilityai/stable-diffusion-2-1', label: 'SD 2.1', notes: 'Reliable fallback with controlled prompts' },
   ],
+  // suggestive_video_generation uses text-to-video models with prompt guarding.
+  // Prompts are validated and sanitized by validateSuggestivePrompt() before
+  // being sent. No nudity or explicit content is allowed.
+  suggestive_video_generation: [
+    { model: 'cerspense/zeroscope_v2_576w', label: 'ZeroScope V2 576w', notes: 'Fashion/lifestyle text-to-video with safe-prompt enforcement' },
+    { model: 'damo-vilab/text-to-video-ms-1.7b', label: 'Text-to-Video MS 1.7B', notes: 'General text-to-video fallback' },
+  ],
+  // video_generation uses text-to-video models for general video content.
+  video_generation: [
+    { model: 'cerspense/zeroscope_v2_576w', label: 'ZeroScope V2 576w', notes: 'Free text-to-video generation (Replicate preferred for production)' },
+    { model: 'damo-vilab/text-to-video-ms-1.7b', label: 'Text-to-Video MS 1.7B', notes: 'Fallback text-to-video' },
+  ],
   embeddings: [
     { model: 'sentence-transformers/all-MiniLM-L6-v2', label: 'MiniLM-L6', notes: 'Fast sentence embeddings' },
     { model: 'BAAI/bge-base-en-v1.5', label: 'BGE Base', notes: 'High-quality embeddings' },

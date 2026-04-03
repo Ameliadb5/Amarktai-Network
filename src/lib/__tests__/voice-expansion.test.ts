@@ -205,14 +205,15 @@ describe('Fallback Chain Depth', () => {
  * ================================================================ */
 
 describe('Realtime Voice Truth', () => {
-  it('realtime_voice has NO backend route', () => {
-    expect(BACKEND_ROUTE_EXISTS.realtime_voice).toBe(false)
+  it('realtime_voice has a backend route (session endpoint + WS service implemented)', () => {
+    expect(BACKEND_ROUTE_EXISTS.realtime_voice).toBe(true)
   })
 
-  it('realtime_voice is blocked with route guard message', () => {
+  it('realtime_voice is blocked when REALTIME_SERVICE_URL not set', () => {
+    delete process.env.REALTIME_SERVICE_URL
     const result = resolveCapabilityRoutes({ capabilities: ['realtime_voice'] })
     expect(result.routes[0].available).toBe(false)
-    expect(result.routes[0].missingMessage).toContain('Route not implemented')
+    expect(result.routes[0].missingMessage).toContain('REALTIME_SERVICE_URL')
   })
 
   it('realtime_voice classification patterns match via taskType', () => {

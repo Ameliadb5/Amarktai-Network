@@ -341,15 +341,15 @@ describe('No Fake Generation Claims', () => {
     expect(map.suggestive_video_planning.label).not.toContain('generation')
   })
 
-  it('adult_18plus_image still has no backend route', () => {
+  it('adult_18plus_image still has no backend route (NOT IMPLEMENTED)', () => {
     expect(BACKEND_ROUTE_EXISTS.adult_18plus_image).toBe(false)
   })
 
-  it('video_generation still has no backend route', () => {
-    expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(false)
+  it('video_generation now has a backend route (async job pipeline implemented)', () => {
+    expect(BACKEND_ROUTE_EXISTS.video_generation).toBe(true)
   })
 
-  it('realtime_voice still has no backend route', () => {
-    expect(BACKEND_ROUTE_EXISTS.realtime_voice).toBe(false)
+  it('realtime_voice now has a backend route (session endpoint + WS service implemented)', () => {
+    expect(BACKEND_ROUTE_EXISTS.realtime_voice).toBe(true)
   })
 })

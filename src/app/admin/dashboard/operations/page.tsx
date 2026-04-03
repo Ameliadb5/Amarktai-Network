@@ -457,8 +457,8 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
                 {/* Test connection */}
                 <button
                   onClick={() => handleTestConnection(p)}
-                  disabled={isTesting || !p.enabled}
-                  title={!p.enabled ? 'Enable provider first' : 'Run a live health check'}
+                  disabled={isTesting}
+                  title={p.maskedPreview ? 'Run a live health check' : 'Save an API key first to test'}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   {isTesting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
