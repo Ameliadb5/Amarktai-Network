@@ -122,7 +122,7 @@ export interface AppProfile {
 // ── Shared constants ────────────────────────────────────────────────────────
 
 const ALL_PROVIDERS = [
-  'openai', 'grok', 'nvidia', 'huggingface', 'deepseek', 'groq', 'openrouter', 'together',
+  'openai', 'groq', 'gemini', 'huggingface', 'together', 'openrouter', 'deepseek', 'nvidia', 'replicate', 'grok',
 ];
 
 const BACKBONE_PROVIDERS = [
@@ -439,6 +439,95 @@ export const DEFAULT_APP_PROFILES: ReadonlyMap<string, AppProfile> = new Map<str
     latency_sensitivity: 'high',
     logging_privacy_rules: BASIC_PRIVACY_RULES,
   }],
+
+  // ── Internal Admin Profiles ────────────────────────────────────────────────
+
+  ['__dashboard__', {
+    app_id: '__dashboard__',
+    app_name: 'Dashboard',
+    app_type: 'internal',
+    domain: 'admin',
+    default_routing_mode: 'direct',
+    allowed_providers: ALL_PROVIDERS,
+    allowed_models: [],  // empty = wildcard (allow all)
+    preferred_models: [],
+    escalation_rules: [],
+    validator_rules: [],
+    agent_permissions: FULL_AGENT_PERMISSIONS,
+    multimodal_permissions: ['vision', 'image_generation'],
+    memory_namespace: '__dashboard__',
+    retrieval_namespace: '__dashboard__',
+    budget_sensitivity: 'low',
+    latency_sensitivity: 'low',
+    logging_privacy_rules: BASIC_PRIVACY_RULES,
+    safe_mode: false,
+    suggestive_mode: false,
+    cost_tier: 'balanced',
+    enabled_capabilities: [
+      'general_chat', 'deep_reasoning', 'coding', 'image_generation',
+      'voice_stt', 'voice_tts', 'research_search', 'deep_research',
+      'reranking', 'embeddings', 'video_planning', 'video_generation',
+      'multimodal_vision', 'agent_planning', 'creative_writing',
+    ],
+  }],
+
+  ['__admin__', {
+    app_id: '__admin__',
+    app_name: 'Admin',
+    app_type: 'internal',
+    domain: 'admin',
+    default_routing_mode: 'direct',
+    allowed_providers: ALL_PROVIDERS,
+    allowed_models: [],  // empty = wildcard (allow all)
+    preferred_models: [],
+    escalation_rules: [],
+    validator_rules: [],
+    agent_permissions: FULL_AGENT_PERMISSIONS,
+    multimodal_permissions: ['vision', 'image_generation'],
+    memory_namespace: '__admin__',
+    retrieval_namespace: '__admin__',
+    budget_sensitivity: 'low',
+    latency_sensitivity: 'low',
+    logging_privacy_rules: BASIC_PRIVACY_RULES,
+    safe_mode: false,
+    suggestive_mode: false,
+    cost_tier: 'balanced',
+    enabled_capabilities: [
+      'general_chat', 'deep_reasoning', 'coding', 'image_generation',
+      'voice_stt', 'voice_tts', 'research_search', 'deep_research',
+      'reranking', 'embeddings', 'video_planning', 'video_generation',
+      'multimodal_vision', 'agent_planning', 'creative_writing',
+    ],
+  }],
+
+  ['__admin_test__', {
+    app_id: '__admin_test__',
+    app_name: 'Admin Test',
+    app_type: 'internal',
+    domain: 'admin',
+    default_routing_mode: 'direct',
+    allowed_providers: ALL_PROVIDERS,
+    allowed_models: [],  // empty = wildcard (allow all)
+    preferred_models: [],
+    escalation_rules: [],
+    validator_rules: [],
+    agent_permissions: FULL_AGENT_PERMISSIONS,
+    multimodal_permissions: ['vision', 'image_generation'],
+    memory_namespace: '__admin_test__',
+    retrieval_namespace: '__admin_test__',
+    budget_sensitivity: 'low',
+    latency_sensitivity: 'low',
+    logging_privacy_rules: BASIC_PRIVACY_RULES,
+    safe_mode: false,
+    suggestive_mode: false,
+    cost_tier: 'balanced',
+    enabled_capabilities: [
+      'general_chat', 'deep_reasoning', 'coding', 'image_generation',
+      'voice_stt', 'voice_tts', 'research_search', 'deep_research',
+      'reranking', 'embeddings', 'video_planning', 'video_generation',
+      'multimodal_vision', 'agent_planning', 'creative_writing',
+    ],
+  }],
 ]);
 
 // ── Helper functions ────────────────────────────────────────────────────────
@@ -466,8 +555,9 @@ export function isProviderAllowed(profile: AppProfile, providerKey: string): boo
   return profile.allowed_providers.includes(providerKey);
 }
 
-/** Check whether a model ID is in the profile's allowed list. */
+/** Check whether a model ID is in the profile's allowed list. Empty list = allow all. */
 export function isModelAllowed(profile: AppProfile, modelId: string): boolean {
+  if (profile.allowed_models.length === 0) return true;
   return profile.allowed_models.includes(modelId);
 }
 
@@ -539,4 +629,46 @@ export function getMemoryNamespace(profile: AppProfile): string {
 /** Get the retrieval namespace for an app profile. */
 export function getRetrievalNamespace(profile: AppProfile): string {
   return profile.retrieval_namespace;
+}
+
+/**
+ * Try to load app profile from database (AppAiProfile table).
+ * Returns null if not found or DB unavailable.
+ */
+export async function getAppProfileFromDb(appSlug: string): Promise<AppProfile | null> {
+  try {
+    const { prisma } = await import('./prisma');
+    const dbProfile = await (prisma as any).appAiProfile?.findUnique({
+      where: { appSlug },
+    });
+    if (!dbProfile) return null;
+
+    return {
+      app_id: dbProfile.appSlug,
+      app_name: dbProfile.appName,
+      app_type: dbProfile.appType,
+      domain: dbProfile.domain,
+      default_routing_mode: dbProfile.defaultRoutingMode as any,
+      allowed_providers: JSON.parse(dbProfile.allowedProviders || '[]'),
+      allowed_models: JSON.parse(dbProfile.allowedModels || '[]'),
+      preferred_models: JSON.parse(dbProfile.preferredModels || '[]'),
+      escalation_rules: JSON.parse(dbProfile.escalationRules || '[]'),
+      validator_rules: JSON.parse(dbProfile.validatorRules || '[]'),
+      agent_permissions: JSON.parse(dbProfile.agentPermissions || '[]'),
+      multimodal_permissions: JSON.parse(dbProfile.multimodalPermissions || '[]'),
+      memory_namespace: dbProfile.memoryNamespace || appSlug,
+      retrieval_namespace: dbProfile.retrievalNamespace || appSlug,
+      budget_sensitivity: dbProfile.budgetSensitivity as any,
+      latency_sensitivity: dbProfile.latencySensitivity as any,
+      logging_privacy_rules: JSON.parse(dbProfile.loggingPrivacyRules || '[]'),
+      safe_mode: dbProfile.safeMode,
+      suggestive_mode: dbProfile.suggestiveMode,
+      cost_tier: dbProfile.costMode as any,
+      fallback_chain: JSON.parse(dbProfile.fallbackChain || '[]'),
+      monthly_budget_usd: dbProfile.monthlyBudgetCap ?? undefined,
+      enabled_capabilities: JSON.parse(dbProfile.enabledCapabilities || '[]'),
+    };
+  } catch {
+    return null;
+  }
 }
