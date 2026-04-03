@@ -430,7 +430,16 @@ function AgentsTab({ data }: { data: unknown }) {
 
 /* ── capabilities tab ──────────────────────────────────────── */
 
-interface CapabilityEntry { capability?: string; available?: boolean }
+interface CapabilityEntry {
+  capability?: string
+  available?: boolean
+  state?: 'AVAILABLE_NOW' | 'BLOCKED_BY_SETTINGS' | 'UNAVAILABLE_WITH_CURRENT_CONFIG' | 'NOT_IMPLEMENTED'
+  reason?: string
+  routeExists?: boolean
+  blockedBySettings?: boolean
+  hasCapableModel?: boolean
+  hasActiveProvider?: boolean
+}
 
 function CapabilitiesTab({ routingData }: { routingData: unknown }) {
   const d = routingData as { capabilities?: CapabilityEntry[] } | null
@@ -440,22 +449,35 @@ function CapabilitiesTab({ routingData }: { routingData: unknown }) {
     return <Placeholder icon={Zap} message="Capability status unavailable." />
   }
 
-  const available = capabilities.filter(c => c.available).length
-  const unavailable = capabilities.length - available
+  const available = capabilities.filter(c => c.available || c.state === 'AVAILABLE_NOW').length
+  const blocked = capabilities.filter(c => c.state === 'BLOCKED_BY_SETTINGS').length
+  const unavailable = capabilities.filter(c => c.state === 'UNAVAILABLE_WITH_CURRENT_CONFIG').length
+  const notImpl = capabilities.filter(c => c.state === 'NOT_IMPLEMENTED').length
+  const otherUnavailable = capabilities.length - available - blocked - unavailable - notImpl
 
   const stats = [
     { label: 'Total', value: capabilities.length },
-    { label: 'Available', value: available },
-    { label: 'Unavailable', value: unavailable },
+    { label: 'Available Now', value: available, color: 'text-emerald-400' },
+    { label: 'Blocked by Settings', value: blocked, color: 'text-amber-400' },
+    { label: 'Unavailable', value: unavailable + otherUnavailable, color: 'text-red-400' },
+    { label: 'Not Implemented', value: notImpl, color: 'text-slate-400' },
   ]
+
+  const stateStyle = (cap: CapabilityEntry) => {
+    const s = cap.state
+    if (s === 'AVAILABLE_NOW' || cap.available) return { dot: 'bg-emerald-400', label: 'Available Now', text: 'text-emerald-400/70' }
+    if (s === 'BLOCKED_BY_SETTINGS') return { dot: 'bg-amber-400', label: 'Blocked by Settings', text: 'text-amber-400/70' }
+    if (s === 'NOT_IMPLEMENTED') return { dot: 'bg-slate-500', label: 'Not Implemented', text: 'text-slate-400/70' }
+    return { dot: 'bg-red-400', label: 'Unavailable', text: 'text-red-400/70' }
+  }
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {stats.map((s, i) => (
           <motion.div key={s.label} className={INNER} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
             <p className="text-[11px] uppercase tracking-wider text-white/30">{s.label}</p>
-            <p className="mt-1 text-xl font-semibold text-white/90">{s.value}</p>
+            <p className={`mt-1 text-xl font-semibold ${'color' in s && s.color ? s.color : 'text-white/90'}`}>{s.value}</p>
           </motion.div>
         ))}
       </div>
@@ -463,17 +485,25 @@ function CapabilitiesTab({ routingData }: { routingData: unknown }) {
       <div className={`${CARD} p-5`}>
         <p className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">Capability Map</p>
         <div className="space-y-2">
-          {capabilities.map((cap, i) => (
-            <motion.div key={cap.capability ?? i}
-              className="flex items-center gap-3 rounded-xl bg-white/[0.02] border border-white/[0.04] px-4 py-3"
-              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-              <StatusDot color={cap.available ? 'bg-emerald-400' : 'bg-red-400'} />
-              <span className="text-sm text-white/60">{(cap.capability ?? 'unknown').replace(/_/g, ' ')}</span>
-              <span className={`ml-auto text-[10px] font-medium ${cap.available ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
-                {cap.available ? 'Available' : 'Unavailable'}
-              </span>
-            </motion.div>
-          ))}
+          {capabilities.map((cap, i) => {
+            const style = stateStyle(cap)
+            return (
+              <motion.div key={cap.capability ?? i}
+                className="flex items-start gap-3 rounded-xl bg-white/[0.02] border border-white/[0.04] px-4 py-3"
+                initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+                <StatusDot color={style.dot} />
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm text-white/60">{(cap.capability ?? 'unknown').replace(/_/g, ' ')}</span>
+                  {cap.reason && (
+                    <p className="text-[10px] text-white/30 mt-0.5">{cap.reason}</p>
+                  )}
+                </div>
+                <span className={`ml-auto text-[10px] font-medium whitespace-nowrap ${style.text}`}>
+                  {style.label}
+                </span>
+              </motion.div>
+            )
+          })}
         </div>
       </div>
     </div>
@@ -487,7 +517,7 @@ const API_MAP: Record<TabKey, string | null> = {
   memory:       '/api/admin/memory',
   learning:     '/api/admin/learning?view=dashboard',
   agents:       '/api/admin/agents',
-  capabilities: null,
+  capabilities: '/api/admin/truth?section=capabilities',
 }
 
 export default function IntelligencePage() {
@@ -497,8 +527,9 @@ export default function IntelligencePage() {
   const memory   = useTabFetch(API_MAP.memory,   tab === 'memory')
   const learning = useTabFetch(API_MAP.learning,  tab === 'learning')
   const agents   = useTabFetch(API_MAP.agents,    tab === 'agents')
+  const capabilities = useTabFetch(API_MAP.capabilities, tab === 'capabilities')
 
-  const current = { routing, memory, learning, agents, capabilities: routing }[tab]
+  const current = { routing, memory, learning, agents, capabilities }[tab]
 
   return (
     <div className="space-y-8">
@@ -554,7 +585,7 @@ export default function IntelligencePage() {
               {tab === 'memory'       && <MemoryTab data={memory.data} />}
               {tab === 'learning'     && <LearningTab data={learning.data} />}
               {tab === 'agents'       && <AgentsTab data={agents.data} />}
-              {tab === 'capabilities' && <CapabilitiesTab routingData={routing.data} />}
+              {tab === 'capabilities' && <CapabilitiesTab routingData={capabilities.data} />}
             </>
           )}
         </motion.div>
