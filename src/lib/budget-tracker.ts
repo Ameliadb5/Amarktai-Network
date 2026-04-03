@@ -23,17 +23,22 @@ const COST_RATES: Record<string, { input: number; output: number }> = {
   'gpt-4-turbo':             { input: 0.01,   output: 0.03 },
   'o1-preview':              { input: 0.015,  output: 0.06 },
   'o1-mini':                 { input: 0.003,  output: 0.012 },
+  'o4-mini':                 { input: 0.003,  output: 0.012 },
   // Groq (very cheap / free tier)
   'llama-3.3-70b-versatile': { input: 0.00059, output: 0.00079 },
   'llama-3.1-8b-instant':    { input: 0.00005, output: 0.00008 },
   'mixtral-8x7b-32768':      { input: 0.00024, output: 0.00024 },
+  'whisper-large-v3-turbo':  { input: 0.00011, output: 0.00011 },
   // DeepSeek
   'deepseek-chat':           { input: 0.00014, output: 0.00028 },
   'deepseek-coder':          { input: 0.00014, output: 0.00028 },
   'deepseek-reasoner':       { input: 0.00055, output: 0.00219 },
   // Gemini
   'gemini-2.0-flash':        { input: 0.00010, output: 0.00040 },
+  'gemini-1.5-flash':        { input: 0.00008, output: 0.00030 },
   'gemini-1.5-pro':          { input: 0.00125, output: 0.00500 },
+  'gemini-2.5-pro':          { input: 0.00150, output: 0.00600 },
+  'gemini-2.5-flash':        { input: 0.00015, output: 0.00060 },
   // Grok
   'grok-2-latest':           { input: 0.002,  output: 0.010 },
   'grok-3-mini-beta':        { input: 0.0003, output: 0.0005 },
@@ -41,6 +46,12 @@ const COST_RATES: Record<string, { input: number; output: number }> = {
   'nvidia/llama-3.1-nemotron-70b-instruct': { input: 0.00035, output: 0.00040 },
   // Together AI
   'meta-llama/Llama-3-70b-chat-hf': { input: 0.00090, output: 0.00090 },
+  // OpenRouter
+  'openai/gpt-4o-mini':      { input: 0.00015, output: 0.0006 },
+  // Replicate (per-second pricing approximation)
+  'wan-ai/wan2.1-t2v-480p':  { input: 0.0032, output: 0.0032 },
+  // HuggingFace (mostly free inference)
+  'meta-llama/Llama-3.3-70B-Instruct': { input: 0.00059, output: 0.00079 },
   // Fallback
   'default':                 { input: 0.001,  output: 0.002 },
 }
@@ -277,6 +288,54 @@ export function getRecommendedModelTier(usagePercent: number): ModelTier {
   if (usagePercent >= 90) return 'cheap'
   if (usagePercent >= 70) return 'mid'
   return 'premium'
+}
+
+/**
+ * Estimate cost for a single request given the model, input tokens, and output tokens.
+ * Returns USD amount.
+ */
+export function estimateRequestCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+): number {
+  const rate = COST_RATES[model] ?? COST_RATES['default']
+  return (inputTokens / 1000) * rate.input + (outputTokens / 1000) * rate.output
+}
+
+/**
+ * Get cost tier label for a given model based on its rate.
+ */
+export function getModelCostLabel(model: string): 'cheap' | 'balanced' | 'premium' {
+  const rate = COST_RATES[model] ?? COST_RATES['default']
+  const avgRate = (rate.input + rate.output) / 2
+  if (avgRate < 0.0005) return 'cheap'
+  if (avgRate < 0.005) return 'balanced'
+  return 'premium'
+}
+
+/**
+ * Select the best cost tier based on provider budget status.
+ * Implements automatic tier downgrade when nearing budget limits.
+ */
+export async function selectCostTierForRequest(
+  providerKey: string,
+  preferredTier?: 'cheap' | 'balanced' | 'premium',
+): Promise<'cheap' | 'balanced' | 'premium'> {
+  const budgetTier = await suggestModelTier(providerKey)
+  // Map ModelTier to cost tier
+  const tierMap: Record<ModelTier, 'cheap' | 'balanced' | 'premium'> = {
+    cheap: 'cheap',
+    mid: 'balanced',
+    premium: 'premium',
+  }
+  const budgetSuggestion = tierMap[budgetTier]
+  // If budget forces a cheaper tier, respect that regardless of preference
+  const tierOrder = { cheap: 0, balanced: 1, premium: 2 }
+  if (preferredTier && tierOrder[preferredTier] <= tierOrder[budgetSuggestion]) {
+    return preferredTier
+  }
+  return budgetSuggestion
 }
 
 /**

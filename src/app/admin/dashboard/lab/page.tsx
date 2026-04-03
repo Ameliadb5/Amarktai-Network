@@ -9,6 +9,7 @@ import {
 
 const CAPABILITIES = [
   'chat', 'code', 'vision', 'reasoning', 'embeddings', 'tts', 'stt', 'image',
+  'video', 'research', 'suggestive',
 ]
 
 const fadeUp = {
@@ -29,6 +30,13 @@ interface CapabilityEntry {
   routeExists: boolean
 }
 
+interface ModelOption {
+  id: string
+  name: string
+  provider: string
+  category: string
+}
+
 interface TestResult {
   success: boolean
   executed: boolean
@@ -47,13 +55,18 @@ interface TestResult {
   warnings: string[]
   error: string | null
   latencyMs: number
+  imageUrl?: string | null
+  audioUrl?: string | null
+  videoStatus?: string | null
 }
 
 export default function LabPage() {
   const [prompt, setPrompt] = useState('')
   const [capability, setCapability] = useState('chat')
   const [forceProvider, setForceProvider] = useState<string>('auto')
+  const [forceModel, setForceModel] = useState<string>('auto')
   const [providers, setProviders] = useState<ProviderOption[]>([])
+  const [models, setModels] = useState<ModelOption[]>([])
   const [loadingProviders, setLoadingProviders] = useState(true)
   const [capabilityStatus, setCapabilityStatus] = useState<CapabilityEntry[]>([])
   const [loadingCaps, setLoadingCaps] = useState(true)
@@ -65,9 +78,12 @@ export default function LabPage() {
   const loadProviders = useCallback(async () => {
     setLoadingProviders(true)
     try {
-      const res = await fetch('/api/admin/providers')
-      if (res.ok) {
-        const data = await res.json()
+      const [provRes, modRes] = await Promise.all([
+        fetch('/api/admin/providers'),
+        fetch('/api/admin/models'),
+      ])
+      if (provRes.ok) {
+        const data = await provRes.json()
         const list: ProviderOption[] = Array.isArray(data)
           ? data
               .filter((p: { enabled: boolean }) => p.enabled)
@@ -78,6 +94,16 @@ export default function LabPage() {
               }))
           : []
         setProviders(list)
+      }
+      if (modRes.ok) {
+        const modData = await modRes.json()
+        const raw = Array.isArray(modData) ? modData : (modData?.models ?? [])
+        setModels(raw.map((m: { model_id?: string; id?: string; model_name?: string; display_name?: string; provider?: string; category?: string }) => ({
+          id: m.model_id ?? m.id ?? '',
+          name: m.model_name ?? m.display_name ?? m.model_id ?? m.id ?? '',
+          provider: m.provider ?? '',
+          category: m.category ?? 'text',
+        })))
       }
     } catch {
       // best-effort
@@ -119,6 +145,9 @@ export default function LabPage() {
       if (forceProvider !== 'auto') {
         body.providerKey = forceProvider
       }
+      if (forceModel !== 'auto') {
+        body.modelId = forceModel
+      }
       const res = await fetch('/api/admin/brain/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -149,6 +178,9 @@ export default function LabPage() {
         warnings: Array.isArray(data.warnings) ? data.warnings : [],
         error: data.error ?? null,
         latencyMs: data.latencyMs ?? 0,
+        imageUrl: data.imageUrl ?? data.image_url ?? null,
+        audioUrl: data.audioUrl ?? data.audio_url ?? null,
+        videoStatus: data.videoStatus ?? data.video_status ?? null,
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Request failed')
@@ -268,6 +300,26 @@ export default function LabPage() {
             )}
           </div>
 
+          {/* Model Selector */}
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Model</label>
+            <select
+              value={forceModel}
+              onChange={(e) => setForceModel(e.target.value)}
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
+            >
+              <option value="auto" className="bg-[#0a0f1a] text-white">🤖 Auto-Select (best for task)</option>
+              {(forceProvider === 'auto'
+                ? models
+                : models.filter(m => m.provider === forceProvider)
+              ).map((m) => (
+                <option key={`${m.provider}:${m.id}`} value={m.id} className="bg-[#0a0f1a] text-white">
+                  {m.name} ({m.provider}) [{m.category}]
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Capability Selector */}
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Task / Capability</label>
@@ -290,7 +342,32 @@ export default function LabPage() {
 
           {/* Prompt Input */}
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Prompt</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Prompt</label>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const SpeechRecognition = (window as any).webkitSpeechRecognition
+                    const recognition = new SpeechRecognition()
+                    recognition.continuous = false
+                    recognition.interimResults = false
+                    recognition.lang = 'en-US'
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    recognition.onresult = (event: any) => {
+                      const transcript = event.results?.[0]?.[0]?.transcript ?? ''
+                      if (transcript) setPrompt(prev => prev ? `${prev} ${transcript}` : transcript)
+                    }
+                    recognition.start()
+                  }
+                }}
+                className="text-[10px] text-slate-500 hover:text-blue-400 transition-colors flex items-center gap-1"
+                title="Voice input (Chrome only)"
+              >
+                🎤 Voice
+              </button>
+            </div>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -414,19 +491,56 @@ export default function LabPage() {
               <div className="flex flex-col items-start gap-2 p-1">
                 <p className="text-sm text-red-400">{error}</p>
               </div>
-            ) : result?.error && !result.output ? (
+            ) : result?.error && !result.output && !result.imageUrl ? (
               <div className="space-y-2">
                 <p className="text-sm text-red-400">{result.error}</p>
                 {!result.executed && (
                   <p className="text-xs text-slate-500">The capability engine could not execute this request. Check the capability map above for available capabilities.</p>
                 )}
               </div>
-            ) : result?.output ? (
-              <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{result.output}</pre>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full gap-2">
-                <FlaskConical className="w-8 h-8 text-slate-700" />
-                <p className="text-sm text-slate-600">Run a test to see output</p>
+              <div className="space-y-4">
+                {/* Image Preview */}
+                {result?.imageUrl && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Generated Image</p>
+                    <img
+                      src={result.imageUrl}
+                      alt="Generated"
+                      className="max-w-full rounded-lg border border-white/[0.06]"
+                    />
+                  </div>
+                )}
+
+                {/* Audio Playback */}
+                {result?.audioUrl && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Audio Output</p>
+                    <audio controls className="w-full">
+                      <source src={result.audioUrl} />
+                    </audio>
+                  </div>
+                )}
+
+                {/* Video Status */}
+                {result?.videoStatus && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Video Status</p>
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-500/5 border border-violet-500/10">
+                      <span className="text-xs text-violet-400 font-mono">{result.videoStatus}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Text Output */}
+                {result?.output ? (
+                  <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{result.output}</pre>
+                ) : !result?.imageUrl && !result?.audioUrl && !result?.videoStatus ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-2">
+                    <FlaskConical className="w-8 h-8 text-slate-700" />
+                    <p className="text-sm text-slate-600">Run a test to see output</p>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
