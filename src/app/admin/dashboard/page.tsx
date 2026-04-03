@@ -61,6 +61,20 @@ interface MemoryStatusData {
   error: string | null
 }
 
+interface TruthSummary {
+  totalProviders: number
+  activeProviders: number
+  configuredProviders: number
+  totalModels: number
+  usableModels: number
+  totalCapabilities: number
+  availableCapabilities: number
+  blockedCapabilities: number
+  unavailableCapabilities: number
+  notImplemented: number
+  systemHealth: number
+}
+
 /* ── Health config ─────────────────────────────────────────────── */
 const H = {
   healthy:      { label: 'Healthy',  color: 'text-emerald-400', dot: 'bg-emerald-400', icon: CheckCircle },
@@ -102,6 +116,7 @@ export default function DashboardOverview() {
   const [providers, setProviders] = useState<ProviderSummary[]>([])
   const [memory, setMemory] = useState<MemoryStatusData | null>(null)
   const [budgetData, setBudgetData] = useState<{ totalEstimatedSpendUsd: number } | null>(null)
+  const [truth, setTruth] = useState<TruthSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [dbError, setDbError] = useState<string | null>(null)
@@ -135,6 +150,16 @@ export default function DashboardOverview() {
         if (budgetRes.ok) setBudgetData(await budgetRes.json())
       } catch (err) {
         console.warn('[dashboard] Budget fetch failed:', err instanceof Error ? err.message : err)
+      }
+      // Fetch truth summary for unified dashboard state
+      try {
+        const truthRes = await fetch('/api/admin/truth?section=summary')
+        if (truthRes.ok) {
+          const truthBody = await truthRes.json()
+          if (truthBody.summary) setTruth(truthBody.summary)
+        }
+      } catch (err) {
+        console.warn('[dashboard] Truth fetch failed:', err instanceof Error ? err.message : err)
       }
       setLastRefreshed(new Date())
     } catch {
@@ -233,7 +258,7 @@ export default function DashboardOverview() {
 
       {/* ─── Top Strip: 5 Metric Cards ──────────────────────────── */}
       <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <MetricCard label="System Health"  value={`${systemHealth}%`}               icon={<Gauge className="w-4 h-4" />} />
+        <MetricCard label="System Health"  value={`${truth?.systemHealth ?? systemHealth}%`}               icon={<Gauge className="w-4 h-4" />} />
         <MetricCard label="Active Apps"    value={totalApps}                         icon={<Server className="w-4 h-4" />} />
         <MetricCard label="AI Activity"    value={totalReqs.toLocaleString()}        icon={<Brain className="w-4 h-4" />} suffix="reqs" />
         <MetricCard label="Cost Burn"      value={budgetData?.totalEstimatedSpendUsd != null ? `$${budgetData.totalEstimatedSpendUsd.toFixed(2)}` : '—'} icon={<DollarSign className="w-4 h-4" />} />
@@ -521,11 +546,12 @@ export default function DashboardOverview() {
           <div className="p-4 space-y-3">
             {[
               { label: 'Total Apps',       value: String(data?.metrics?.totalProducts ?? 0) },
-              { label: 'Active Providers',  value: `${enabledProviders.length} / ${providers.length}` },
-              { label: 'Healthy Providers', value: String(healthyProviders.length) },
+              { label: 'Active Providers',  value: `${truth?.activeProviders ?? enabledProviders.length} / ${truth?.totalProviders ?? providers.length}` },
+              { label: 'Healthy Providers', value: String(truth?.activeProviders ?? healthyProviders.length) },
               { label: 'Total Requests',    value: totalReqs.toLocaleString() },
               { label: 'Error Rate',        value: totalReqs > 0 ? `${100 - successRate}%` : '0%' },
               { label: 'Memory Entries',    value: (memory?.totalEntries ?? 0).toLocaleString() },
+              { label: 'Capabilities',      value: truth ? `${truth.availableCapabilities} / ${truth.totalCapabilities}` : '—' },
               { label: 'Contacts',          value: String(data?.metrics?.totalContacts ?? 0) },
               { label: 'Waitlist',          value: String(data?.metrics?.totalWaitlist ?? 0) },
             ].map(row => (
