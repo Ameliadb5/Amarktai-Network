@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, AppWindow, Brain, Palette, Server, FlaskConical, Settings,
-  LogOut, Menu, X, User,
+  LogOut, Menu, X, User, Code2,
 } from 'lucide-react'
 
 interface NavItem {
@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { href: '/admin/dashboard/media',        label: 'Media',         icon: Palette },
   { href: '/admin/dashboard/operations',   label: 'Operations',    icon: Server },
   { href: '/admin/dashboard/lab',          label: 'Lab',           icon: FlaskConical },
+  { href: '/admin/dashboard/labs',         label: 'Labs',          icon: Code2 },
   { href: '/admin/dashboard/access',       label: 'Access',        icon: Settings },
 ]
 
