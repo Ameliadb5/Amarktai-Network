@@ -100,6 +100,12 @@ export async function POST(request: NextRequest) {
 
   // ── Resolve provider and model ────────────────────────────────────────
   const resolvedProvider = resolveProvider(body.provider)
+  if (!resolvedProvider) {
+    return NextResponse.json(
+      { error: 'No streaming provider is configured — add at least one API key.', traceId },
+      { status: 503 },
+    )
+  }
   const resolvedModel = body.model || DEFAULT_STREAM_MODELS[resolvedProvider] || 'gpt-4o-mini'
 
   // ── Stream response via SSE ──────────────────────────────────────────
@@ -118,8 +124,7 @@ export async function POST(request: NextRequest) {
         if (resolvedProvider === 'anthropic') {
           const apiKey = process.env.ANTHROPIC_API_KEY
           if (!apiKey) {
-            send({ type: 'chunk', content: `[Stream stub] Provider: anthropic — No API key configured.` })
-            send({ type: 'done', traceId, model: resolvedModel, provider: 'anthropic' })
+            send({ type: 'error', message: 'Provider anthropic is not configured — no API key found.' })
             controller.close()
             return
           }
@@ -167,8 +172,7 @@ export async function POST(request: NextRequest) {
         if (resolvedProvider === 'gemini') {
           const apiKey = process.env.GEMINI_API_KEY
           if (!apiKey) {
-            send({ type: 'chunk', content: `[Stream stub] Provider: gemini — No API key configured.` })
-            send({ type: 'done', traceId, model: resolvedModel, provider: 'gemini' })
+            send({ type: 'error', message: 'Provider gemini is not configured — no API key found.' })
             controller.close()
             return
           }
@@ -208,8 +212,7 @@ export async function POST(request: NextRequest) {
         if (resolvedProvider === 'cohere') {
           const apiKey = process.env.COHERE_API_KEY
           if (!apiKey) {
-            send({ type: 'chunk', content: `[Stream stub] Provider: cohere — No API key configured.` })
-            send({ type: 'done', traceId, model: resolvedModel, provider: 'cohere' })
+            send({ type: 'error', message: 'Provider cohere is not configured — no API key found.' })
             controller.close()
             return
           }
@@ -253,17 +256,14 @@ export async function POST(request: NextRequest) {
         // ── OpenAI-compatible streaming (8 providers) ────────────────
         const providerConfig = STREAMING_PROVIDERS[resolvedProvider]
         if (!providerConfig) {
-          send({ type: 'chunk', content: `[Stream stub] Provider "${resolvedProvider}" does not support streaming yet.` })
-          send({ type: 'done', traceId, model: resolvedModel, provider: resolvedProvider })
+          send({ type: 'error', message: `Provider "${resolvedProvider}" does not support streaming.` })
           controller.close()
           return
         }
 
         const apiKey = process.env[providerConfig.envKey]
         if (!apiKey) {
-          send({ type: 'chunk', content: `[Stream stub] Processing: "${body.message.slice(0, 100)}"` })
-          send({ type: 'chunk', content: ` — No API key configured for ${resolvedProvider}.` })
-          send({ type: 'done', traceId, model: resolvedModel, provider: resolvedProvider })
+          send({ type: 'error', message: `Provider ${resolvedProvider} is not configured — no API key found.` })
           controller.close()
           return
         }
@@ -348,7 +348,7 @@ function resolveProvider(requested?: string): string {
     if (process.env[envMap[provider]]) return provider
   }
 
-  return 'openai' // Default fallback
+  return '' // No provider available
 }
 
 /** Process an SSE stream, calling handler for each data line. */

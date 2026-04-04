@@ -194,9 +194,14 @@ export async function POST(request: NextRequest) {
   })
 
   // ── Build normalised response ─────────────────────────────────────────
-  if (!success && result.routedProvider === null && result.errors.some(e => e.includes('No AI provider'))) {
+  // Return 503 when orchestration produced no output AND no provider was routed.
+  // This catches all "no provider available" scenarios regardless of error message format.
+  if (!success && result.routedProvider === null && result.output === null) {
+    const errorMsg = result.errors.length > 0
+      ? result.errors[0]
+      : 'No AI provider is available — all providers are unconfigured or disabled'
     return NextResponse.json(
-      errorResponse({ traceId, taskType: body.taskType, app, error: result.errors[0], statusCode: 503, latencyMs }),
+      errorResponse({ traceId, taskType: body.taskType, app, error: errorMsg, statusCode: 503, latencyMs }),
       { status: 503 },
     )
   }
