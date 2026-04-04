@@ -802,6 +802,7 @@ interface SafetyConfig {
   appSlug: string
   safeMode: boolean
   adultMode: boolean
+  suggestiveMode: boolean
   note: string
 }
 
@@ -828,7 +829,7 @@ function SafetyTab({ appSlug }: { appSlug: string }) {
 
   useEffect(() => { load() }, [load])
 
-  const updateConfig = async (updates: { safeMode?: boolean; adultMode?: boolean }) => {
+  const updateConfig = async (updates: { safeMode?: boolean; adultMode?: boolean; suggestiveMode?: boolean }) => {
     setSaving(true)
     setSaveMsg(null)
     setError(null)
@@ -929,6 +930,36 @@ function SafetyTab({ appSlug }: { appSlug: string }) {
           </button>
         </div>
 
+        {/* Suggestive Mode Toggle */}
+        <div className="flex items-center justify-between py-3 border-b border-white/[0.06]">
+          <div>
+            <p className="text-sm text-white">Suggestive Mode</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Allows lingerie, swimwear, fashion poses, topless nudity. Requires Safe Mode OFF.
+            </p>
+            <p className="text-[10px] text-purple-400/60 mt-0.5">
+              Explicit sex, pornography, genitalia, and minors are ALWAYS blocked.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              if (config?.safeMode && !config?.suggestiveMode) {
+                setError('Disable Safe Mode first before enabling Suggestive Mode.')
+                return
+              }
+              updateConfig({ suggestiveMode: !config?.suggestiveMode })
+            }}
+            disabled={saving || (config?.safeMode ?? false)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              config?.suggestiveMode ? 'bg-purple-500' : 'bg-slate-600'
+            } ${config?.safeMode ? 'opacity-40 cursor-not-allowed' : ''}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              config?.suggestiveMode ? 'translate-x-6' : 'translate-x-1'
+            }`} />
+          </button>
+        </div>
+
         {/* Current Status */}
         <div className="pt-2 space-y-2">
           <div className="flex items-center gap-2">
@@ -941,6 +972,12 @@ function SafetyTab({ appSlug }: { appSlug: string }) {
             <span className={`h-2 w-2 rounded-full ${config?.adultMode ? 'bg-amber-400' : 'bg-slate-600'}`} />
             <span className="text-xs text-slate-300">
               Adult Mode: <strong>{config?.adultMode ? 'ENABLED' : 'DISABLED'}</strong>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${config?.suggestiveMode ? 'bg-purple-400' : 'bg-slate-600'}`} />
+            <span className="text-xs text-slate-300">
+              Suggestive Mode: <strong>{config?.suggestiveMode ? 'ENABLED' : 'DISABLED'}</strong>
             </span>
           </div>
         </div>
@@ -959,6 +996,23 @@ function SafetyTab({ appSlug }: { appSlug: string }) {
         </ul>
         <p className="mt-3 text-[10px] text-slate-500">
           These categories are blocked regardless of Safe Mode or Adult Mode settings. No exceptions.
+        </p>
+      </div>
+
+      {/* Suggestive Capability status */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6">
+        <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Suggestive Image Capability</h4>
+        <div className="flex items-center gap-2">
+          <span className={`h-2 w-2 rounded-full ${config?.suggestiveMode ? 'bg-purple-400' : 'bg-slate-600'}`} />
+          <span className="text-xs text-slate-300">
+            {config?.suggestiveMode
+              ? 'AVAILABLE — Suggestive mode is enabled. Lingerie, swimwear, fashion, and topless imagery can be generated.'
+              : 'BLOCKED BY SETTINGS — Enable suggestive mode (requires Safe Mode OFF) to unlock this capability.'}
+          </span>
+        </div>
+        <p className="mt-2 text-[10px] text-slate-500">
+          Routes: /api/brain/suggestive-image (DALL-E → SDXL), /api/brain/suggestive-video (planning only).
+          Prompts are validated before generation — explicit sex, pornography, genitalia, and minors are always blocked.
         </p>
       </div>
 

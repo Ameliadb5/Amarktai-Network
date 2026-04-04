@@ -132,8 +132,8 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     key: 'qwen',
     displayName: 'Qwen',
     defaultBaseUrl: 'https://dashscope.aliyuncs.com',
-    healthCheckSupported: false,
-    supportedCapabilityFamilies: ['chat', 'reasoning', 'code'],
+    healthCheckSupported: true,
+    supportedCapabilityFamilies: ['chat', 'reasoning', 'code', 'vision', 'image_generation', 'video_generation', 'embeddings', 'voice_interaction'],
     sortOrder: 9,
   },
   {
@@ -143,6 +143,22 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['video_generation', 'image_generation'],
     sortOrder: 10,
+  },
+  {
+    key: 'anthropic',
+    displayName: 'Anthropic',
+    defaultBaseUrl: 'https://api.anthropic.com',
+    healthCheckSupported: true,
+    supportedCapabilityFamilies: ['chat', 'reasoning', 'code', 'vision', 'agent_planning'],
+    sortOrder: 11,
+  },
+  {
+    key: 'cohere',
+    displayName: 'Cohere',
+    defaultBaseUrl: 'https://api.cohere.com',
+    healthCheckSupported: true,
+    supportedCapabilityFamilies: ['chat', 'embeddings', 'reranking'],
+    sortOrder: 12,
   },
 ] as const;
 

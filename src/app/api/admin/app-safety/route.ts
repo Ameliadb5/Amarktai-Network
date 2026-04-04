@@ -10,7 +10,7 @@ import { getAppSafetyConfig, setAppSafetyConfig } from '@/lib/content-filter'
  *  1. Adult mode and suggestive mode can ONLY be enabled when safe mode is explicitly disabled.
  *  2. CSAM / violence / self-harm are ALWAYS blocked regardless of mode.
  *  3. Only lawful adult 18+ content is allowed. NEVER minors. NEVER illegal.
- *  4. Suggestive mode allows lingerie, swimwear, fashion poses — NO nudity or explicit acts.
+ *  4. Suggestive mode allows lingerie, swimwear, fashion poses, topless nudity — no explicit sex acts or genitalia.
  */
 export async function GET(request: NextRequest) {
   const session = await getSession()

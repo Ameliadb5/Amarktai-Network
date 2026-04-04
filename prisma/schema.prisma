@@ -18,42 +18,42 @@ model AdminUser {
 }
 
 model Product {
-  id                  Int      @id @default(autoincrement())
-  name                String
-  slug                String   @unique
-  category            String   @default("app")
-  shortDescription    String   @map("short_description")
-  longDescription     String   @default("") @map("long_description")
-  status              String   @default("coming_soon")
-  accessType          String   @default("public") @map("access_type")
-  featured            Boolean  @default(false)
-  primaryUrl          String   @default("") @map("primary_url")
-  hostedHere          Boolean  @default(false) @map("hosted_here")
-  hostingScope        String   @default("external_domain") @map("hosting_scope")
-  subdomain           String   @default("")
-  customDomain        String   @default("") @map("custom_domain")
-  environment         String   @default("production")
-  publicVisibility    Boolean  @default(true) @map("public_visibility")
-  monitoringEnabled   Boolean  @default(false) @map("monitoring_enabled")
-  integrationEnabled  Boolean  @default(false) @map("integration_enabled")
-  appType             String   @default("app") @map("app_type")
-  readyToDeploy       Boolean  @default(false) @map("ready_to_deploy")
-  aiEnabled           Boolean  @default(false) @map("ai_enabled")
-  connectedToBrain    Boolean  @default(false) @map("connected_to_brain")
-  onboardingStatus    String   @default("unconfigured") @map("onboarding_status")
+  id                    Int       @id @default(autoincrement())
+  name                  String
+  slug                  String    @unique
+  category              String    @default("app")
+  shortDescription      String    @map("short_description")
+  longDescription       String    @default("") @map("long_description")
+  status                String    @default("coming_soon")
+  accessType            String    @default("public") @map("access_type")
+  featured              Boolean   @default(false)
+  primaryUrl            String    @default("") @map("primary_url")
+  hostedHere            Boolean   @default(false) @map("hosted_here")
+  hostingScope          String    @default("external_domain") @map("hosting_scope")
+  subdomain             String    @default("")
+  customDomain          String    @default("") @map("custom_domain")
+  environment           String    @default("production")
+  publicVisibility      Boolean   @default(true) @map("public_visibility")
+  monitoringEnabled     Boolean   @default(false) @map("monitoring_enabled")
+  integrationEnabled    Boolean   @default(false) @map("integration_enabled")
+  appType               String    @default("app") @map("app_type")
+  readyToDeploy         Boolean   @default(false) @map("ready_to_deploy")
+  aiEnabled             Boolean   @default(false) @map("ai_enabled")
+  connectedToBrain      Boolean   @default(false) @map("connected_to_brain")
+  onboardingStatus      String    @default("unconfigured") @map("onboarding_status")
   onboardingCompletedAt DateTime? @map("onboarding_completed_at")
-  appSecret           String   @default("") @map("app_secret")
-  customInstructions  String   @default("") @map("custom_instructions")
-  sortOrder           Int      @default(99) @map("sort_order")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  appSecret             String    @default("") @map("app_secret")
+  customInstructions    String    @default("") @map("custom_instructions")
+  sortOrder             Int       @default(99) @map("sort_order")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
 
-  integration         AppIntegration?
-  metricDefinitions   AppMetricDefinition[]
-  metricPoints        AppMetricPoint[]
-  events              AppEvent[]
-  widgetConfigs       DashboardWidgetConfig[]
-  vpsSnapshots        VpsResourceSnapshot[]
+  integration       AppIntegration?
+  metricDefinitions AppMetricDefinition[]
+  metricPoints      AppMetricPoint[]
+  events            AppEvent[]
+  widgetConfigs     DashboardWidgetConfig[]
+  vpsSnapshots      VpsResourceSnapshot[]
 
   @@map("products")
 }
@@ -71,37 +71,37 @@ model ApiKey {
 }
 
 model AppIntegration {
-  id                Int       @id @default(autoincrement())
-  productId         Int       @unique @map("product_id")
-  integrationToken  String    @unique @map("integration_token")
-  heartbeatEnabled  Boolean   @default(true) @map("heartbeat_enabled")
-  metricsEnabled    Boolean   @default(true) @map("metrics_enabled")
-  eventsEnabled     Boolean   @default(true) @map("events_enabled")
-  vpsEnabled        Boolean   @default(false) @map("vps_enabled")
-  lastHeartbeatAt   DateTime? @map("last_heartbeat_at")
-  healthStatus      String    @default("unknown") @map("health_status")
-  uptime            Float?
-  version           String    @default("")
-  environment       String    @default("production")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id               Int       @id @default(autoincrement())
+  productId        Int       @unique @map("product_id")
+  integrationToken String    @unique @map("integration_token")
+  heartbeatEnabled Boolean   @default(true) @map("heartbeat_enabled")
+  metricsEnabled   Boolean   @default(true) @map("metrics_enabled")
+  eventsEnabled    Boolean   @default(true) @map("events_enabled")
+  vpsEnabled       Boolean   @default(false) @map("vps_enabled")
+  lastHeartbeatAt  DateTime? @map("last_heartbeat_at")
+  healthStatus     String    @default("unknown") @map("health_status")
+  uptime           Float?
+  version          String    @default("")
+  environment      String    @default("production")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  product           Product   @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
 
   @@map("app_integrations")
 }
 
 model AppMetricDefinition {
-  id             Int     @id @default(autoincrement())
-  productId      Int     @map("product_id")
-  metricKey      String  @map("metric_key")
-  metricLabel    String  @map("metric_label")
-  metricType     String  @default("number") @map("metric_type")
-  defaultChartType String @default("line") @map("default_chart_type")
-  isEnabled      Boolean @default(true) @map("is_enabled")
-  sortOrder      Int     @default(0) @map("sort_order")
+  id               Int     @id @default(autoincrement())
+  productId        Int     @map("product_id")
+  metricKey        String  @map("metric_key")
+  metricLabel      String  @map("metric_label")
+  metricType       String  @default("number") @map("metric_type")
+  defaultChartType String  @default("line") @map("default_chart_type")
+  isEnabled        Boolean @default(true) @map("is_enabled")
+  sortOrder        Int     @default(0) @map("sort_order")
 
-  product        Product @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
 
   @@map("app_metric_definitions")
 }
@@ -114,7 +114,7 @@ model AppMetricPoint {
   metricLabel String   @default("") @map("metric_label")
   timestamp   DateTime @default(now())
 
-  product     Product  @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
 
   @@map("app_metric_points")
 }
@@ -128,7 +128,7 @@ model AppEvent {
   message   String   @default("")
   timestamp DateTime @default(now())
 
-  product   Product  @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
 
   @@map("app_events")
 }
@@ -147,7 +147,7 @@ model VpsResourceSnapshot {
   netOutKbps  Float    @default(0) @map("net_out_kbps")
   timestamp   DateTime @default(now())
 
-  product     Product  @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
 
   @@map("vps_resource_snapshots")
 }
@@ -161,7 +161,7 @@ model DashboardWidgetConfig {
   sortOrder    Int     @default(0) @map("sort_order")
   settingsJson String  @default("{}") @map("settings_json")
 
-  product      Product? @relation(fields: [productId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
 
   @@map("dashboard_widget_configs")
 }
@@ -189,10 +189,10 @@ model WaitlistEntry {
 
 model AiProvider {
   id            Int       @id @default(autoincrement())
-  providerKey   String    @unique @map("provider_key")   // openai | gemini | grok | qwen | huggingface | nvidia
+  providerKey   String    @unique @map("provider_key") // openai | gemini | grok | qwen | huggingface | nvidia
   displayName   String    @map("display_name")
   enabled       Boolean   @default(false)
-  apiKey        String    @default("") @map("api_key")   // stored server-side only — never returned raw
+  apiKey        String    @default("") @map("api_key") // stored server-side only — never returned raw
   maskedPreview String    @default("") @map("masked_preview") // e.g. sk-proj-••••••••••••abcd
   baseUrl       String    @default("") @map("base_url")
   defaultModel  String    @default("") @map("default_model")
@@ -211,11 +211,11 @@ model AiProvider {
 model BrainEvent {
   id                 Int      @id @default(autoincrement())
   traceId            String   @map("trace_id")
-  productId          Int?     @map("product_id")       // nullable — app may not be in registry
+  productId          Int?     @map("product_id") // nullable — app may not be in registry
   appSlug            String   @default("") @map("app_slug")
   taskType           String   @default("") @map("task_type")
-  executionMode      String   @default("direct") @map("execution_mode")   // direct|specialist|review|consensus
-  classificationJson String   @default("{}") @map("classification_json")  // JSON: ClassificationResult
+  executionMode      String   @default("direct") @map("execution_mode") // direct|specialist|review|consensus
+  classificationJson String   @default("{}") @map("classification_json") // JSON: ClassificationResult
   routedProvider     String?  @map("routed_provider")
   routedModel        String?  @map("routed_model")
   validationUsed     Boolean  @default(false) @map("validation_used")
@@ -223,7 +223,7 @@ model BrainEvent {
   confidenceScore    Float?   @map("confidence_score")
   success            Boolean  @default(false)
   errorMessage       String?  @map("error_message")
-  warningsJson       String   @default("[]") @map("warnings_json")        // JSON: string[]
+  warningsJson       String   @default("[]") @map("warnings_json") // JSON: string[]
   latencyMs          Int?     @map("latency_ms")
   timestamp          DateTime @default(now())
 
@@ -236,14 +236,14 @@ model BrainEvent {
 /// Memory Layer — stores retrievable context, summaries, and learned patterns
 /// per connected app. Used by the Brain Gateway to provide context-aware execution.
 model MemoryEntry {
-  id          Int       @id @default(autoincrement())
-  appSlug     String    @map("app_slug")     // which app this memory belongs to
-  memoryType  String    @default("event") @map("memory_type") // event|summary|context|learned
-  key         String    @default("") // optional lookup key
-  content     String    // the stored memory content
-  importance  Float     @default(0.5) // 0.0–1.0 priority weight
-  expiresAt   DateTime? @map("expires_at")  // null = permanent
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id         Int       @id @default(autoincrement())
+  appSlug    String    @map("app_slug") // which app this memory belongs to
+  memoryType String    @default("event") @map("memory_type") // event|summary|context|learned
+  key        String    @default("") // optional lookup key
+  content    String // the stored memory content
+  importance Float     @default(0.5) // 0.0–1.0 priority weight
+  expiresAt  DateTime? @map("expires_at") // null = permanent
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   @@index([appSlug])
   @@index([memoryType])
@@ -252,15 +252,15 @@ model MemoryEntry {
 
 /// Per-provider monthly budget configuration and spend tracking.
 model ProviderBudget {
-  id                  Int      @id @default(autoincrement())
-  providerKey         String   @unique @map("provider_key")
-  monthlyBudgetUsd    Float?   @map("monthly_budget_usd")   // null = unlimited
-  currentSpendUsd     Float    @default(0) @map("current_spend_usd")
-  warningThresholdPct Float    @default(75) @map("warning_threshold_pct")
-  criticalThresholdPct Float   @default(90) @map("critical_threshold_pct")
-  notes               String   @default("")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-  createdAt           DateTime @default(now()) @map("created_at")
+  id                   Int      @id @default(autoincrement())
+  providerKey          String   @unique @map("provider_key")
+  monthlyBudgetUsd     Float?   @map("monthly_budget_usd") // null = unlimited
+  currentSpendUsd      Float    @default(0) @map("current_spend_usd")
+  warningThresholdPct  Float    @default(75) @map("warning_threshold_pct")
+  criticalThresholdPct Float    @default(90) @map("critical_threshold_pct")
+  notes                String   @default("")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  createdAt            DateTime @default(now()) @map("created_at")
 
   @@map("provider_budgets")
 }
@@ -269,8 +269,8 @@ model ProviderBudget {
 model PlaygroundProject {
   id                Int       @id @default(autoincrement())
   name              String
-  type              String    @default("general")       // prompt_test|agent_prototype|workflow|code_assistant|comparison|general
-  status            String    @default("draft")          // draft|active|archived
+  type              String    @default("general") // prompt_test|agent_prototype|workflow|code_assistant|comparison|general
+  status            String    @default("draft") // draft|active|archived
   description       String    @default("")
   promptHistoryJson String    @default("[]") @map("prompt_history_json")
   filesJson         String    @default("[]") @map("files_json")
@@ -283,7 +283,7 @@ model PlaygroundProject {
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  pushLogs          GitHubPushLog[]
+  pushLogs GitHubPushLog[]
 
   @@index([status])
   @@index([type])
@@ -305,18 +305,18 @@ model GitHubConfig {
 
 /// Audit log for all GitHub push actions from the developer workspace.
 model GitHubPushLog {
-  id             Int       @id @default(autoincrement())
-  projectId      Int       @map("project_id")
-  repoFullName   String    @map("repo_full_name")
-  branch         String
-  commitSha      String?   @map("commit_sha")
-  commitMessage  String    @map("commit_message")
-  filesChanged   Int       @default(0) @map("files_changed")
-  success        Boolean   @default(false)
-  error          String?
-  pushedAt       DateTime  @default(now()) @map("pushed_at")
+  id            Int      @id @default(autoincrement())
+  projectId     Int      @map("project_id")
+  repoFullName  String   @map("repo_full_name")
+  branch        String
+  commitSha     String?  @map("commit_sha")
+  commitMessage String   @map("commit_message")
+  filesChanged  Int      @default(0) @map("files_changed")
+  success       Boolean  @default(false)
+  error         String?
+  pushedAt      DateTime @default(now()) @map("pushed_at")
 
-  project        PlaygroundProject @relation(fields: [projectId], references: [id])
+  project PlaygroundProject @relation(fields: [projectId], references: [id])
 
   @@index([projectId])
   @@index([pushedAt])
@@ -324,24 +324,127 @@ model GitHubPushLog {
 }
 
 model VideoGenerationJob {
-  id          String   @id @default(cuid())
-  provider    String
-  modelId     String   @map("model_id")
-  prompt      String
-  style       String?
-  duration    Int?
-  aspectRatio String?  @map("aspect_ratio")
-  appSlug     String?  @map("app_slug")
-  status      String   @default("pending") // pending | processing | succeeded | failed
-  providerJobId String? @map("provider_job_id")
-  resultUrl   String?  @map("result_url")
-  resultMeta  String?  @map("result_meta") // JSON metadata from provider
-  errorMessage String? @map("error_message")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  provider      String
+  modelId       String   @map("model_id")
+  prompt        String
+  style         String?
+  duration      Int?
+  aspectRatio   String?  @map("aspect_ratio")
+  appSlug       String?  @map("app_slug")
+  status        String   @default("pending") // pending | processing | succeeded | failed
+  providerJobId String?  @map("provider_job_id")
+  resultUrl     String?  @map("result_url")
+  resultMeta    String?  @map("result_meta") // JSON metadata from provider
+  errorMessage  String?  @map("error_message")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@index([status])
   @@index([appSlug])
   @@index([createdAt])
   @@map("video_generation_jobs")
+}
+
+model ModelRegistryEntry {
+  id            Int    @id @default(autoincrement())
+  provider      String
+  modelId       String @map("model_id")
+  displayName   String @map("display_name")
+  family        String @default("")
+  category      String @default("text") // text|image|video|voice|code|multimodal|embeddings|reranking|research
+  primaryRole   String @default("chat") @map("primary_role")
+  costTier      String @default("low") @map("cost_tier") // free|very_low|low|medium|high|premium
+  latencyTier   String @default("medium") @map("latency_tier") // ultra_low|low|medium|high
+  contextWindow Int    @default(4096) @map("context_window")
+
+  // Capability flags
+  supportsText             Boolean @default(false) @map("supports_text")
+  supportsReasoning        Boolean @default(false) @map("supports_reasoning")
+  supportsCode             Boolean @default(false) @map("supports_code")
+  supportsChat             Boolean @default(false) @map("supports_chat")
+  supportsImageGeneration  Boolean @default(false) @map("supports_image_generation")
+  supportsImageEditing     Boolean @default(false) @map("supports_image_editing")
+  supportsVideoPlanning    Boolean @default(false) @map("supports_video_planning")
+  supportsVideoGeneration  Boolean @default(false) @map("supports_video_generation")
+  supportsStt              Boolean @default(false) @map("supports_stt")
+  supportsTts              Boolean @default(false) @map("supports_tts")
+  supportsRealtimeVoice    Boolean @default(false) @map("supports_realtime_voice")
+  supportsEmbeddings       Boolean @default(false) @map("supports_embeddings")
+  supportsReranking        Boolean @default(false) @map("supports_reranking")
+  supportsResearch         Boolean @default(false) @map("supports_research")
+  supportsMultimodal       Boolean @default(false) @map("supports_multimodal")
+  supportsToolUse          Boolean @default(false) @map("supports_tool_use")
+  supportsStructuredOutput Boolean @default(false) @map("supports_structured_output")
+
+  // Metadata
+  estimatedUnitCost Float?  @map("estimated_unit_cost")
+  enabled           Boolean @default(true)
+  hidden            Boolean @default(false)
+  notes             String  @default("")
+  safetyTags        String  @default("") @map("safety_tags")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([provider, modelId])
+  @@index([provider])
+  @@index([category])
+  @@index([enabled])
+  @@map("model_registry_entries")
+}
+
+model AppAiProfile {
+  id      Int    @id @default(autoincrement())
+  appSlug String @unique @map("app_slug")
+  appName String @map("app_name")
+  appType String @default("general") @map("app_type")
+  domain  String @default("general")
+
+  // Routing
+  defaultRoutingMode String @default("direct") @map("default_routing_mode")
+  allowedProviders   String @default("[]") @map("allowed_providers") // JSON array
+  allowedModels      String @default("[]") @map("allowed_models") // JSON array
+  preferredModels    String @default("[]") @map("preferred_models") // JSON array
+  fallbackChain      String @default("[]") @map("fallback_chain") // JSON array
+
+  // Cost & Budget
+  costMode          String @default("balanced") @map("cost_mode") // cheap|balanced|premium|custom
+  maxCostPerRequest Float? @map("max_cost_per_request")
+  monthlyBudgetCap  Float? @map("monthly_budget_cap")
+
+  // Safety
+  safeMode       Boolean @default(true) @map("safe_mode")
+  /// Allows lingerie, swimwear, fashion poses, topless nudity. Blocks explicit sex, genitalia, minors. Requires safeMode=false.
+  suggestiveMode Boolean @default(false) @map("suggestive_mode")
+
+  // Capabilities (JSON array of enabled capability strings)
+  enabledCapabilities String @default("[]") @map("enabled_capabilities")
+  enabledAgents       String @default("[]") @map("enabled_agents")
+
+  // Routing strategy
+  routingStrategy String  @default("balanced") @map("routing_strategy") // balanced|cheapest|fastest|quality
+  allowBenchmark  Boolean @default(false) @map("allow_benchmark")
+
+  // Escalation & Validation (JSON)
+  escalationRules String @default("[]") @map("escalation_rules")
+  validatorRules  String @default("[]") @map("validator_rules")
+
+  // Permissions (JSON arrays)
+  agentPermissions      String @default("[]") @map("agent_permissions")
+  multimodalPermissions String @default("[]") @map("multimodal_permissions")
+
+  // Memory
+  memoryNamespace    String @default("") @map("memory_namespace")
+  retrievalNamespace String @default("") @map("retrieval_namespace")
+
+  // Operational
+  budgetSensitivity   String @default("medium") @map("budget_sensitivity")
+  latencySensitivity  String @default("medium") @map("latency_sensitivity")
+  loggingPrivacyRules String @default("[]") @map("logging_privacy_rules") // JSON array
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_ai_profiles")
 }

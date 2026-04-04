@@ -266,6 +266,11 @@ describe('validateSuggestivePrompt — Blocked Prompts', () => {
     expect(result.allowed).toBe(true)
   })
 
+  it('allows explicit topless prompts', () => {
+    const result = validateSuggestivePrompt('Topless woman on a beach, professional photography')
+    expect(result.allowed).toBe(true)
+  })
+
   it('blocks explicit genitalia references', () => {
     const result = validateSuggestivePrompt('Exposed genitalia in a photo')
     expect(result.allowed).toBe(false)

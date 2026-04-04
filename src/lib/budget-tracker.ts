@@ -52,6 +52,37 @@ const COST_RATES: Record<string, { input: number; output: number }> = {
   'wan-ai/wan2.1-t2v-480p':  { input: 0.0032, output: 0.0032 },
   // HuggingFace (mostly free inference)
   'meta-llama/Llama-3.3-70B-Instruct': { input: 0.00059, output: 0.00079 },
+  // Anthropic
+  'claude-3.5-sonnet':       { input: 0.003, output: 0.015 },
+  'claude-3-opus':           { input: 0.015, output: 0.075 },
+  'claude-3-haiku':          { input: 0.00025, output: 0.00125 },
+  'claude-sonnet-4':         { input: 0.003, output: 0.015 },
+  // Cohere
+  'command-r-plus':          { input: 0.003, output: 0.015 },
+  'command-r':               { input: 0.0005, output: 0.0015 },
+  'embed-english-v3.0':     { input: 0.0001, output: 0.0001 },
+  'rerank-english-v3.0':    { input: 0.002, output: 0.002 },
+  // Qwen (DashScope pricing)
+  'qwen-max':                { input: 0.0016, output: 0.0064 },
+  'qwen-plus':               { input: 0.0004, output: 0.0012 },
+  'qwen-turbo':              { input: 0.00005, output: 0.0002 },
+  'qwen-long':               { input: 0.00005, output: 0.0002 },
+  'qwen-coder-plus':         { input: 0.00035, output: 0.0012 },
+  'qwen-coder-turbo':        { input: 0.00005, output: 0.0002 },
+  'qwen-vl-max':             { input: 0.003,  output: 0.009 },
+  'qwen-vl-plus':            { input: 0.0008, output: 0.002 },
+  'qvq-72b-preview':         { input: 0.003,  output: 0.009 },
+  'qwen2.5-vl-72b-instruct': { input: 0.003,  output: 0.009 },
+  'qwen2.5-vl-7b-instruct':  { input: 0.0003, output: 0.0006 },
+  'wanx-v1':                 { input: 0.002,  output: 0.002 },
+  'wanx2.1-t2i-turbo':       { input: 0.001,  output: 0.001 },
+  'wanx2.1-t2v-turbo':       { input: 0.003,  output: 0.003 },
+  'wanx2.1-t2v-plus':        { input: 0.006,  output: 0.006 },
+  'wanx2.1-i2v-turbo':       { input: 0.003,  output: 0.003 },
+  'qwen-audio-turbo':        { input: 0.0003, output: 0.0003 },
+  'qwen-audio-chat':         { input: 0.001,  output: 0.002 },
+  'text-embedding-v3':       { input: 0.00007, output: 0.00007 },
+  'qwen-math-plus':          { input: 0.0004, output: 0.0012 },
   // Fallback
   'default':                 { input: 0.001,  output: 0.002 },
 }

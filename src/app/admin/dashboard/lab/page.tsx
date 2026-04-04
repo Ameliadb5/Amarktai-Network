@@ -8,8 +8,9 @@ import {
 } from 'lucide-react'
 
 const CAPABILITIES = [
-  'chat', 'code', 'vision', 'reasoning', 'embeddings', 'tts', 'stt', 'image',
-  'video', 'research', 'suggestive',
+  'chat', 'code', 'reasoning', 'image', 'image_editing', 'video', 'video_planning',
+  'tts', 'stt', 'vision', 'embeddings', 'reranking', 'research', 'suggestive',
+  'app_builder',
 ]
 
 const fadeUp = {
@@ -65,6 +66,7 @@ export default function LabPage() {
   const [capability, setCapability] = useState('chat')
   const [forceProvider, setForceProvider] = useState<string>('auto')
   const [forceModel, setForceModel] = useState<string>('auto')
+  const [appProfile, setAppProfile] = useState<string>('__admin_test__')
   const [providers, setProviders] = useState<ProviderOption[]>([])
   const [models, setModels] = useState<ModelOption[]>([])
   const [loadingProviders, setLoadingProviders] = useState(true)
@@ -148,6 +150,7 @@ export default function LabPage() {
       if (forceModel !== 'auto') {
         body.modelId = forceModel
       }
+      body.appSlug = appProfile
       const res = await fetch('/api/admin/brain/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -317,6 +320,26 @@ export default function LabPage() {
                   {m.name} ({m.provider}) [{m.category}]
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* App Profile Selector */}
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">App Profile</label>
+            <select
+              value={appProfile}
+              onChange={(e) => setAppProfile(e.target.value)}
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
+            >
+              <option value="__admin_test__" className="bg-[#0a0f1a] text-white">Admin Test (default)</option>
+              <option value="__dashboard__" className="bg-[#0a0f1a] text-white">Dashboard</option>
+              <option value="__admin__" className="bg-[#0a0f1a] text-white">Admin</option>
+              <option value="amarktai-network" className="bg-[#0a0f1a] text-white">Amarktai Network</option>
+              <option value="amarktai-crypto" className="bg-[#0a0f1a] text-white">Amarktai Crypto</option>
+              <option value="amarktai-marketing" className="bg-[#0a0f1a] text-white">Amarktai Marketing</option>
+              <option value="amarktai-travel" className="bg-[#0a0f1a] text-white">Amarktai Travel</option>
+              <option value="equiprofile" className="bg-[#0a0f1a] text-white">EquiProfile</option>
+              <option value="amarktai-online" className="bg-[#0a0f1a] text-white">Amarktai Online</option>
             </select>
           </div>
 
@@ -543,6 +566,28 @@ export default function LabPage() {
                     <p className="text-sm text-slate-600">Run a test to see output</p>
                   </div>
                 ) : null}
+
+                {result && (
+                  <details className="mt-3">
+                    <summary className="text-[10px] uppercase tracking-wider text-slate-500 font-mono cursor-pointer hover:text-slate-400 transition-colors">
+                      Diagnostics
+                    </summary>
+                    <div className="mt-2 bg-white/[0.01] border border-white/[0.04] rounded-lg p-3 space-y-1 text-[11px] font-mono text-slate-500">
+                      <p>Success: <span className={result.success ? 'text-emerald-400' : 'text-red-400'}>{String(result.success)}</span></p>
+                      <p>Executed: <span className={result.executed ? 'text-emerald-400' : 'text-red-400'}>{String(result.executed)}</span></p>
+                      <p>Provider: {result.routedProvider ?? 'none'}</p>
+                      <p>Model: {result.routedModel ?? 'none'}</p>
+                      <p>Mode: {result.executionMode ?? 'none'}</p>
+                      <p>Latency: {result.latencyMs}ms</p>
+                      <p>Validation: {String(result.validationUsed)}</p>
+                      <p>Consensus: {String(result.consensusUsed)}</p>
+                      <p>Fallback: {String(result.fallback_used)}</p>
+                      {result.confidenceScore !== null && <p>Confidence: {Math.round(result.confidenceScore * 100)}%</p>}
+                      {result.error && <p className="text-red-400">Error: {result.error}</p>}
+                      {result.warnings.length > 0 && <p className="text-amber-400">Warnings: {result.warnings.join(', ')}</p>}
+                    </div>
+                  </details>
+                )}
               </div>
             )}
           </div>

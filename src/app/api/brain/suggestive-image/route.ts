@@ -5,8 +5,8 @@ import { getAppSafetyConfig, validateSuggestivePrompt } from '@/lib/content-filt
  * POST /api/brain/suggestive-image — Suggestive (non-explicit) image generation
  *
  * Generates tasteful suggestive images: lingerie, swimwear, fashion poses,
- * attractive people, lifestyle photography. No nudity. No explicit acts.
- * No minors. All prompts are validated and sanitized before generation.
+ * attractive people, lifestyle photography, topless nudity. No explicit acts.
+ * No minors. No genitalia. All prompts are validated and sanitized before generation.
  *
  * GATING:
  *   - App must have safeMode=false AND suggestiveMode=true
@@ -39,7 +39,7 @@ const ALLOWED_HF_IMAGE_MODELS = [
 /** Prepend a style prefix to the prompt to reinforce tasteful imagery. */
 function enforceStylePrefix(prompt: string): string {
   const prefix =
-    'Tasteful fashion photograph, professional lighting, no nudity, no explicit content:';
+    'Tasteful professional photograph, artistic lighting, no explicit sexual content, no genitalia:';
   return `${prefix} ${prompt}`;
 }
 

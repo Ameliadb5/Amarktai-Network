@@ -105,8 +105,8 @@ describe('Provider Catalog', () => {
     expect(replicate?.supportedCapabilityFamilies).toContain('video_generation');
   });
 
-  it('has 11 canonical providers (including Replicate)', () => {
-    expect(CANONICAL_PROVIDERS.length).toBe(11);
+  it('has 13 canonical providers (including Replicate, Anthropic, Cohere)', () => {
+    expect(CANONICAL_PROVIDERS.length).toBe(13);
   });
 });
 
@@ -174,7 +174,8 @@ describe('Video Generation Capability', () => {
 
   it('does NOT use video_planning models for video_generation', () => {
     // This verifies the capability map fix (was incorrectly using supports_video_planning)
-    const planningOnlyModels = getModelRegistry().filter(
+    const allModels = getModelRegistry();
+    const planningOnlyModels = allModels.filter(
       (m) => m.supports_video_planning && !m.supports_video_generation,
     );
     const videoPlanningProviders = new Set(planningOnlyModels.map((m) => m.provider));
@@ -185,9 +186,12 @@ describe('Video Generation Capability', () => {
     }
 
     const result = resolveCapabilityRoutes({ capabilities: ['video_generation'] });
-    // Unless any of those providers also have video generation models, it should be unavailable
-    const hasVideoGenModels = planningOnlyModels.some((m) => m.supports_video_generation);
-    if (!hasVideoGenModels) {
+    // Unless any of those providers also have OTHER models with video_generation,
+    // it should be unavailable. Check the full registry for gen models in those providers.
+    const providerHasVideoGenModel = allModels.some(
+      (m) => videoPlanningProviders.has(m.provider) && m.supports_video_generation,
+    );
+    if (!providerHasVideoGenModel) {
       expect(result.allSatisfied).toBe(false);
     }
     clearProviderHealthCache();

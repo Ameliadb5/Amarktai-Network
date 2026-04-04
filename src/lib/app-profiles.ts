@@ -122,11 +122,11 @@ export interface AppProfile {
 // ── Shared constants ────────────────────────────────────────────────────────
 
 const ALL_PROVIDERS = [
-  'openai', 'grok', 'nvidia', 'huggingface', 'deepseek', 'groq', 'openrouter', 'together',
+  'openai', 'groq', 'gemini', 'huggingface', 'together', 'openrouter', 'deepseek', 'nvidia', 'replicate', 'grok', 'anthropic', 'cohere', 'qwen',
 ];
 
 const BACKBONE_PROVIDERS = [
-  'nvidia', 'huggingface', 'deepseek', 'groq', 'openrouter', 'together',
+  'nvidia', 'huggingface', 'deepseek', 'groq', 'openrouter', 'together', 'qwen',
 ];
 
 const BASIC_AGENT_PERMISSIONS = [
@@ -439,6 +439,95 @@ export const DEFAULT_APP_PROFILES: ReadonlyMap<string, AppProfile> = new Map<str
     latency_sensitivity: 'high',
     logging_privacy_rules: BASIC_PRIVACY_RULES,
   }],
+
+  // ── Internal Admin Profiles ────────────────────────────────────────────────
+
+  ['__dashboard__', {
+    app_id: '__dashboard__',
+    app_name: 'Dashboard',
+    app_type: 'internal',
+    domain: 'admin',
+    default_routing_mode: 'direct',
+    allowed_providers: ALL_PROVIDERS,
+    allowed_models: [],  // empty = wildcard (allow all)
+    preferred_models: [],
+    escalation_rules: [],
+    validator_rules: [],
+    agent_permissions: FULL_AGENT_PERMISSIONS,
+    multimodal_permissions: ['vision', 'image_generation'],
+    memory_namespace: '__dashboard__',
+    retrieval_namespace: '__dashboard__',
+    budget_sensitivity: 'low',
+    latency_sensitivity: 'low',
+    logging_privacy_rules: BASIC_PRIVACY_RULES,
+    safe_mode: false,
+    suggestive_mode: false,
+    cost_tier: 'balanced',
+    enabled_capabilities: [
+      'general_chat', 'deep_reasoning', 'coding', 'image_generation',
+      'voice_stt', 'voice_tts', 'research_search', 'deep_research',
+      'reranking', 'embeddings', 'video_planning', 'video_generation',
+      'multimodal_vision', 'agent_planning', 'creative_writing',
+    ],
+  }],
+
+  ['__admin__', {
+    app_id: '__admin__',
+    app_name: 'Admin',
+    app_type: 'internal',
+    domain: 'admin',
+    default_routing_mode: 'direct',
+    allowed_providers: ALL_PROVIDERS,
+    allowed_models: [],  // empty = wildcard (allow all)
+    preferred_models: [],
+    escalation_rules: [],
+    validator_rules: [],
+    agent_permissions: FULL_AGENT_PERMISSIONS,
+    multimodal_permissions: ['vision', 'image_generation'],
+    memory_namespace: '__admin__',
+    retrieval_namespace: '__admin__',
+    budget_sensitivity: 'low',
+    latency_sensitivity: 'low',
+    logging_privacy_rules: BASIC_PRIVACY_RULES,
+    safe_mode: false,
+    suggestive_mode: false,
+    cost_tier: 'balanced',
+    enabled_capabilities: [
+      'general_chat', 'deep_reasoning', 'coding', 'image_generation',
+      'voice_stt', 'voice_tts', 'research_search', 'deep_research',
+      'reranking', 'embeddings', 'video_planning', 'video_generation',
+      'multimodal_vision', 'agent_planning', 'creative_writing',
+    ],
+  }],
+
+  ['__admin_test__', {
+    app_id: '__admin_test__',
+    app_name: 'Admin Test',
+    app_type: 'internal',
+    domain: 'admin',
+    default_routing_mode: 'direct',
+    allowed_providers: ALL_PROVIDERS,
+    allowed_models: [],  // empty = wildcard (allow all)
+    preferred_models: [],
+    escalation_rules: [],
+    validator_rules: [],
+    agent_permissions: FULL_AGENT_PERMISSIONS,
+    multimodal_permissions: ['vision', 'image_generation'],
+    memory_namespace: '__admin_test__',
+    retrieval_namespace: '__admin_test__',
+    budget_sensitivity: 'low',
+    latency_sensitivity: 'low',
+    logging_privacy_rules: BASIC_PRIVACY_RULES,
+    safe_mode: false,
+    suggestive_mode: false,
+    cost_tier: 'balanced',
+    enabled_capabilities: [
+      'general_chat', 'deep_reasoning', 'coding', 'image_generation',
+      'voice_stt', 'voice_tts', 'research_search', 'deep_research',
+      'reranking', 'embeddings', 'video_planning', 'video_generation',
+      'multimodal_vision', 'agent_planning', 'creative_writing',
+    ],
+  }],
 ]);
 
 // ── Helper functions ────────────────────────────────────────────────────────
@@ -466,8 +555,9 @@ export function isProviderAllowed(profile: AppProfile, providerKey: string): boo
   return profile.allowed_providers.includes(providerKey);
 }
 
-/** Check whether a model ID is in the profile's allowed list. */
+/** Check whether a model ID is in the profile's allowed list. Empty list = allow all. */
 export function isModelAllowed(profile: AppProfile, modelId: string): boolean {
+  if (profile.allowed_models.length === 0) return true;
   return profile.allowed_models.includes(modelId);
 }
 
@@ -539,4 +629,50 @@ export function getMemoryNamespace(profile: AppProfile): string {
 /** Get the retrieval namespace for an app profile. */
 export function getRetrievalNamespace(profile: AppProfile): string {
   return profile.retrieval_namespace;
+}
+
+/**
+ * Try to load app profile from database (AppAiProfile table).
+ * Returns null if not found or DB unavailable.
+ */
+export async function getAppProfileFromDb(appSlug: string): Promise<AppProfile | null> {
+  try {
+    const { prisma } = await import('./prisma');
+    // AppAiProfile may not be in the generated client yet — use dynamic access
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = prisma as unknown as Record<string, any>;
+    const appAiProfile = db.appAiProfile as { findUnique?: (args: unknown) => Promise<Record<string, unknown> | null> } | undefined;
+    const dbProfile = await appAiProfile?.findUnique?.({
+      where: { appSlug },
+    });
+    if (!dbProfile) return null;
+
+    return {
+      app_id: dbProfile.appSlug as string,
+      app_name: dbProfile.appName as string,
+      app_type: dbProfile.appType as string,
+      domain: dbProfile.domain as string,
+      default_routing_mode: dbProfile.defaultRoutingMode as AppProfile['default_routing_mode'],
+      allowed_providers: JSON.parse((dbProfile.allowedProviders as string) || '[]'),
+      allowed_models: JSON.parse((dbProfile.allowedModels as string) || '[]'),
+      preferred_models: JSON.parse((dbProfile.preferredModels as string) || '[]'),
+      escalation_rules: JSON.parse((dbProfile.escalationRules as string) || '[]'),
+      validator_rules: JSON.parse((dbProfile.validatorRules as string) || '[]'),
+      agent_permissions: JSON.parse((dbProfile.agentPermissions as string) || '[]'),
+      multimodal_permissions: JSON.parse((dbProfile.multimodalPermissions as string) || '[]'),
+      memory_namespace: (dbProfile.memoryNamespace as string) || appSlug,
+      retrieval_namespace: (dbProfile.retrievalNamespace as string) || appSlug,
+      budget_sensitivity: dbProfile.budgetSensitivity as AppProfile['budget_sensitivity'],
+      latency_sensitivity: dbProfile.latencySensitivity as AppProfile['latency_sensitivity'],
+      logging_privacy_rules: JSON.parse((dbProfile.loggingPrivacyRules as string) || '[]'),
+      safe_mode: dbProfile.safeMode as boolean,
+      suggestive_mode: dbProfile.suggestiveMode as boolean,
+      cost_tier: dbProfile.costMode as AppProfile['cost_tier'],
+      fallback_chain: JSON.parse((dbProfile.fallbackChain as string) || '[]'),
+      monthly_budget_usd: (dbProfile.monthlyBudgetCap as number | null) ?? undefined,
+      enabled_capabilities: JSON.parse((dbProfile.enabledCapabilities as string) || '[]'),
+    };
+  } catch {
+    return null;
+  }
 }

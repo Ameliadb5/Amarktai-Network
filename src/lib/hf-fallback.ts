@@ -45,6 +45,7 @@ const HF_FALLBACK_MODELS: Partial<Record<CapabilityClass, HfFallbackSpec[]>> = {
   ],
   // video_generation uses text-to-video models for general video content.
   video_generation: [
+    { model: 'THUDM/CogVideoX-5b', label: 'CogVideoX 5B', notes: 'High-quality text-to-video generation (reserve)' },
     { model: 'cerspense/zeroscope_v2_576w', label: 'ZeroScope V2 576w', notes: 'Free text-to-video generation (Replicate preferred for production)' },
     { model: 'damo-vilab/text-to-video-ms-1.7b', label: 'Text-to-Video MS 1.7B', notes: 'Fallback text-to-video' },
   ],

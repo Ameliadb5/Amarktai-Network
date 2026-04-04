@@ -140,6 +140,60 @@ export async function runProviderHealthCheck(
         return { status: 'degraded', message: `HTTP ${res.status} from Hugging Face API` }
       }
 
+      case 'anthropic': {
+        const endpoint = `${baseUrl || 'https://api.anthropic.com'}/v1/messages`
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-3-haiku-20240307',
+            max_tokens: 1,
+            messages: [{ role: 'user', content: 'hi' }],
+          }),
+          signal: AbortSignal.timeout(timeout),
+        })
+        if (res.ok) return { status: 'healthy', message: 'Connected · Anthropic API responding' }
+        if (res.status === 401) return { status: 'error', message: 'Invalid API key (401 Unauthorized)' }
+        if (res.status === 429) return { status: 'degraded', message: 'Rate limited (429)' }
+        return { status: 'degraded', message: `HTTP ${res.status} from Anthropic API` }
+      }
+
+      case 'cohere': {
+        const endpoint = `${baseUrl || 'https://api.cohere.com'}/v2/chat`
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'command-r',
+            messages: [{ role: 'user', content: 'hi' }],
+          }),
+          signal: AbortSignal.timeout(timeout),
+        })
+        if (res.ok) return { status: 'healthy', message: 'Connected · Cohere API responding' }
+        if (res.status === 401) return { status: 'error', message: 'Invalid API key (401 Unauthorized)' }
+        if (res.status === 429) return { status: 'degraded', message: 'Rate limited (429)' }
+        return { status: 'degraded', message: `HTTP ${res.status} from Cohere API` }
+      }
+
+      case 'qwen': {
+        const endpoint = `${baseUrl || 'https://dashscope-intl.aliyuncs.com/compatible-mode'}/v1/models`
+        const res = await fetch(endpoint, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(timeout),
+        })
+        if (res.ok) return { status: 'healthy', message: 'Connected · Qwen/DashScope API responding' }
+        if (res.status === 401) return { status: 'error', message: 'Invalid API key (401 Unauthorized)' }
+        if (res.status === 429) return { status: 'degraded', message: 'Rate limited (429)' }
+        return { status: 'degraded', message: `HTTP ${res.status} from Qwen/DashScope API` }
+      }
+
       case 'nvidia':
         // NVIDIA NIM — key can be validated but models list requires explicit access
         return { status: 'configured', message: 'Key configured · use Gateway Test to validate live inference' }

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
-  RefreshCw, AlertCircle, Brain, Layers, Bell, FileText, Shield,
+  RefreshCw, AlertCircle, Brain, Layers, Bell, FileText, Shield, DollarSign,
   CheckCircle, XCircle, Clock, WifiOff, Key, Plus, Save, Activity,
   Eye, EyeOff, ToggleLeft, ToggleRight,
 } from 'lucide-react'
@@ -58,6 +58,15 @@ interface ReadinessData {
   summary: { total: number; passed: number; failed: number; warnings: number; critical: number }
 }
 
+interface BudgetEntry {
+  providerKey: string
+  monthlyBudgetUsd: number | null
+  currentSpendUsd: number
+  warningThresholdPct: number
+  criticalThresholdPct: number
+  notes?: string
+}
+
 const HEALTH: Record<string, { color: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; label: string }> = {
   healthy:      { color: 'text-emerald-400', icon: CheckCircle, label: 'Healthy' },
   configured:   { color: 'text-amber-400',   icon: Clock,       label: 'Key Set' },
@@ -74,10 +83,10 @@ const SEV: Record<string, { color: string; bg: string }> = {
   info:     { color: 'text-blue-400',  bg: 'bg-blue-400/10' },
 }
 
-const TABS = ['Providers', 'Models', 'Alerts', 'Events', 'Readiness'] as const
+const TABS = ['Providers', 'Models', 'Budget', 'Alerts', 'Events', 'Readiness'] as const
 type Tab = typeof TABS[number]
 const TAB_ICONS: Record<Tab, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
-  Providers: Brain, Models: Layers, Alerts: Bell, Events: FileText, Readiness: Shield,
+  Providers: Brain, Models: Layers, Budget: DollarSign, Alerts: Bell, Events: FileText, Readiness: Shield,
 }
 
 const fadeUp = {
@@ -92,6 +101,7 @@ export default function OperationsPage() {
   const [alerts, setAlerts] = useState<AlertEntry[]>([])
   const [events, setEvents] = useState<EventEntry[]>([])
   const [readiness, setReadiness] = useState<ReadinessData | null>(null)
+  const [budgets, setBudgets] = useState<BudgetEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -99,18 +109,20 @@ export default function OperationsPage() {
     setLoading(true)
     setError(null)
     try {
-      const [pRes, mRes, aRes, eRes, rRes] = await Promise.allSettled([
+      const [pRes, mRes, aRes, eRes, rRes, bRes] = await Promise.allSettled([
         fetch('/api/admin/providers').then(r => r.ok ? r.json() : []),
         fetch('/api/admin/models').then(r => r.ok ? r.json() : []),
         fetch('/api/admin/healing').then(r => r.ok ? r.json() : { issues: [] }),
         fetch('/api/admin/events').then(r => r.ok ? r.json() : []),
         fetch('/api/admin/readiness').then(r => r.ok ? r.json() : null),
+        fetch('/api/admin/budgets').then(r => r.ok ? r.json() : { budgets: [] }),
       ])
       if (pRes.status === 'fulfilled') setProviders(Array.isArray(pRes.value) ? pRes.value : [])
       if (mRes.status === 'fulfilled') setModels(Array.isArray(mRes.value) ? mRes.value : mRes.value?.models ?? [])
       if (aRes.status === 'fulfilled') setAlerts(Array.isArray(aRes.value?.issues) ? aRes.value.issues : [])
       if (eRes.status === 'fulfilled') setEvents(Array.isArray(eRes.value) ? eRes.value : [])
       if (rRes.status === 'fulfilled') setReadiness(rRes.value)
+      if (bRes.status === 'fulfilled') setBudgets(Array.isArray(bRes.value?.budgets) ? bRes.value.budgets : [])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load operations data')
     } finally {
@@ -161,6 +173,7 @@ export default function OperationsPage() {
         <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
           {tab === 'Providers' && <ProvidersView providers={providers} onRefresh={load} />}
           {tab === 'Models' && <ModelsView models={models} />}
+          {tab === 'Budget' && <BudgetView budgets={budgets} />}
           {tab === 'Alerts' && <AlertsView alerts={alerts} />}
           {tab === 'Events' && <EventsView events={events} />}
           {tab === 'Readiness' && <ReadinessView data={readiness} />}
@@ -502,6 +515,80 @@ function ModelsView({ models }: { models: ModelEntry[] }) {
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+function BudgetView({ budgets }: { budgets: BudgetEntry[] }) {
+  if (budgets.length === 0) return <EmptyState message="No budget configurations set. Add provider budgets to track costs." icon={<DollarSign className="w-8 h-8 text-slate-600" />} />
+
+  const totalSpend = budgets.reduce((acc, b) => acc + (b.currentSpendUsd ?? 0), 0)
+  const totalBudget = budgets.reduce((acc, b) => acc + (b.monthlyBudgetUsd ?? 0), 0)
+
+  return (
+    <div className="space-y-6">
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Total Monthly Spend</p>
+          <p className="text-2xl font-bold text-white mt-1">${totalSpend.toFixed(2)}</p>
+        </div>
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Total Budget</p>
+          <p className="text-2xl font-bold text-white mt-1">{totalBudget > 0 ? `$${totalBudget.toFixed(2)}` : 'Unlimited'}</p>
+        </div>
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Budget Utilization</p>
+          <p className={`text-2xl font-bold mt-1 ${totalBudget > 0 && (totalSpend / totalBudget) > 0.9 ? 'text-red-400' : totalBudget > 0 && (totalSpend / totalBudget) > 0.75 ? 'text-amber-400' : 'text-emerald-400'}`}>
+            {totalBudget > 0 ? `${((totalSpend / totalBudget) * 100).toFixed(1)}%` : '—'}
+          </p>
+        </div>
+      </div>
+
+      {/* Per-provider budget table */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
+              <th className="text-left px-4 py-3">Provider</th>
+              <th className="text-left px-4 py-3">Budget</th>
+              <th className="text-left px-4 py-3">Spent</th>
+              <th className="text-left px-4 py-3">Usage</th>
+              <th className="text-left px-4 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {budgets.map((b) => {
+              const pct = b.monthlyBudgetUsd ? (b.currentSpendUsd / b.monthlyBudgetUsd) * 100 : 0
+              const status = !b.monthlyBudgetUsd ? 'unlimited' : pct >= (b.criticalThresholdPct ?? 90) ? 'critical' : pct >= (b.warningThresholdPct ?? 75) ? 'warning' : 'ok'
+              return (
+                <tr key={b.providerKey} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition">
+                  <td className="px-4 py-3 text-white font-mono">{b.providerKey}</td>
+                  <td className="px-4 py-3 text-slate-400">{b.monthlyBudgetUsd ? `$${b.monthlyBudgetUsd.toFixed(2)}` : 'Unlimited'}</td>
+                  <td className="px-4 py-3 text-slate-300">${(b.currentSpendUsd ?? 0).toFixed(2)}</td>
+                  <td className="px-4 py-3">
+                    {b.monthlyBudgetUsd ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                          <div className={`h-full rounded-full ${status === 'critical' ? 'bg-red-400' : status === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                        </div>
+                        <span className="text-xs text-slate-500">{pct.toFixed(1)}%</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-600">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${status === 'critical' ? 'bg-red-400/10 text-red-400' : status === 'warning' ? 'bg-amber-400/10 text-amber-400' : status === 'unlimited' ? 'bg-slate-400/10 text-slate-400' : 'bg-emerald-400/10 text-emerald-400'}`}>
+                      {status === 'critical' ? 'Over budget' : status === 'warning' ? 'Warning' : status === 'unlimited' ? 'Unlimited' : 'OK'}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

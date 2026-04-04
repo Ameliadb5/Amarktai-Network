@@ -27,6 +27,9 @@ describe('Integration Verification', () => {
     setProviderHealth('huggingface', 'configured')
     setProviderHealth('nvidia', 'configured')
     setProviderHealth('replicate', 'configured')
+    setProviderHealth('anthropic', 'configured')
+    setProviderHealth('cohere', 'configured')
+    setProviderHealth('qwen', 'configured')
   }
 
   beforeEach(() => {
