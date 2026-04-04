@@ -15,7 +15,7 @@
  *  - Prompt Studio
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { existsSync } from 'fs'
 import { resolve } from 'path'
 
@@ -226,7 +226,6 @@ import {
   setWebhookActive,
   generateSignature,
   verifySignature,
-  dispatchEvent,
   getDeliveryLog,
   getDeliveryStats,
   WEBHOOK_EVENT_TYPES,
@@ -416,8 +415,6 @@ import {
   chunkText,
   generateEmbedding,
   generateEmbeddings,
-  ingestDocument,
-  retrieve,
   buildRAGPrompt,
   getRAGHealth,
   RAG_CHUNK_SIZE,
@@ -619,7 +616,6 @@ import {
   getToolsAsOpenAIFunctions,
   executeTool,
   executeToolCalls,
-  processToolCallsFromResponse,
   registerTool,
   unregisterTool,
   BUILTIN_TOOL_NAMES,
@@ -744,7 +740,6 @@ import {
   listWorkflows,
   activateWorkflow,
   deleteWorkflow,
-  executeWorkflow,
   getWorkflowRun,
   listWorkflowRuns,
   STEP_TYPES,
@@ -863,8 +858,6 @@ import {
   createABTest,
   startABTest,
   selectVariant,
-  recordABResult,
-  getABResults,
   getABTest,
   listABTests,
   TEMPLATE_CATEGORIES,
