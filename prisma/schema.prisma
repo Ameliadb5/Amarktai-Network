@@ -415,6 +415,7 @@ model AppAiProfile {
 
   // Safety
   safeMode       Boolean @default(true) @map("safe_mode")
+  /// Allows lingerie, swimwear, fashion poses, topless nudity. Blocks explicit sex, genitalia, minors. Requires safeMode=false.
   suggestiveMode Boolean @default(false) @map("suggestive_mode")
 
   // Capabilities (JSON array of enabled capability strings)
