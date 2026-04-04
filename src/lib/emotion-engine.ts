@@ -1064,11 +1064,17 @@ export const DEFAULT_MULTIMODAL_CONFIG: MultimodalEmotionConfig = {
 
 // ─── Phase 10 — Full Pipeline ───────────────────────────────────────────────
 
+import { persistEmotionState } from './emotion-persistence'
+import { enrichAndBlend, isHFEnrichmentAvailable } from './hf-emotion-enrichment'
+
 /**
  * Run the complete emotional intelligence pipeline (v2).
  *
  * input → detect → emoji + NLP + negation → context update → memory lookup
- *       → personality adapt → modulate → output
+ *       → personality adapt → modulate → persist → output
+ *
+ * The pipeline is synchronous for performance. Persistence (Redis/Qdrant)
+ * and HF enrichment are fire-and-forget async — they don't block the response.
  */
 export function runEmotionPipeline(
   userId: string,
@@ -1099,8 +1105,82 @@ export function runEmotionPipeline(
   const profile = userProfiles.get(userId)!
   const drift = userDrift.get(userId)!
   const personality = userPersonality.get(userId)!
+  const memory = emotionMemory.get(userId) ?? []
+
+  // Step 8: Fire-and-forget async persistence (Redis + Qdrant)
+  // Non-blocking — errors are swallowed; in-memory state is authoritative
+  persistEmotionState(userId, {
+    profile,
+    drift,
+    memory,
+    personality,
+    context,
+    analysis,
+    analysesCount: totalAnalyses,
+    transitions: transitionMatrix,
+    analysisContext: text.slice(0, 200),
+  }).catch(() => {}) // swallow errors — persistence is best-effort
 
   return { analysis, modulation, profile, drift, personality, context, sentiment }
+}
+
+/**
+ * Run the complete pipeline with HuggingFace enrichment (async version).
+ *
+ * Use this when you can afford the extra latency (~200-3000ms for HF API call).
+ * Falls back to internal-only if HF is unavailable.
+ */
+export async function runEmotionPipelineEnriched(
+  userId: string,
+  text: string,
+  basePersonality: PersonalityType = 'professional',
+): Promise<{
+  analysis: EmotionAnalysis
+  modulation: ResponseModulation
+  profile: EmotionalProfile
+  drift: EmotionalDrift
+  personality: PersonalityState
+  context: ConversationContext
+  sentiment: SentimentResult
+  hfEnriched: boolean
+}> {
+  // Step 1: Internal detection
+  let analysis = detectEmotions(text)
+
+  // Step 1b: HF enrichment (if available)
+  let hfEnriched = false
+  if (isHFEnrichmentAvailable()) {
+    const blended = await enrichAndBlend(text, analysis)
+    if (blended.blendApplied) {
+      analysis = blended.analysis
+      hfEnriched = true
+    }
+  }
+
+  // Steps 2-7: Same as synchronous pipeline
+  const sentiment = analyzeSentiment(text)
+  const context = updateConversationContext(userId, text, analysis)
+  const modulation = modulateResponse(userId, analysis, basePersonality)
+
+  const profile = userProfiles.get(userId)!
+  const drift = userDrift.get(userId)!
+  const personality = userPersonality.get(userId)!
+  const memory = emotionMemory.get(userId) ?? []
+
+  // Step 8: Async persistence
+  persistEmotionState(userId, {
+    profile,
+    drift,
+    memory,
+    personality,
+    context,
+    analysis,
+    analysesCount: totalAnalyses,
+    transitions: transitionMatrix,
+    analysisContext: text.slice(0, 200),
+  }).catch(() => {})
+
+  return { analysis, modulation, profile, drift, personality, context, sentiment, hfEnriched }
 }
 
 // ─── Phase 12 — Dashboard Summary ───────────────────────────────────────────

@@ -10,17 +10,19 @@ import {
   detectEmotions,
   analyzeSentiment,
   runEmotionPipeline,
+  runEmotionPipelineEnriched,
   EMOTION_TYPES,
   EMOTION_MODELS,
   PERSONALITY_TYPES,
   EMOJI_EMOTION_COUNT,
   type PersonalityType,
 } from '@/lib/emotion-engine'
+import { isHFEnrichmentAvailable } from '@/lib/hf-emotion-enrichment'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { text, userId, basePersonality, fullPipeline } = body
+    const { text, userId, basePersonality, fullPipeline, enableHF } = body
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json({ error: 'text (string) is required' }, { status: 400 })
@@ -41,13 +43,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Use enriched pipeline if HF is available and requested (or by default)
+    const useHF = enableHF !== false && isHFEnrichmentAvailable()
+    if (useHF) {
+      const result = await runEmotionPipelineEnriched(
+        userId,
+        text,
+        (basePersonality as PersonalityType) || 'professional',
+      )
+      return NextResponse.json({ success: true, ...result })
+    }
+
+    // Standard pipeline (no HF enrichment)
     const result = runEmotionPipeline(
       userId,
       text,
       (basePersonality as PersonalityType) || 'professional',
     )
 
-    return NextResponse.json({ success: true, ...result })
+    return NextResponse.json({ success: true, ...result, hfEnriched: false })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Emotion analysis failed'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -60,6 +74,7 @@ export async function GET() {
     personalityTypes: PERSONALITY_TYPES,
     models: EMOTION_MODELS,
     version: 2,
+    hfEnrichmentAvailable: isHFEnrichmentAvailable(),
     features: [
       'Multi-label emotion detection',
       'AFINN-165 NLP sentiment analysis',
@@ -70,9 +85,12 @@ export async function GET() {
       'Conversation context window',
       'Adaptive personality engine',
       'Behavioral learning loop',
+      'HuggingFace live enrichment (when API key set)',
+      'Redis emotion persistence (when REDIS_URL set)',
+      'Qdrant long-term emotion vectors (when QDRANT_URL set)',
     ],
     endpoints: {
-      'POST /api/emotions': 'Analyse text (send { text, userId?, basePersonality?, fullPipeline? })',
+      'POST /api/emotions': 'Analyse text (send { text, userId?, basePersonality?, fullPipeline?, enableHF? })',
       'GET  /api/emotions': 'Return available types, models, and features',
     },
   })
