@@ -127,7 +127,7 @@ const sessions = new Map<string, GenerationSession>()
 
 // ── Language Detection ───────────────────────────────────────────────────────
 
-function detectLanguage(filePath: string): string {
+function _detectLanguage(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
   const map: Record<string, string> = {
     ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
@@ -333,7 +333,7 @@ function generateNextjsApp(desc: string, opts: GenerateOptions): GeneratedFile[]
   return files
 }
 
-function generateReactApp(desc: string, opts: GenerateOptions): GeneratedFile[] {
+function generateReactApp(desc: string, _opts: GenerateOptions): GeneratedFile[] {
   const appName = extractAppName(desc)
   const slug = appName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 

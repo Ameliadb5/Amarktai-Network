@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   runGuardrails,
-  detectPII,
-  redactPII,
   type GuardrailPolicy,
   GUARDRAIL_CATEGORIES,
 } from '@/lib/guardrails'
