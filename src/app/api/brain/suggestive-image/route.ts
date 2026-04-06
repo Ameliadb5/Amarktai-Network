@@ -36,7 +36,7 @@ const ALLOWED_HF_IMAGE_MODELS = [
   'stabilityai/stable-diffusion-2-1',
 ] as const;
 
-/** Steps used for FLUX models (distilled, very fast at low step counts). */
+/** Steps used for FLUX models (distilled diffusion — high quality at 4 steps). */
 const FLUX_DEFAULT_STEPS = 4;
 /** Steps used for SDXL-based models (needs more diffusion steps for quality). */
 const SDXL_DEFAULT_STEPS = 30;

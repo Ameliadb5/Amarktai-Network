@@ -37,8 +37,9 @@ async function syncHealthCacheFromDB(): Promise<void> {
     for (const key of Array.from(allKeys)) {
       if (!configured.has(key)) setProviderHealth(key, 'unconfigured')
     }
-  } catch {
-    // Best-effort — proceed with whatever state is in the cache
+  } catch (err) {
+    // Log so operators can diagnose DB connectivity issues affecting model listings.
+    console.warn('[models] syncHealthCacheFromDB failed; health overlay may be stale:', err)
   }
 }
 
