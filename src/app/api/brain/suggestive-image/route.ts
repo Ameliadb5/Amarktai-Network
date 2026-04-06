@@ -36,11 +36,16 @@ const ALLOWED_HF_IMAGE_MODELS = [
   'stabilityai/stable-diffusion-2-1',
 ] as const;
 
+/** Steps used for FLUX models (distilled, very fast at low step counts). */
+const FLUX_DEFAULT_STEPS = 4;
+/** Steps used for SDXL-based models (needs more diffusion steps for quality). */
+const SDXL_DEFAULT_STEPS = 30;
+
 /** Together AI image models in preference order (FLUX first, then SDXL). */
 const TOGETHER_IMAGE_MODELS: ReadonlyArray<{ id: string; steps: number }> = [
-  { id: 'black-forest-labs/FLUX.1-schnell-Free', steps: 4 },
-  { id: 'black-forest-labs/FLUX.1-schnell', steps: 4 },
-  { id: 'stabilityai/stable-diffusion-xl-base-1.0', steps: 30 },
+  { id: 'black-forest-labs/FLUX.1-schnell-Free', steps: FLUX_DEFAULT_STEPS },
+  { id: 'black-forest-labs/FLUX.1-schnell', steps: FLUX_DEFAULT_STEPS },
+  { id: 'stabilityai/stable-diffusion-xl-base-1.0', steps: SDXL_DEFAULT_STEPS },
 ];
 
 /** Prepend a style prefix to the prompt to reinforce tasteful imagery. */

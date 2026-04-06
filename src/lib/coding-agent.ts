@@ -129,6 +129,9 @@ export interface GenerateOptions {
 // In-memory session store (persists for server lifetime)
 const sessions = new Map<string, GenerationSession>()
 
+/** Maximum context characters to include when building a refine prompt. */
+const MAX_REFINE_CONTEXT_CHARS = 14_000;
+
 // ── AI Provider Selection ─────────────────────────────────────────────────────
 
 /** Ordered preference for code-generation providers (best quality first). */
@@ -212,7 +215,7 @@ function buildRefinePrompt(
   const fileSummary = existingFiles
     .map(f => `// ${f.path}\n${f.content}`)
     .join('\n\n---\n\n')
-    .slice(0, 14_000)
+    .slice(0, MAX_REFINE_CONTEXT_CHARS)
 
   return `You are an expert ${info.language} developer. Modify the existing ${info.label} project based on user feedback.
 
@@ -862,9 +865,23 @@ function generateStaticApp(desc: string, _opts: GenerateOptions): GeneratedFile[
   ]
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Extract a short app name from the user's description. */
+/**
+ * Return the scaffold generator for a project type.
+ * Using an exhaustive switch prevents dynamic property access on user input
+ * and satisfies static analysis requirements.
+ */
+function getScaffoldGenerator(
+  pt: ProjectType,
+): (d: string, o: GenerateOptions) => GeneratedFile[] {
+  switch (pt) {
+    case 'nextjs':  return generateNextjsApp
+    case 'react':   return generateReactApp
+    case 'express': return generateExpressApp
+    case 'flask':   return generateFlaskApp
+    case 'static':  return generateStaticApp
+    default: throw new Error(`Unsupported project type: ${pt as string}`)
+  }
+}
 function extractAppName(desc: string): string {
   const cleaned = desc.replace(/[^\w\s]/g, '').trim()
   const words = cleaned.split(/\s+/).slice(0, 4)
@@ -904,15 +921,7 @@ export async function generateApp(
     styling: options.styling ?? 'tailwind',
   }
 
-  const scaffold: Record<ProjectType, (d: string, o: GenerateOptions) => GeneratedFile[]> = {
-    nextjs: generateNextjsApp,
-    react: generateReactApp,
-    express: generateExpressApp,
-    flask: generateFlaskApp,
-    static: generateStaticApp,
-  }
-  const generator = scaffold[projectType]
-  if (!generator) throw new Error(`Unsupported project type: ${projectType}`)
+  const generator = getScaffoldGenerator(projectType)
 
   // ── Attempt real AI generation ────────────────────────────────────────
   let files: GeneratedFile[] = []
@@ -925,7 +934,7 @@ export async function generateApp(
     if (result.ok && result.output) {
       const aiFiles = parseAIFiles(result.output)
       if (aiFiles.length > 0) {
-        // AI files take priority; append any scaffold files not covered by AI
+        // AI files take priority; lazily append scaffold files not covered by AI
         const aiPaths = new Set(aiFiles.map(f => f.path))
         const extra = generator(description, resolvedOpts).filter(f => !aiPaths.has(f.path))
         files = [...aiFiles, ...extra]
