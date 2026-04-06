@@ -933,6 +933,10 @@ interface BenchmarkResult {
   providerKey: string
   model: string
   output: string | null
+  /** For streaming mode — partial output accumulated from SSE tokens */
+  streamOutput?: string
+  /** For streaming mode — whether streaming is still active for this provider */
+  streaming?: boolean
   success: boolean
   error: string | null
   latencyMs: number
@@ -943,6 +947,7 @@ function BenchmarkPanel() {
   const [loadingProviders, setLoadingProviders] = useState(true)
   const [benchPrompt, setBenchPrompt] = useState('')
   const [benchTask, setBenchTask] = useState('chat')
+  const [benchStreamMode, setBenchStreamMode] = useState(false)
   const [selectedProviders, setSelectedProviders] = useState<string[]>([])
   const [benchRunning, setBenchRunning] = useState(false)
   const [benchResults, setBenchResults] = useState<BenchmarkResult[] | null>(null)
@@ -1019,6 +1024,89 @@ function BenchmarkPanel() {
     }
   }
 
+  /** Stream benchmark: run each provider through SSE /api/brain/stream sequentially,
+   *  accumulating live tokens into per-provider results. */
+  const handleBenchmarkStream = async () => {
+    if (!benchPrompt.trim() || selectedProviders.length === 0) return
+    setBenchRunning(true)
+    setBenchError(null)
+    // Pre-populate result cards so they appear immediately
+    setBenchResults(selectedProviders.map(key => ({
+      providerKey: key,
+      model: key,
+      output: null,
+      streamOutput: '',
+      streaming: true,
+      success: false,
+      error: null,
+      latencyMs: 0,
+    })))
+
+    for (const providerKey of selectedProviders) {
+      const start = Date.now()
+      try {
+        const res = await fetch('/api/brain/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: benchPrompt.trim(),
+            taskType: benchTask,
+            providerKey,
+          }),
+        })
+        if (!res.ok || !res.body) {
+          const err = await res.json().catch(() => ({}))
+          setBenchResults(prev => (prev ?? []).map(r =>
+            r.providerKey === providerKey
+              ? { ...r, streaming: false, success: false, error: err.error ?? `HTTP ${res.status}`, latencyMs: Date.now() - start }
+              : r
+          ))
+          continue
+        }
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let accumulated = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const payload = line.slice(6).trim()
+              if (payload === '[DONE]') break
+              try {
+                const parsed = JSON.parse(payload)
+                const delta = parsed.choices?.[0]?.delta?.content ?? parsed.content ?? ''
+                if (delta) {
+                  accumulated += delta
+                  setBenchResults(prev => (prev ?? []).map(r =>
+                    r.providerKey === providerKey ? { ...r, streamOutput: accumulated } : r
+                  ))
+                }
+              } catch { /* ignore non-JSON */ }
+            }
+          }
+        }
+        setBenchResults(prev => (prev ?? []).map(r =>
+          r.providerKey === providerKey
+            ? { ...r, streaming: false, success: true, output: accumulated, latencyMs: Date.now() - start }
+            : r
+        ))
+      } catch (e) {
+        setBenchResults(prev => (prev ?? []).map(r =>
+          r.providerKey === providerKey
+            ? { ...r, streaming: false, success: false, error: e instanceof Error ? e.message : 'Stream failed', latencyMs: Date.now() - start }
+            : r
+        ))
+      }
+    }
+
+    setBenchRunning(false)
+  }
+
   return (
     <motion.div variants={fadeUp} className="space-y-5">
       <div className="flex items-center gap-2">
@@ -1092,17 +1180,33 @@ function BenchmarkPanel() {
           />
         </div>
 
-        {/* Run */}
-        <button
-          onClick={handleBenchmark}
-          disabled={benchRunning || !benchPrompt.trim() || selectedProviders.length === 0}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-amber-600 to-amber-500 text-white hover:from-amber-500 hover:to-amber-400 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {benchRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-          {benchRunning
-            ? `Running across ${selectedProviders.length} provider${selectedProviders.length !== 1 ? 's' : ''}…`
-            : `Benchmark ${selectedProviders.length} provider${selectedProviders.length !== 1 ? 's' : ''}`}
-        </button>
+        {/* Stream mode toggle + Run */}
+        <div className="space-y-2">
+          {['chat', 'code', 'reasoning'].includes(benchTask) && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBenchStreamMode(m => !m)}
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors ${benchStreamMode ? 'border-blue-500/40 bg-blue-500/10 text-blue-300' : 'border-white/[0.08] text-slate-500 hover:text-slate-300'}`}
+              >
+                <Radio className="w-3 h-3" />
+                {benchStreamMode ? 'Stream: ON' : 'Stream: OFF'}
+              </button>
+              <span className="text-[10px] text-slate-600">Streams SSE tokens live per provider (sequential)</span>
+            </div>
+          )}
+          <button
+            onClick={benchStreamMode ? handleBenchmarkStream : handleBenchmark}
+            disabled={benchRunning || !benchPrompt.trim() || selectedProviders.length === 0}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-amber-600 to-amber-500 text-white hover:from-amber-500 hover:to-amber-400 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {benchRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : benchStreamMode ? <Radio className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+            {benchRunning
+              ? `${benchStreamMode ? 'Streaming' : 'Running'} across ${selectedProviders.length} provider${selectedProviders.length !== 1 ? 's' : ''}…`
+              : benchStreamMode
+                ? `Stream ${selectedProviders.length} provider${selectedProviders.length !== 1 ? 's' : ''}`
+                : `Benchmark ${selectedProviders.length} provider${selectedProviders.length !== 1 ? 's' : ''}`}
+          </button>
+        </div>
 
         {benchError && <p className="text-sm text-red-400">{benchError}</p>}
       </div>
@@ -1114,7 +1218,7 @@ function BenchmarkPanel() {
             <div
               key={i}
               className={`bg-white/[0.03] border rounded-xl p-5 space-y-3 ${
-                r.success ? 'border-white/[0.06]' : 'border-red-500/20'
+                r.streaming ? 'border-blue-500/20' : r.success ? 'border-white/[0.06]' : 'border-red-500/20'
               }`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -1123,15 +1227,21 @@ function BenchmarkPanel() {
                   <p className="text-[10px] text-slate-500 font-mono mt-0.5">{r.model}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {r.success
-                    ? <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    : <XCircle className="w-4 h-4 text-red-400" />}
-                  <span className="text-xs text-slate-500">{r.latencyMs}ms</span>
+                  {r.streaming
+                    ? <Radio className="w-4 h-4 text-blue-400 animate-pulse" />
+                    : r.success
+                      ? <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      : <XCircle className="w-4 h-4 text-red-400" />}
+                  <span className="text-xs text-slate-500">{r.latencyMs > 0 ? `${r.latencyMs}ms` : r.streaming ? '…' : '0ms'}</span>
                 </div>
               </div>
               <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 min-h-[80px] max-h-[200px] overflow-auto">
-                {r.success && r.output ? (
-                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{r.output}</pre>
+                {r.streaming && (r.streamOutput !== undefined) ? (
+                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
+                    {r.streamOutput || <span className="text-slate-600">Waiting for tokens…</span>}
+                  </pre>
+                ) : r.success && (r.output ?? r.streamOutput) ? (
+                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{r.output ?? r.streamOutput}</pre>
                 ) : (
                   <p className="text-xs text-red-400">{r.error ?? 'No output'}</p>
                 )}
