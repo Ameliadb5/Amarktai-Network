@@ -4,42 +4,9 @@ import { routeRequest, type RoutingContext } from '@/lib/routing-engine'
 import {
   getModelRegistry,
   getUsableModels,
-  setProviderHealth,
-  type ProviderHealthStatus,
 } from '@/lib/model-registry'
 import { getDetailedCapabilityStatus } from '@/lib/capability-engine'
-import { prisma } from '@/lib/prisma'
-
-/**
- * Sync the model-registry health cache from DB provider state so that
- * getUsableModels() reflects real configuration for this request.
- */
-async function syncHealthCacheFromDB(): Promise<void> {
-  try {
-    const dbProviders = await prisma.aiProvider.findMany({
-      where: { enabled: true },
-      select: { providerKey: true, healthStatus: true, apiKey: true },
-    })
-    const configuredKeys = new Set<string>()
-    for (const p of dbProviders) {
-      if (p.apiKey) {
-        setProviderHealth(p.providerKey, p.healthStatus as ProviderHealthStatus)
-        configuredKeys.add(p.providerKey)
-      }
-    }
-    // Mark all other known providers as unconfigured
-    const allKeys = new Set(getModelRegistry().map(m => m.provider))
-    for (const key of Array.from(allKeys)) {
-      if (!configuredKeys.has(key)) {
-        setProviderHealth(key, 'unconfigured')
-      }
-    }
-  } catch (err) {
-    // Best-effort — fall through with empty cache (all models treated as usable).
-    // Log so operators can diagnose DB connectivity issues affecting routing stats.
-    console.warn('[routing] syncHealthCacheFromDB failed; stats will reflect static registry:', err)
-  }
-}
+import { syncProviderHealthFromDB } from '@/lib/sync-provider-health'
 
 /**
  * GET /api/admin/routing — returns routing status summary for the Intelligence dashboard.
@@ -52,7 +19,7 @@ export async function GET() {
 
   try {
     // Sync health cache from DB so getUsableModels() reflects real configuration
-    await syncHealthCacheFromDB()
+    await syncProviderHealthFromDB()
 
     const allModels = getModelRegistry()
     const usableModels = getUsableModels()

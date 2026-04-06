@@ -8,16 +8,14 @@ import {
   getEnabledModels,
   getValidatorEligibleModels,
   getCategorySummary,
-  setProviderHealth,
   getProviderHealth,
-  type ProviderHealthStatus,
   type ModelEntry,
 } from '@/lib/model-registry'
-import { prisma } from '@/lib/prisma'
+import { syncProviderHealthFromDB } from '@/lib/sync-provider-health'
 
 /**
  * Derives a capabilities string array from a model's boolean flag fields.
- * UI components expect a capabilities: string[] rather than individual flags.
+ * UI components expect a `capabilities: string[]` rather than individual flags.
  */
 function deriveCapabilities(m: ModelEntry): string[] {
   const caps: string[] = []
@@ -41,35 +39,6 @@ function deriveCapabilities(m: ModelEntry): string[] {
 }
 
 /**
- * Sync the model-registry health cache from DB so that model listings
- * accurately reflect which providers are actually configured.
- * Uses the same pattern as /api/admin/routing.
- */
-async function syncHealthCacheFromDB(): Promise<void> {
-  try {
-    const dbProviders = await prisma.aiProvider.findMany({
-      where: { enabled: true },
-      select: { providerKey: true, healthStatus: true, apiKey: true },
-    })
-    const configured = new Set<string>()
-    for (const p of dbProviders) {
-      if (p.apiKey) {
-        setProviderHealth(p.providerKey, p.healthStatus as ProviderHealthStatus)
-        configured.add(p.providerKey)
-      }
-    }
-    // Mark all unconfigured providers so getUsableModels() returns accurate data
-    const allKeys = new Set(getModelRegistry().map(m => m.provider))
-    for (const key of Array.from(allKeys)) {
-      if (!configured.has(key)) setProviderHealth(key, 'unconfigured')
-    }
-  } catch (err) {
-    // Log so operators can diagnose DB connectivity issues affecting model listings.
-    console.warn('[models] syncHealthCacheFromDB failed; health overlay may be stale:', err)
-  }
-}
-
-/**
  * GET /api/admin/models — returns model registry entries.
  *
  * Query params:
@@ -86,7 +55,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Sync provider health from DB so model listings reflect real configuration
-  await syncHealthCacheFromDB()
+  await syncProviderHealthFromDB()
 
   const { searchParams } = new URL(request.url)
   const provider = searchParams.get('provider')

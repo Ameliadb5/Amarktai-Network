@@ -253,7 +253,7 @@ export default function DashboardOverview() {
             <p className="text-xs text-red-400/70 mt-0.5">{dbError}</p>
             <p className="text-xs text-slate-500 mt-1.5">
               Set a valid <code className="text-slate-400 font-mono text-[11px]">DATABASE_URL</code> and check the{' '}
-              <Link href="/admin/dashboard/readiness" className="text-blue-400 hover:text-blue-300 underline transition-colors">Readiness</Link> page.
+              <Link href="/admin/dashboard/access" className="text-blue-400 hover:text-blue-300 underline transition-colors">Readiness</Link> page.
             </p>
           </div>
         </motion.div>
@@ -350,7 +350,7 @@ export default function DashboardOverview() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-slate-500 uppercase tracking-wider">Providers</p>
-                <Link href="/admin/dashboard/ai-providers" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors">Manage →</Link>
+                <Link href="/admin/dashboard/operations" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors">Manage →</Link>
               </div>
               {providers.length === 0 ? (
                 <p className="text-xs text-slate-600 py-3 text-center">No providers configured</p>
@@ -416,7 +416,7 @@ export default function DashboardOverview() {
                     <div key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-400/[0.04] border border-amber-400/10">
                       <WifiOff className="w-3 h-3 text-amber-400 shrink-0" />
                       <span className="text-xs text-white truncate flex-1">{p.displayName}</span>
-                      <Link href="/admin/dashboard/ai-providers" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors shrink-0">
+                      <Link href="/admin/dashboard/operations" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors shrink-0">
                         Configure
                       </Link>
                     </div>
@@ -573,7 +573,7 @@ export default function DashboardOverview() {
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
               <Layers className="w-4 h-4 text-violet-400" /> Platform Systems
             </h2>
-            <span className="text-[10px] text-emerald-400 font-mono bg-emerald-400/10 px-2 py-0.5 rounded-full">ALL ACTIVE</span>
+            <span className="text-[10px] text-emerald-400 font-mono bg-emerald-400/10 px-2 py-0.5 rounded-full">IMPLEMENTED</span>
           </div>
           <div className="p-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
