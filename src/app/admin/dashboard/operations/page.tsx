@@ -120,7 +120,10 @@ export default function OperationsPage() {
       if (pRes.status === 'fulfilled') setProviders(Array.isArray(pRes.value) ? pRes.value : [])
       if (mRes.status === 'fulfilled') setModels(Array.isArray(mRes.value) ? mRes.value : mRes.value?.models ?? [])
       if (aRes.status === 'fulfilled') setAlerts(Array.isArray(aRes.value?.issues) ? aRes.value.issues : [])
-      if (eRes.status === 'fulfilled') setEvents(Array.isArray(eRes.value?.events) ? eRes.value.events : Array.isArray(eRes.value) ? eRes.value : [])
+      if (eRes.status === 'fulfilled') {
+        const eVal = eRes.value
+        setEvents(Array.isArray(eVal?.events) ? eVal.events : Array.isArray(eVal) ? eVal : [])
+      }
       if (rRes.status === 'fulfilled') setReadiness(rRes.value)
       if (bRes.status === 'fulfilled') setBudgets(Array.isArray(bRes.value?.budgets) ? bRes.value.budgets : [])
     } catch (e) {

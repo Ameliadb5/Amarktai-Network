@@ -58,7 +58,10 @@ EnvironmentFile=-/var/www/amarktai/repo/.env
 # Filesystem hardening
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/www/amarktai/repo/.next /var/www/amarktai/repo/prisma /tmp
+# The runtime writes to .next/server/app during request handling.
+# The prisma path is needed only for the migration runner in deploy.sh
+# (not the runtime itself), so we scope it to just the generated client directory.
+ReadWritePaths=/var/www/amarktai/repo/.next /tmp
 PrivateTmp=true
 NoNewPrivileges=true
 

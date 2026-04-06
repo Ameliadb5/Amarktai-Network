@@ -62,7 +62,9 @@ rm -rf .next/
 
 # ── 3. Install production dependencies ──────────────────────────────────────
 log "Installing dependencies..."
-"$NPM_BIN" ci --omit=dev
+# All deps are needed: TypeScript, tailwindcss, postcss are devDependencies but
+# required at build time.  Use plain `npm ci` (not --omit=dev) so the build succeeds.
+"$NPM_BIN" ci
 
 # ── 4. Generate Prisma client ────────────────────────────────────────────────
 log "Generating Prisma client..."
