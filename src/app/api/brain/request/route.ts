@@ -12,7 +12,8 @@ import { retrieve } from '@/lib/retrieval-engine'
 import { logRouteOutcome } from '@/lib/learning-engine'
 import { scanContent, blockedExplanation, loadAppSafetyConfigFromDB } from '@/lib/content-filter'
 import { getBudgetSummary } from '@/lib/budget-tracker'
-import { runEmotionPipeline, type PersonalityType } from '@/lib/emotion-engine'
+import { runEmotionPipeline, setAppContextWindow, type PersonalityType } from '@/lib/emotion-engine'
+import { prisma } from '@/lib/prisma'
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -137,7 +138,20 @@ export async function POST(request: NextRequest) {
   // Uses the synchronous pipeline to avoid adding streaming latency.
   // Emotion state is persisted to Redis/Qdrant in a fire-and-forget manner.
   const emotionUserId = body.externalUserId || app.slug
-  const appPersonality = mapAppPersonality(app.category)
+  let appPersonality = mapAppPersonality(app.category)
+
+  // Override from DB-backed AppAiProfile if set
+  try {
+    const aiProfile = await prisma.appAiProfile.findUnique({ where: { appSlug: app.slug } })
+    if (aiProfile?.basePersonality) {
+      appPersonality = aiProfile.basePersonality as PersonalityType
+    }
+    if (aiProfile?.emotionContextWindow && aiProfile.emotionContextWindow > 0) {
+      setAppContextWindow(app.slug, aiProfile.emotionContextWindow)
+    }
+  } catch {
+    // DB lookup failure → fall through to category-based default
+  }
   let emotionContext = ''
   try {
     const emotionResult = runEmotionPipeline(emotionUserId, body.message, appPersonality)

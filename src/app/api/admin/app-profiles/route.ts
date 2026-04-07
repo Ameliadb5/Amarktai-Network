@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
+import { prisma } from '@/lib/prisma'
 import {
   getAppProfile,
   DEFAULT_APP_PROFILES,
@@ -23,8 +24,15 @@ export async function GET(request: NextRequest) {
   const appSlug = searchParams.get('appSlug')
 
   if (appSlug) {
+    // Return both in-memory routing profile AND DB-backed AI profile
     const profile = getAppProfile(appSlug)
-    return NextResponse.json({ profile })
+    let dbProfile = null
+    try {
+      dbProfile = await prisma.appAiProfile.findUnique({ where: { appSlug } })
+    } catch {
+      // DB unavailable — return in-memory only
+    }
+    return NextResponse.json({ profile: dbProfile ?? profile })
   }
 
   // Merge defaults + runtime overrides
@@ -39,7 +47,9 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/admin/app-profiles — create or update an app profile.
  *
- * Body: full AppProfile JSON. The `app_id` field is used as the key.
+ * Supports two modes:
+ *   1. action='upsert' — simple DB upsert of AppAiProfile fields
+ *   2. Full AppProfile JSON — legacy in-memory override
  */
 export async function POST(request: NextRequest) {
   const session = await getSession()
@@ -49,6 +59,34 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+
+    // ── DB-backed upsert mode ────────────────────────────────────────
+    if (body.action === 'upsert' && body.appSlug) {
+      const data: Record<string, unknown> = {}
+      const allowedFields = [
+        'routingStrategy', 'basePersonality', 'emotionContextWindow',
+        'allowedProviders', 'preferredModels', 'costMode',
+        'budgetSensitivity', 'latencySensitivity', 'allowedModels',
+        'fallbackChain', 'enabledCapabilities', 'enabledAgents',
+        'safeMode', 'adultMode', 'suggestiveMode',
+      ]
+      for (const field of allowedFields) {
+        if (body[field] !== undefined) data[field] = body[field]
+      }
+
+      const result = await prisma.appAiProfile.upsert({
+        where: { appSlug: body.appSlug },
+        update: data,
+        create: {
+          appSlug: body.appSlug,
+          appName: body.appName ?? body.appSlug,
+          ...data,
+        },
+      })
+      return NextResponse.json({ success: true, profile: result })
+    }
+
+    // ── Legacy in-memory profile mode ────────────────────────────────
     const profile = body as AppProfile
 
     if (!profile.app_id || !profile.app_name) {

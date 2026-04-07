@@ -90,6 +90,10 @@ export default function LabPage() {
   // STT file upload
   const sttFileRef = useRef<HTMLInputElement>(null)
   const [sttFile, setSttFile] = useState<File | null>(null)
+  // Video job polling
+  const [_videoJobId, setVideoJobId] = useState<string | null>(null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const videoPollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadProviders = useCallback(async () => {
     setLoadingProviders(true)
@@ -147,6 +151,13 @@ export default function LabPage() {
     loadProviders()
     loadCapabilities()
   }, [loadProviders, loadCapabilities])
+
+  // Cleanup video polling on unmount
+  useEffect(() => {
+    return () => {
+      if (videoPollingRef.current) clearInterval(videoPollingRef.current)
+    }
+  }, [])
 
   const handleRun = async () => {
     if (!prompt.trim()) return
@@ -213,6 +224,31 @@ export default function LabPage() {
             )
           : null,
       })
+
+      // Start video job polling if result includes a jobId
+      const jobId = data.jobId ?? data.job_id
+      if (jobId && (capability === 'video' || capability === 'video_planning')) {
+        setVideoJobId(jobId)
+        setVideoUrl(null)
+        if (videoPollingRef.current) clearInterval(videoPollingRef.current)
+        videoPollingRef.current = setInterval(async () => {
+          try {
+            const pollRes = await fetch(`/api/brain/video-generate/${encodeURIComponent(jobId)}`)
+            if (!pollRes.ok) return
+            const pollData = await pollRes.json()
+            setResult(prev => prev ? { ...prev, videoStatus: pollData.status } : prev)
+            if (pollData.status === 'succeeded' && pollData.resultUrl) {
+              setVideoUrl(pollData.resultUrl)
+              if (videoPollingRef.current) clearInterval(videoPollingRef.current)
+              videoPollingRef.current = null
+            } else if (pollData.status === 'failed') {
+              setResult(prev => prev ? { ...prev, videoStatus: `failed: ${pollData.errorMessage ?? 'unknown error'}` } : prev)
+              if (videoPollingRef.current) clearInterval(videoPollingRef.current)
+              videoPollingRef.current = null
+            }
+          } catch { /* polling retry on next interval */ }
+        }, 3000)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Request failed')
     } finally {
@@ -828,13 +864,25 @@ export default function LabPage() {
                   </div>
                 )}
 
-                {/* Video Status */}
+                {/* Video Status + Polling */}
                 {result?.videoStatus && (
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Video Status</p>
                     <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-500/5 border border-violet-500/10">
                       <span className="text-xs text-violet-400 font-mono">{result.videoStatus}</span>
+                      {result.videoStatus === 'processing' && (
+                        <span className="text-[10px] text-slate-500 animate-pulse">polling every 3s…</span>
+                      )}
                     </div>
+                    {videoUrl && (
+                      <div className="space-y-1">
+                        <a href={videoUrl} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-blue-400 underline hover:text-blue-300 break-all">
+                          {videoUrl}
+                        </a>
+                        <video src={videoUrl} controls className="w-full max-h-[300px] rounded-lg border border-white/10 mt-2" />
+                      </div>
+                    )}
                   </div>
                 )}
 

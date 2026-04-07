@@ -42,6 +42,7 @@ import {
   type ProviderHealthStatus,
 } from '@/lib/model-registry'
 import { routeRequest, type RoutingDecision } from '@/lib/routing-engine'
+import { isProviderWithinBudget } from '@/lib/budget-tracker'
 import { createAgentTask, executeAgent, handoffTask, isAgentPermitted } from '@/lib/agent-runtime'
 import { retrieve, type RetrievalResult } from '@/lib/retrieval-engine'
 import { generateContent, type MultimodalResult } from '@/lib/multimodal-router'
@@ -474,7 +475,23 @@ export async function orchestrate(opts: {
   //    getUsableModels() / isProviderUsable() reflect real configured state before
   //    any routing decision is made.
   const available = await loadAvailableProviders()
-  syncProviderHealthCache(available)
+
+  // 2b. Pre-filter providers that have exceeded their budget critical threshold.
+  //     Providers over budget are removed from the available list so the routing
+  //     engine and fallback logic won't select them. If ALL are over budget,
+  //     we keep all to avoid a total outage (the request route has a 429 guard).
+  let filteredAvailable = available
+  try {
+    const budgetOk = await Promise.all(available.map(p => isProviderWithinBudget(p.providerKey)))
+    const withinBudget = available.filter((_, i) => budgetOk[i])
+    if (withinBudget.length > 0 && withinBudget.length < available.length) {
+      filteredAvailable = withinBudget
+    }
+  } catch {
+    // Budget DB unavailable — proceed with all providers
+  }
+
+  syncProviderHealthCache(filteredAvailable)
 
   // 3. Build routing context with signal detection
   const isMultimodal = detectMultimodal(appCategory, taskType)
@@ -494,7 +511,7 @@ export async function orchestrate(opts: {
   const routingDecision = routeRequest(routingCtx)
 
   // 5. Build decision from routing-engine result (also uses health-aware cache internally)
-  const decision = await decideExecution(classification, available, appSlug)
+  const decision = await decideExecution(classification, filteredAvailable, appSlug)
 
   // Override the execution mode with the routing engine's mode when it returns valid models
   let effectiveMode: ExecutionMode = decision.executionMode

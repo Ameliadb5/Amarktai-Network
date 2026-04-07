@@ -10,6 +10,7 @@
  */
 
 import { getModelRegistry, getEnabledModels, type ModelEntry } from './model-registry'
+import { getRedisClient } from './redis'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,82 @@ const MIN_SAMPLES_FOR_SMART_ROUTING = 10
 // Custom routing profiles
 const routingProfiles = new Map<string, RoutingProfile>()
 
+// Track whether we've loaded from Redis on first boot
+let hydrated = false
+
+// ── Redis Persistence ────────────────────────────────────────────────────────
+
+const REDIS_PREFIX = 'smart-router:'
+const REDIS_TTL = 30 * 24 * 60 * 60 // 30 days
+
+/** Persist smart router state to Redis (fire-and-forget). */
+export async function persistSmartRouterState(): Promise<void> {
+  const redis = getRedisClient()
+  if (!redis) return
+  try {
+    // Serialize modelScores: Map<string, Map<string, ModelScore>> → nested object
+    const scoresObj: Record<string, Record<string, ModelScore>> = {}
+    for (const [taskType, taskScores] of modelScores.entries()) {
+      scoresObj[taskType] = Object.fromEntries(taskScores.entries())
+    }
+    await redis.set(`${REDIS_PREFIX}scores`, JSON.stringify(scoresObj), 'EX', REDIS_TTL)
+
+    // Persist recent performance history (last 2000 records to keep payload sane)
+    const recentHistory = performanceHistory.slice(-2000)
+    await redis.set(`${REDIS_PREFIX}history`, JSON.stringify(recentHistory), 'EX', REDIS_TTL)
+
+    // Persist routing profiles
+    const profilesObj = Object.fromEntries(routingProfiles.entries())
+    await redis.set(`${REDIS_PREFIX}profiles`, JSON.stringify(profilesObj), 'EX', REDIS_TTL)
+  } catch {
+    // Persistence is best-effort — in-memory is authoritative
+  }
+}
+
+/** Load smart router state from Redis on first boot. */
+export async function loadSmartRouterState(): Promise<void> {
+  if (hydrated) return
+  hydrated = true
+
+  const redis = getRedisClient()
+  if (!redis) return
+
+  try {
+    const [scoresRaw, historyRaw, profilesRaw] = await Promise.all([
+      redis.get(`${REDIS_PREFIX}scores`),
+      redis.get(`${REDIS_PREFIX}history`),
+      redis.get(`${REDIS_PREFIX}profiles`),
+    ])
+
+    if (scoresRaw) {
+      const scoresObj = JSON.parse(scoresRaw) as Record<string, Record<string, ModelScore>>
+      for (const [taskType, taskScores] of Object.entries(scoresObj)) {
+        if (!modelScores.has(taskType)) {
+          modelScores.set(taskType, new Map(Object.entries(taskScores)))
+        }
+      }
+    }
+
+    if (historyRaw) {
+      const records = JSON.parse(historyRaw) as PerformanceRecord[]
+      if (performanceHistory.length === 0) {
+        performanceHistory.push(...records)
+      }
+    }
+
+    if (profilesRaw) {
+      const profilesObj = JSON.parse(profilesRaw) as Record<string, RoutingProfile>
+      for (const [key, value] of Object.entries(profilesObj)) {
+        if (!routingProfiles.has(key)) {
+          routingProfiles.set(key, value)
+        }
+      }
+    }
+  } catch {
+    // Redis unavailable — in-memory engine works without it
+  }
+}
+
 // ── Performance Recording ────────────────────────────────────────────────────
 
 /** Record a model's performance for a task. */
@@ -78,6 +155,11 @@ export function recordPerformance(record: PerformanceRecord): void {
 
   // Update model scores
   updateModelScore(record.taskType, record)
+
+  // Fire-and-forget Redis persistence (every 10 records to avoid Redis spam)
+  if (performanceHistory.length % 10 === 0) {
+    persistSmartRouterState().catch(() => {})
+  }
 }
 
 function updateModelScore(taskType: string, record: PerformanceRecord): void {
@@ -158,6 +240,7 @@ function computeCompositeScore(
 /**
  * Select the best model for a task using learned performance data.
  * Falls back to static routing when insufficient data.
+ * Automatically hydrates from Redis on first call after process start.
  */
 export function selectBestModel(
   taskType: string,
@@ -169,6 +252,11 @@ export function selectBestModel(
     avoidProviders?: string[]
   },
 ): RoutingDecision {
+  // Trigger one-time hydration from Redis (fire-and-forget; first call may miss data)
+  if (!hydrated) {
+    loadSmartRouterState().catch(() => {})
+  }
+
   if (candidates.length === 0) {
     return {
       selectedModel: getEnabledModels()[0] ?? getModelRegistry()[0],
@@ -304,6 +392,7 @@ export function resetSmartRouter(): void {
   modelScores.clear()
   performanceHistory.length = 0
   routingProfiles.clear()
+  hydrated = false
 }
 
 // ── Exports for Testing ──────────────────────────────────────────────────────

@@ -428,6 +428,14 @@ model AppAiProfile {
   routingStrategy String  @default("balanced") @map("routing_strategy") // balanced|cheapest|fastest|quality
   allowBenchmark  Boolean @default(false) @map("allow_benchmark")
 
+  // Personality — used by the emotion engine as the app's base tone.
+  // Values: professional|analytical|friendly|empathetic|assertive|calm|flirty|upbeat
+  // Empty string = auto-detect from app category via mapAppPersonality().
+  basePersonality String @default("") @map("base_personality")
+
+  // Context window for the emotion engine (0 = use default of 5)
+  emotionContextWindow Int @default(0) @map("emotion_context_window")
+
   // Escalation & Validation (JSON)
   escalationRules String @default("[]") @map("escalation_rules")
   validatorRules  String @default("[]") @map("validator_rules")

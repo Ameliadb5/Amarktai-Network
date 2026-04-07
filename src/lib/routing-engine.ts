@@ -29,7 +29,24 @@ import {
   requiresValidation,
 } from '@/lib/app-profiles'
 
-// ── Types ───────────────────────────────────────────────────────────────
+import { isProviderWithinBudget } from '@/lib/budget-tracker'
+
+// ── Budget cache (avoid hitting DB per candidate during a single routing call) ──
+let budgetCache: Map<string, boolean> | null = null
+let budgetCacheAge = 0
+const BUDGET_CACHE_TTL_MS = 30_000 // refresh every 30 s
+
+async function isBudgetOk(providerKey: string): Promise<boolean> {
+  if (!budgetCache || Date.now() - budgetCacheAge > BUDGET_CACHE_TTL_MS) {
+    budgetCache = new Map()
+    budgetCacheAge = Date.now()
+  }
+  const cached = budgetCache.get(providerKey)
+  if (cached !== undefined) return cached
+  const ok = await isProviderWithinBudget(providerKey)
+  budgetCache.set(providerKey, ok)
+  return ok
+}
 
 /**
  * Supported routing modes.
@@ -273,6 +290,23 @@ export function selectPrimaryModel(
   }
 
   return candidates[0] ?? null
+}
+
+/**
+ * Filter out models whose providers have exceeded their budget critical threshold.
+ * Call this before selectPrimaryModel() to enforce per-provider budgets.
+ * Returns the same list if no budgets are configured or DB is unavailable.
+ */
+export async function filterByBudget(models: ModelEntry[]): Promise<ModelEntry[]> {
+  if (models.length === 0) return models
+  const uniqueProviders = [...new Set(models.map(m => m.provider))]
+  const results = await Promise.all(uniqueProviders.map(p => isBudgetOk(p)))
+  const overBudget = new Set(uniqueProviders.filter((_, i) => !results[i]))
+  if (overBudget.size === 0) return models
+  // Keep models from providers that are still within budget
+  const filtered = models.filter(m => !overBudget.has(m.provider))
+  // If ALL are over budget, return original list to avoid total failure
+  return filtered.length > 0 ? filtered : models
 }
 
 /**

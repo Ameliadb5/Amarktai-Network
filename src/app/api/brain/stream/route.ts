@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
-import { authenticateApp, getVaultApiKey } from '@/lib/brain'
+import { authenticateApp, getVaultApiKey, callProvider } from '@/lib/brain'
 import { scanContent } from '@/lib/content-filter'
 
 // ── Provider streaming configuration ──────────────────────────────────────────
@@ -55,9 +55,10 @@ const streamRequestSchema = z.object({
  * POST /api/brain/stream
  *
  * Server-Sent Events (SSE) streaming endpoint for real-time AI responses.
- * Supports ALL 13 providers: OpenAI, Groq, DeepSeek, OpenRouter, Together,
- * Grok, Qwen, NVIDIA, Gemini, Anthropic, Cohere (OpenAI-compatible streaming),
- * plus HuggingFace and Replicate (non-streaming fallback).
+ * Supports ALL 14 providers: OpenAI, Groq, DeepSeek, OpenRouter, Together,
+ * Grok, Qwen, NVIDIA, Mistral (OpenAI-compatible streaming), Gemini,
+ * Anthropic, Cohere (provider-specific streaming), plus HuggingFace and
+ * Replicate (non-streaming fallback via callProvider).
  *
  * Events emitted:
  *   - `data: {"type":"chunk","content":"..."}` — incremental response text
@@ -255,6 +256,26 @@ export async function POST(request: NextRequest) {
           return
         }
 
+        // ── HuggingFace / Replicate non-streaming fallback ─────────────
+        // These providers don't support SSE — call via callProvider and
+        // emit the full response as a single chunk + done event.
+        if (resolvedProvider === 'huggingface' || resolvedProvider === 'replicate') {
+          const result = await callProvider(
+            resolvedProvider,
+            resolvedModel,
+            body.message,
+          )
+          if (!result.ok) {
+            send({ type: 'error', message: result.error ?? `${resolvedProvider} call failed` })
+          } else {
+            const text = typeof result.output === 'string' ? result.output : JSON.stringify(result.output)
+            send({ type: 'chunk', content: text })
+            send({ type: 'done', traceId, model: resolvedModel, provider: resolvedProvider })
+          }
+          controller.close()
+          return
+        }
+
         // ── OpenAI-compatible streaming (9 providers incl. Mistral) ──
         const providerConfig = STREAMING_PROVIDERS[resolvedProvider]
         if (!providerConfig) {
@@ -336,7 +357,7 @@ export async function POST(request: NextRequest) {
  * Checks DB vault first via getVaultApiKey(), falls back to env vars.
  */
 async function resolveProvider(requested?: string): Promise<string | null> {
-  const allSupported = [...Object.keys(STREAMING_PROVIDERS), 'anthropic', 'gemini', 'cohere']
+  const allSupported = [...Object.keys(STREAMING_PROVIDERS), 'anthropic', 'gemini', 'cohere', 'huggingface', 'replicate']
 
   if (requested && allSupported.includes(requested)) {
     return requested
@@ -346,6 +367,7 @@ async function resolveProvider(requested?: string): Promise<string | null> {
   const priority = [
     'openai', 'groq', 'anthropic', 'gemini', 'mistral',
     'deepseek', 'together', 'qwen', 'grok', 'openrouter', 'nvidia', 'cohere',
+    'huggingface', 'replicate',
   ]
 
   for (const provider of priority) {

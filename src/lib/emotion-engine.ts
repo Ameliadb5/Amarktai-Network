@@ -221,8 +221,28 @@ const MAX_MEMORY_PER_USER = 100
 /** Personality adaptation thresholds */
 const ADAPT_THRESHOLD = 0.3 // 30 % frequency triggers adaptation
 
-/** Conversation context window size */
-const CONTEXT_WINDOW = 5
+/** Default conversation context window size */
+const DEFAULT_CONTEXT_WINDOW = 5
+
+/** Per-app context window overrides (set via setAppContextWindow) */
+const appContextWindows = new Map<string, number>()
+
+/** Set the context window size for a specific app (e.g. 20 for companion apps). */
+export function setAppContextWindow(appSlug: string, windowSize: number): void {
+  appContextWindows.set(appSlug, Math.max(2, Math.min(100, windowSize)))
+}
+
+/** Get the effective context window for a user (uses app slug prefix if present). */
+function getEffectiveContextWindow(userId: string): number {
+  // Convention: userId may be prefixed with appSlug, e.g. "my-app:user123"
+  const colonIdx = userId.indexOf(':')
+  if (colonIdx > 0) {
+    const appSlug = userId.slice(0, colonIdx)
+    const override = appContextWindows.get(appSlug)
+    if (override) return override
+  }
+  return DEFAULT_CONTEXT_WINDOW
+}
 
 // ─── Emoji → Emotion Mapping ────────────────────────────────────────────────
 
@@ -776,9 +796,10 @@ export function updateConversationContext(userId: string, text: string, analysis
     timestamp: new Date().toISOString(),
   })
 
-  // Keep only last N messages
-  if (existing.recentMessages.length > CONTEXT_WINDOW) {
-    existing.recentMessages = existing.recentMessages.slice(-CONTEXT_WINDOW)
+  // Keep only last N messages (per-app configurable window)
+  const windowSize = getEffectiveContextWindow(userId)
+  if (existing.recentMessages.length > windowSize) {
+    existing.recentMessages = existing.recentMessages.slice(-windowSize)
   }
 
   // Calculate emotional momentum: weighted average of recent valences
@@ -1376,7 +1397,8 @@ export function getTopTransitions(limit = 10): EmotionTransition[] {
 export {
   DETECTION_RULES, DRIFT_WINDOW, MAX_MEMORY_PER_USER, ADAPT_THRESHOLD,
   EMOTION_VALENCE, EMOJI_EMOTIONS, NEGATION_WORDS, INTENSITY_MODIFIERS,
-  CONTEXT_WINDOW,
+  DEFAULT_CONTEXT_WINDOW,
+  DEFAULT_CONTEXT_WINDOW as CONTEXT_WINDOW, // backward compat alias
 }
 
 /**
