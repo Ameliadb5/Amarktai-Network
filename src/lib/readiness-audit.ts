@@ -210,11 +210,32 @@ async function checkCheapRoute(): Promise<AuditCheck> {
   }
 
   if (active.length > 0) {
+    // Verify routing actually works by attempting a test routing decision
+    let routingWorks = false
+    let routingDetail = ''
+    try {
+      const decision = routeRequest({
+        appSlug: '__readiness_audit__',
+        appCategory: 'general',
+        taskType: 'chat',
+        taskComplexity: 'simple',
+        message: 'test',
+        requiresRetrieval: false,
+        requiresMultimodal: false,
+      })
+      routingWorks = !!decision.primaryModel
+      routingDetail = routingWorks
+        ? `Routes to ${decision.primaryModel?.model_id} (${decision.primaryModel?.provider})`
+        : `Routing returned no model: ${decision.reason}`
+    } catch (e) {
+      routingDetail = `Routing error: ${e instanceof Error ? e.message : String(e)}`
+    }
+
     return check(
       'provider_cheap_route', 'provider', 'Backbone / Budget Route',
-      'At least one backbone/budget provider is configured',
-      true, 'pass',
-      `Active backbone route(s): ${active.join(', ')}`,
+      'At least one backbone/budget provider is configured and routing works',
+      true, routingWorks ? 'pass' : 'warning',
+      `Active backbone route(s): ${active.join(', ')}. ${routingDetail}`,
     )
   }
 

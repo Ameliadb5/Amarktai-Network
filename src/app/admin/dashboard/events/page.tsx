@@ -35,11 +35,13 @@ const CARD = 'bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounde
 
 export default function EventsPage() {
   const [events, setEvents] = useState<BrainEvent[]>([])
+  const [appEvents, setAppEvents] = useState<Array<{ id: number; eventSource: string; appSlug: string; appName?: string; eventType: string; severity: string; title: string; message: string; timestamp: string; success: boolean }>>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filterApp, setFilterApp] = useState('')
   const [filterMode, setFilterMode] = useState('')
+  const [showUnified, setShowUnified] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -48,17 +50,19 @@ export default function EventsPage() {
       const params = new URLSearchParams({ limit: '100' })
       if (filterApp) params.set('appSlug', filterApp)
       if (filterMode) params.set('executionMode', filterMode)
+      if (showUnified) params.set('includeAppEvents', 'true')
       const res = await fetch(`/api/admin/events?${params}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setEvents(data.events ?? [])
+      setAppEvents(data.appEvents ?? [])
       setTotal(data.total ?? 0)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load events')
     } finally {
       setLoading(false)
     }
-  }, [filterApp, filterMode])
+  }, [filterApp, filterMode, showUnified])
 
   useEffect(() => { load() }, [load])
 
@@ -120,7 +124,38 @@ export default function EventsPage() {
             </option>
           ))}
         </select>
+        <button
+          onClick={() => setShowUnified(!showUnified)}
+          className={`text-xs px-3 py-2 rounded-lg border transition-colors ${
+            showUnified
+              ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
+              : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:text-white'
+          }`}
+        >
+          {showUnified ? '✓ Unified View' : 'Show App Events'}
+        </button>
       </motion.div>
+
+      {/* App Events Section (unified view) */}
+      {showUnified && appEvents.length > 0 && (
+        <motion.div variants={fadeUp} className={`${CARD} p-4 space-y-2`}>
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">App Events ({appEvents.length})</h3>
+          <div className="divide-y divide-white/[0.04]">
+            {appEvents.map(e => (
+              <div key={`app-${e.id}`} className="flex items-center gap-3 py-2 text-xs">
+                <span className={`w-2 h-2 rounded-full ${
+                  e.severity === 'error' || e.severity === 'critical' ? 'bg-red-400' :
+                  e.severity === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'
+                }`} />
+                <span className="text-slate-500 font-mono w-24 flex-shrink-0">{e.appSlug}</span>
+                <span className="text-slate-300 flex-1 truncate">{e.title}</span>
+                <span className="text-slate-600 font-mono">{e.eventType}</span>
+                <span className="text-slate-600 font-mono">{formatDistanceToNow(new Date(e.timestamp), { addSuffix: true })}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Content */}
       {loading ? (

@@ -58,13 +58,46 @@ export async function GET(request: Request) {
 
   const enriched = events.map(e => ({
     ...e,
+    eventSource: 'brain' as const,
     classification: safeParseJson<Record<string, unknown>>(e.classificationJson, {}),
     warnings: safeParseJson<string[]>(e.warningsJson, []),
     classificationJson: undefined,
     warningsJson: undefined,
   }))
 
-  return NextResponse.json({ events: enriched, total, limit })
+  // Optionally include AppEvents for unified view
+  const includeApp = searchParams.get('includeAppEvents') === 'true'
+  let appEvents: Array<Record<string, unknown>> = []
+  if (includeApp) {
+    try {
+      const rawAppEvents = await prisma.appEvent.findMany({
+        orderBy: { timestamp: 'desc' },
+        take: limit,
+        include: { product: { select: { name: true, slug: true } } },
+      })
+      appEvents = rawAppEvents.map(e => ({
+        id: e.id,
+        eventSource: 'app' as const,
+        appSlug: e.product?.slug ?? `product-${e.productId}`,
+        appName: e.product?.name ?? '',
+        eventType: e.eventType,
+        severity: e.severity,
+        title: e.title,
+        message: e.message,
+        timestamp: e.timestamp,
+        success: e.severity !== 'error' && e.severity !== 'critical',
+      }))
+    } catch {
+      // AppEvent table may not exist or be empty — no-op
+    }
+  }
+
+  return NextResponse.json({
+    events: enriched,
+    appEvents: includeApp ? appEvents : undefined,
+    total,
+    limit,
+  })
   } catch (error) {
     const { category, message } = classifyDbError(error)
     return NextResponse.json({ events: [], total: 0, limit, error: message, category }, { status: category === 'config_invalid' ? 503 : 500 })
