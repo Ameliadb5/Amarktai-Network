@@ -277,15 +277,61 @@ export async function callProvider(
       // ── Hugging Face Inference ──────────────────────────────────────────────
       case 'huggingface': {
         const base = vault.baseUrl || 'https://api-inference.huggingface.co'
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${vault.apiKey}`,
+        }
+
+        // Detect task type from model name patterns to send correct payload
+        const modelLower = resolvedModel.toLowerCase()
+        const isEmbedding = modelLower.includes('embed') || modelLower.includes('sentence-transformer') || modelLower.includes('bge-') || modelLower.includes('e5-')
+        const isTTS = modelLower.includes('tts') || modelLower.includes('bark') || modelLower.includes('speecht5') || modelLower.includes('speech-t5')
+        const isSTT = modelLower.includes('whisper') || modelLower.includes('wav2vec') || modelLower.includes('stt')
+
+        let body: string
+        const contentType = 'application/json'
+
+        if (isEmbedding) {
+          // Embedding models: { inputs: string | string[] } → returns float[][]
+          body = JSON.stringify({ inputs: message })
+        } else if (isTTS) {
+          // TTS models: { inputs: string } → returns audio bytes
+          body = JSON.stringify({ inputs: message })
+        } else if (isSTT) {
+          // STT models: raw audio bytes (message is expected to be a base64-encoded audio)
+          // For text-based calls, wrap in the standard format
+          body = JSON.stringify({ inputs: message })
+        } else {
+          // Default: text generation with parameters for better results
+          body = JSON.stringify({
+            inputs: message,
+            parameters: { max_new_tokens: 1024, return_full_text: false },
+          })
+        }
+        headers['Content-Type'] = contentType
+
         const res = await fetch(`${base}/models/${resolvedModel}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${vault.apiKey}` },
-          body: JSON.stringify({ inputs: message }),
+          headers,
+          body,
           signal: AbortSignal.timeout(timeout),
         })
         if (!res.ok) {
           return { ok: false, output: null, error: `Hugging Face HTTP ${res.status}`, latencyMs: Date.now() - start, model: resolvedModel, providerKey }
         }
+
+        if (isTTS) {
+          // TTS returns audio buffer — convert to base64 data URL
+          const audioBuffer = await res.arrayBuffer()
+          const base64 = Buffer.from(audioBuffer).toString('base64')
+          return { ok: true, output: `data:audio/wav;base64,${base64}`, error: null, latencyMs: Date.now() - start, model: resolvedModel, providerKey }
+        }
+
+        if (isEmbedding) {
+          // Embedding returns float[][] — return as JSON string
+          const embeddings = await res.json()
+          return { ok: true, output: JSON.stringify(embeddings), error: null, latencyMs: Date.now() - start, model: resolvedModel, providerKey }
+        }
+
         const data = await res.json() as Array<{ generated_text?: string }> | { generated_text?: string }
         const text = Array.isArray(data) ? (data[0]?.generated_text ?? null) : (data?.generated_text ?? null)
         return { ok: true, output: text, error: null, latencyMs: Date.now() - start, model: resolvedModel, providerKey }

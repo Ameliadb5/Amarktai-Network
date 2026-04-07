@@ -9,6 +9,7 @@
 5. [Budget Management](./budget-management.md)
 6. [Health Monitoring](./health-monitoring.md)
 7. [Safety & Content Policies](./safety-policies.md)
+8. [Developer Guide — SDK & Integration](./developer-guide.md)
 
 ---
 
