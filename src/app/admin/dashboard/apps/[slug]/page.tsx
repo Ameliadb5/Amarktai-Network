@@ -389,19 +389,19 @@ function AgentsTab({ appSlug, appId, appSecret, productId, onSecretRotated }: {
     setRotatingSecret(true)
     setError(null)
     try {
-      // Generate a random 64-char hex secret client-side for immediate display
-      const array = new Uint8Array(32)
-      crypto.getRandomValues(array)
-      const newSecret = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('')
       const res = await fetch(`/api/admin/products/${productId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appSecret: newSecret }),
+        // regenerateSecret: true causes the server to generate a cryptographically-secure
+        // 64-char hex secret server-side — never trust client-supplied entropy
+        body: JSON.stringify({ regenerateSecret: true }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
       }
+      const updated = await res.json() as { appSecret?: string }
+      const newSecret = updated.appSecret ?? ''
       setLocalSecret(newSecret)
       setSecretRevealed(true)
       onSecretRotated?.(newSecret)

@@ -256,7 +256,9 @@ const EMOJI_EMOTIONS: Record<string, EmotionType> = {
   // Confusion
   '🤔': 'confusion', '😕': 'confusion', '🫤': 'confusion', '😐': 'confusion',
   '🤨': 'confusion', '❓': 'confusion', '❔': 'confusion', '🧐': 'confusion',
-  // Frustration — includes 🙃 (sarcasm/passive aggression), 💀 (colloquial "I'm dead"), 🤌
+  // Frustration — includes 🙃 (passive-aggressive/sarcasm), 💀 (colloquial slang: "dying"
+  // / "I'm dead" — in modern usage almost always means laughter or exasperation, not fear),
+  // 🤌 (exasperation/perfection used ironically), 😮‍💨 (exhale/relief after a stressful moment)
   '🙄': 'frustration', '😩': 'frustration', '😫': 'frustration',
   '🤦': 'frustration', '🤦‍♂️': 'frustration', '🤦‍♀️': 'frustration',
   '🙃': 'frustration', '💀': 'frustration', '🤌': 'frustration',
@@ -833,7 +835,9 @@ export function adaptPersonality(
   let reason = 'default base personality'
   let strength = 0
 
-  // EMOTION GAP 8: Use learned best personality when there is enough signal data
+  // EMOTION GAP 8: Use learned best personality when there is enough signal data.
+  // 5 signals: enough to form a statistically meaningful preference (< 5 may be noise).
+  // 0.6 positiveRate: majority positive — the adapted personality is working better than chance.
   if (learningState && learningState.totalSignals >= 5 && learningState.positiveRate > 0.6) {
     adapted = learningState.bestPersonality
     reason = `learned best personality (${learningState.positiveRate * 100 | 0}% positive rate, ${learningState.totalSignals} signals) → ${adapted}`

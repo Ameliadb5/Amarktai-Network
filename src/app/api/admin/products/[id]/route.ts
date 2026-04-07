@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { z } from 'zod'
+import { randomBytes } from 'crypto'
 
 const productSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -28,6 +29,9 @@ const productSchema = z.object({
   onboardingStatus: z.enum(['unconfigured', 'discovered', 'configuring', 'configured', 'connected']).optional(),
   onboardingCompletedAt: z.string().datetime().optional().nullable(),
   appSecret: z.string().optional(),
+  /** When true, a new cryptographically-secure 64-char hex secret is generated server-side.
+   *  The generated secret is returned in the response. Takes precedence over `appSecret`. */
+  regenerateSecret: z.boolean().optional(),
   customInstructions: z.string().optional(),
   sortOrder: z.number().int().optional(),
 })
@@ -56,8 +60,15 @@ export async function PATCH(
   const { id } = await params
   try {
     const body = await request.json()
-    const data = productSchema.parse(body)
-    const product = await prisma.product.update({ where: { id: parseInt(id) }, data })
+    const { regenerateSecret, ...rest } = productSchema.parse(body)
+
+    // Server-side secret generation — never trust client-supplied entropy
+    const updateData = { ...rest }
+    if (regenerateSecret) {
+      updateData.appSecret = randomBytes(32).toString('hex')
+    }
+
+    const product = await prisma.product.update({ where: { id: parseInt(id) }, data: updateData })
     return NextResponse.json(product)
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })

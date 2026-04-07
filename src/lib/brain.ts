@@ -413,8 +413,10 @@ export async function callProvider(
 
         // Step 2: poll until succeeded / failed (max 28 s to stay within timeout)
         const pollUrl = prediction.urls?.get ?? `${base}/v1/predictions/${prediction.id}`
+        // 800 ms gives ~35 polls within the 30 s window without overwhelming the API rate limits
         const POLL_INTERVAL_MS = 800
-        const POLL_DEADLINE = start + timeout - 2_000 // leave 2 s buffer
+        // 2 s buffer ensures the final response can still be read before AbortSignal fires
+        const POLL_DEADLINE = start + timeout - 2_000
 
         let pollResult = prediction
         while (pollResult.status !== 'succeeded' && pollResult.status !== 'failed') {
