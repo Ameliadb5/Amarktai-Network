@@ -52,6 +52,9 @@ const CONSENSUS_LENGTH_RATIO_THRESHOLD = 1.2
 // Warn about differing consensus outputs if length difference exceeds this (chars)
 const CONSENSUS_LENGTH_DIFF_THRESHOLD = 200
 
+/** Task types that require image-generation routing (evaluated once at module load). */
+const IMAGE_TASK_TYPES_SET = new Set(['image_generation', 'image', 'image_gen', 'generate_image', 'create_image'])
+
 // ── Classification ────────────────────────────────────────────────────────────
 
 export type TaskComplexity = 'simple' | 'moderate' | 'complex'
@@ -496,6 +499,8 @@ export async function orchestrate(opts: {
   // 3. Build routing context with signal detection
   const isMultimodal = detectMultimodal(appCategory, taskType)
   const isRetrieval = detectRetrieval(taskType, message)
+  const normalizedTask = (taskType ?? '').toLowerCase()
+  const isImageTask = IMAGE_TASK_TYPES_SET.has(normalizedTask)
 
   const routingCtx = {
     appSlug: appSlug ?? 'unknown',
@@ -505,6 +510,7 @@ export async function orchestrate(opts: {
     message,
     requiresRetrieval: isRetrieval,
     requiresMultimodal: isMultimodal,
+    ...(isImageTask ? { requiredModality: 'image' as const } : {}),
   }
 
   // 4. Route via the routing-engine (now health-aware — only configured providers considered)

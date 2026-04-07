@@ -116,7 +116,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (['image', 'image_generation', 'suggestive', 'suggestive_image'].includes(body.taskType)) {
+    if (['image', 'image_generation'].includes(body.taskType)) {
+      const imageRes = await fetch(`${origin}/api/brain/image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: body.message }),
+      })
+      const latencyMs = Date.now() - start
+      const imageData = await imageRes.json().catch(() => ({})) as {
+        imageUrl?: string; imageBase64?: string; error?: string; provider?: string; model?: string
+      }
+      return NextResponse.json(
+        {
+          success: imageRes.ok && (!!imageData.imageUrl || !!imageData.imageBase64),
+          executed: imageRes.ok, traceId,
+          output: imageRes.ok ? '[Image generated]' : null,
+          imageUrl: imageData.imageUrl ?? imageData.imageBase64 ?? null,
+          capability: capabilities, routedProvider: imageData.provider ?? null,
+          routedModel: imageData.model ?? null, executionMode: 'specialist', fallback_used: false,
+          error: imageData.error ?? null, latencyMs, timestamp: new Date().toISOString(),
+        },
+        { status: imageRes.ok ? 200 : imageRes.status },
+      )
+    }
+
+    if (['suggestive', 'suggestive_image'].includes(body.taskType)) {
       const imageRes = await fetch(`${origin}/api/brain/suggestive-image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

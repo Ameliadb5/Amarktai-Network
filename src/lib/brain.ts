@@ -181,6 +181,9 @@ export async function getVaultApiKey(providerKey: string): Promise<string | null
   return null
 }
 
+/** OpenAI image generation models that require /v1/images/generations instead of /v1/chat/completions. */
+export const OPENAI_IMAGE_MODELS = new Set(['dall-e-3', 'dall-e-2', 'gpt-image-1'])
+
 /**
  * Call an AI provider via the single provider vault.
  * Reads API key + base URL from the vault — never from the request.
@@ -237,6 +240,27 @@ export async function callProvider(
         if (providerKey === 'openrouter') {
           headers['HTTP-Referer'] = 'https://amarktai.network'
           headers['X-Title'] = 'AmarktAI Network'
+        }
+        // Image models require the images/generations endpoint, not chat/completions
+        if (providerKey === 'openai' && OPENAI_IMAGE_MODELS.has(resolvedModel)) {
+          const imgRes = await fetch(`${base}/v1/images/generations`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: resolvedModel,
+              prompt: message,
+              n: 1,
+              size: '1024x1024',
+            }),
+            signal: AbortSignal.timeout(timeout),
+          })
+          if (!imgRes.ok) {
+            const errBody = await imgRes.json().catch(() => ({})) as { error?: { message?: string } }
+            return { ok: false, output: null, error: `OpenAI Images API HTTP ${imgRes.status}: ${errBody?.error?.message ?? 'request failed'}`, latencyMs: Date.now() - start, model: resolvedModel, providerKey }
+          }
+          const imgData = await imgRes.json() as { data?: Array<{ url?: string; b64_json?: string }> }
+          const imageUrl = imgData?.data?.[0]?.url ?? imgData?.data?.[0]?.b64_json ?? null
+          return { ok: true, output: imageUrl, error: null, latencyMs: Date.now() - start, model: resolvedModel, providerKey }
         }
         const res = await fetch(`${base}/v1/chat/completions`, {
           method: 'POST',
