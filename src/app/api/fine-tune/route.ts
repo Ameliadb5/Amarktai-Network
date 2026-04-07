@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { randomUUID } from 'crypto'
 
-// Fine-tuning job types
+// ── Types ────────────────────────────────────────────────────────────────────
+
 interface FineTuneJob {
   id: string
   provider: 'openai' | 'together' | 'qwen'
@@ -15,10 +18,38 @@ interface FineTuneJob {
   error: string | null
 }
 
-const jobs = new Map<string, FineTuneJob>()
+// ── DB helpers ───────────────────────────────────────────────────────────────
+
+function rowToJob(row: {
+  jobId: string
+  provider: string
+  status: string
+  baseModel: string
+  trainingFile: string
+  hyperparameters: string
+  createdAt: Date
+  finishedAt: Date | null
+  trainedTokens: number | null
+  resultModel: string | null
+  error: string | null
+}): FineTuneJob {
+  return {
+    id: row.jobId,
+    provider: row.provider as FineTuneJob['provider'],
+    status: row.status as FineTuneJob['status'],
+    baseModel: row.baseModel,
+    trainingFile: row.trainingFile,
+    hyperparameters: JSON.parse(row.hyperparameters) as Record<string, unknown>,
+    createdAt: row.createdAt.toISOString(),
+    finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
+    trainedTokens: row.trainedTokens,
+    resultModel: row.resultModel,
+    error: row.error,
+  }
+}
 
 function generateId(): string {
-  return `ft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  return `ft_${Date.now()}_${randomUUID().slice(0, 8)}`
 }
 
 export async function POST(req: NextRequest) {
@@ -43,31 +74,19 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      const job: FineTuneJob = {
-        id: generateId(),
-        provider,
-        status: 'pending',
-        baseModel,
-        trainingFile: typeof trainingData === 'string' ? trainingData : `upload_${Date.now()}`,
-        hyperparameters: hyperparameters || { epochs: 3, learning_rate_multiplier: 1.0 },
-        createdAt: new Date().toISOString(),
-        finishedAt: null,
-        trainedTokens: null,
-        resultModel: null,
-        error: null,
-      }
+      const jobId = generateId()
+      const row = await prisma.fineTuneJob.create({
+        data: {
+          jobId,
+          provider,
+          status: 'pending',
+          baseModel,
+          trainingFile: typeof trainingData === 'string' ? trainingData : `upload_${Date.now()}`,
+          hyperparameters: JSON.stringify(hyperparameters || { epochs: 3, learning_rate_multiplier: 1.0 }),
+        },
+      })
 
-      jobs.set(job.id, job)
-
-      // Simulate async training start
-      setTimeout(() => {
-        const j = jobs.get(job.id)
-        if (j && j.status === 'pending') {
-          j.status = 'running'
-        }
-      }, 2000)
-
-      return NextResponse.json({ success: true, job })
+      return NextResponse.json({ success: true, job: rowToJob(row) })
     }
 
     if (action === 'cancel') {
@@ -75,15 +94,18 @@ export async function POST(req: NextRequest) {
       if (!jobId) {
         return NextResponse.json({ error: 'jobId required' }, { status: 400 })
       }
-      const job = jobs.get(jobId)
-      if (!job) {
+      const row = await prisma.fineTuneJob.findUnique({ where: { jobId } })
+      if (!row) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 })
       }
-      if (job.status === 'succeeded' || job.status === 'failed') {
+      if (row.status === 'succeeded' || row.status === 'failed') {
         return NextResponse.json({ error: 'Cannot cancel completed job' }, { status: 400 })
       }
-      job.status = 'cancelled'
-      return NextResponse.json({ success: true, job })
+      const updated = await prisma.fineTuneJob.update({
+        where: { jobId },
+        data: { status: 'cancelled' },
+      })
+      return NextResponse.json({ success: true, job: rowToJob(updated) })
     }
 
     return NextResponse.json(
@@ -103,21 +125,21 @@ export async function GET(req: NextRequest) {
     const provider = searchParams.get('provider')
 
     if (jobId) {
-      const job = jobs.get(jobId)
-      if (!job) {
+      const row = await prisma.fineTuneJob.findUnique({ where: { jobId } })
+      if (!row) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 })
       }
-      return NextResponse.json({ job })
+      return NextResponse.json({ job: rowToJob(row) })
     }
 
-    let allJobs = Array.from(jobs.values())
-    if (provider) {
-      allJobs = allJobs.filter(j => j.provider === provider)
-    }
+    const rows = await prisma.fineTuneJob.findMany({
+      where: provider ? { provider } : undefined,
+      orderBy: { createdAt: 'desc' },
+    })
 
     return NextResponse.json({
-      jobs: allJobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-      total: allJobs.length,
+      jobs: rows.map(rowToJob),
+      total: rows.length,
       supportedProviders: ['openai', 'together', 'qwen'],
       supportedModels: {
         openai: ['gpt-4o-mini-2024-07-18', 'gpt-3.5-turbo-0125'],

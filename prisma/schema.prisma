@@ -458,3 +458,223 @@ model AppAiProfile {
 
   @@map("app_ai_profiles")
 }
+
+// ── Fine-Tuning Jobs ─────────────────────────────────────────────────────────
+
+/// Persisted fine-tuning job metadata for OpenAI / Together / Qwen providers.
+model FineTuneJob {
+  id              Int       @id @default(autoincrement())
+  jobId           String    @unique @map("job_id")
+  provider        String
+  status          String    @default("pending")
+  baseModel       String    @map("base_model")
+  trainingFile    String    @map("training_file")
+  hyperparameters String    @default("{}") @map("hyperparameters") // JSON
+  appSlug         String?   @map("app_slug")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  finishedAt      DateTime? @map("finished_at")
+  trainedTokens   Int?      @map("trained_tokens")
+  resultModel     String?   @map("result_model")
+  error           String?
+
+  @@index([appSlug])
+  @@map("fine_tune_jobs")
+}
+
+// ── Batch Processing Jobs ────────────────────────────────────────────────────
+
+/// Batch job header row; item payloads are stored separately in BatchJobItem.
+model BatchJob {
+  id          String    @id // UUID
+  appSlug     String    @map("app_slug")
+  status      String    @default("pending")
+  config      String    @default("{}") // JSON BatchConfig
+  progress    String    @default("{}") // JSON BatchProgress
+  createdAt   DateTime  @default(now()) @map("created_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  error       String?
+
+  items BatchJobItem[]
+
+  @@index([appSlug])
+  @@map("batch_jobs")
+}
+
+/// Individual item within a batch job.
+model BatchJobItem {
+  id        Int     @id @default(autoincrement())
+  batchId   String  @map("batch_id")
+  batch     BatchJob @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  itemId    String  @map("item_id") // original UUID from BatchItem.id
+  itemIndex Int     @map("item_index")
+  input     String  // prompt text
+  taskType  String  @map("task_type")
+  status    String  @default("pending")
+  output    String?
+  error     String?
+  provider  String?
+  model     String?
+  latencyMs Int?    @map("latency_ms")
+  tokens    Int?
+
+  @@index([batchId])
+  @@map("batch_job_items")
+}
+
+// ── Workflow Engine ──────────────────────────────────────────────────────────
+
+/// Workflow definition (steps stored as JSON).
+model WorkflowDefinition {
+  id          String   @id // UUID
+  name        String
+  description String   @default("")
+  appSlug     String   @map("app_slug")
+  version     Int      @default(1)
+  steps       String   @default("{}") // JSON map<stepId, WorkflowStep>
+  entryStepId String   @map("entry_step_id")
+  status      String   @default("draft") // draft|active|archived
+  metadata    String   @default("{}") // JSON
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  runs WorkflowRun[]
+
+  @@index([appSlug])
+  @@map("workflow_definitions")
+}
+
+/// Single execution run of a workflow.
+model WorkflowRun {
+  id           String    @id // UUID
+  workflowId   String    @map("workflow_id")
+  workflow     WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  status       String    @default("running") // running|completed|failed|cancelled
+  input        String    @default("{}") // JSON
+  output       String?   // JSON
+  stepResults  String    @default("{}") // JSON map<stepId, StepResult>
+  startedAt    DateTime  @default(now()) @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  totalLatency Int       @default(0) @map("total_latency")
+  error        String?
+
+  @@index([workflowId])
+  @@map("workflow_runs")
+}
+
+// ── Prompt Studio ────────────────────────────────────────────────────────────
+
+/// Prompt template with versioning.
+model PromptTemplate {
+  id           String   @id // UUID
+  name         String
+  description  String   @default("")
+  appSlug      String   @map("app_slug")
+  template     String
+  systemPrompt String?  @map("system_prompt")
+  variables    String   @default("[]") // JSON PromptVariable[]
+  version      Int      @default(1)
+  parentVersion Int?    @map("parent_version")
+  tags         String   @default("[]") // JSON string[]
+  category     String   @default("custom")
+  isActive     Boolean  @default(true) @map("is_active")
+  metrics      String   @default("{}") // JSON PromptMetrics
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  versions PromptTemplateVersion[]
+  abTests  PromptABTest[]
+
+  @@index([appSlug])
+  @@map("prompt_templates")
+}
+
+/// Historical version snapshot of a prompt template.
+model PromptTemplateVersion {
+  id           Int      @id @default(autoincrement())
+  templateId   String   @map("template_id")
+  template     PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  version      Int
+  content      String   // template text at this version
+  systemPrompt String?  @map("system_prompt")
+  metrics      String   @default("{}") // JSON PromptMetrics
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([templateId])
+  @@map("prompt_template_versions")
+}
+
+/// A/B test comparing two prompt template versions.
+model PromptABTest {
+  id          String    @id // UUID
+  templateId  String    @map("template_id")
+  template    PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name        String
+  variantA    Int       @map("variant_a") // version number
+  variantB    Int       @map("variant_b") // version number
+  status      String    @default("draft") // draft|running|completed
+  results     String    @default("{}") // JSON ABTestResults
+  createdAt   DateTime  @default(now()) @map("created_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@index([templateId])
+  @@map("prompt_ab_tests")
+}
+
+// ── Strategy Engine ──────────────────────────────────────────────────────────
+
+/// Per-app strategy: goals, KPIs, recommendations.
+model AppStrategyRecord {
+  id              Int      @id @default(autoincrement())
+  appSlug         String   @unique @map("app_slug")
+  appName         String   @map("app_name")
+  appType         String   @default("general") @map("app_type")
+  goals           String   @default("[]") // JSON AppGoal[]
+  kpis            String   @default("[]") // JSON KpiTarget[]
+  recommendations String   @default("[]") // JSON StrategyRecommendation[]
+  strategyState   String   @default("not_configured") @map("strategy_state")
+  lastUpdated     DateTime @default(now()) @updatedAt @map("last_updated")
+
+  @@map("app_strategy_records")
+}
+
+// ── Webhook Manager ──────────────────────────────────────────────────────────
+
+/// Registered webhook endpoint for an app.
+model WebhookRegistrationRecord {
+  id        String   @id // UUID
+  appSlug   String   @map("app_slug")
+  url       String
+  secret    String
+  events    String   @default("[]") // JSON WebhookEventType[]
+  active    Boolean  @default(true)
+  metadata  String   @default("{}") // JSON
+  createdAt DateTime @default(now()) @map("created_at")
+
+  deliveries WebhookDeliveryRecord[]
+
+  @@index([appSlug])
+  @@map("webhook_registrations")
+}
+
+/// Delivery attempt log for a webhook event.
+model WebhookDeliveryRecord {
+  id            Int      @id @default(autoincrement())
+  webhookId     String   @map("webhook_id")
+  webhook       WebhookRegistrationRecord @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  eventId       String   @map("event_id")
+  eventType     String   @map("event_type")
+  url           String
+  status        String   @default("pending") // pending|success|failed|retrying
+  statusCode    Int?     @map("status_code")
+  attempts      Int      @default(0)
+  maxAttempts   Int      @default(5) @map("max_attempts")
+  lastAttemptAt DateTime? @map("last_attempt_at")
+  nextRetryAt   DateTime? @map("next_retry_at")
+  error         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([webhookId])
+  @@map("webhook_delivery_log")
+}

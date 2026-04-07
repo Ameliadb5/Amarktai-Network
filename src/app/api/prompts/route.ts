@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       if (!name || !template) {
         return NextResponse.json({ error: 'name and template required' }, { status: 400 })
       }
-      const prompt = createTemplate({
+      const prompt = await createTemplate({
         name,
         template,
         description: description || '',
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       if (!templateId) {
         return NextResponse.json({ error: 'templateId required' }, { status: 400 })
       }
-      const rendered = renderTemplate(templateId, variables || {})
+      const rendered = await renderTemplate(templateId, variables || {})
       if (!rendered) {
         return NextResponse.json({ error: 'Template not found' }, { status: 404 })
       }
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
           { status: 400 },
         )
       }
-      const experiment = createABTest({
+      const experiment = await createABTest({
         name,
         appSlug: appSlug || 'default',
         variants,
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       if (!testId) {
         return NextResponse.json({ error: 'testId required' }, { status: 400 })
       }
-      const started = startABTest(testId)
+      const started = await startABTest(testId)
       return NextResponse.json({ success: started })
     }
 
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
           { status: 400 },
         )
       }
-      recordABResult(testId, variantId, metrics || {})
+      await recordABResult(testId, variantId, metrics || {})
       return NextResponse.json({ success: true })
     }
 
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       if (!templateId) {
         return NextResponse.json({ error: 'templateId required' }, { status: 400 })
       }
-      const deleted = deleteTemplate(templateId)
+      const deleted = await deleteTemplate(templateId)
       return NextResponse.json({ success: deleted })
     }
 
@@ -114,21 +114,21 @@ export async function GET(req: NextRequest) {
     const appSlug = searchParams.get('appSlug') || 'default'
 
     if (testId) {
-      const results = getABResults(testId)
+      const results = await getABResults(testId)
       return NextResponse.json({ results })
     }
 
     if (templateId) {
-      const template = getTemplate(templateId)
+      const template = await getTemplate(templateId)
       if (!template) {
         return NextResponse.json({ error: 'Template not found' }, { status: 404 })
       }
-      const versions = getVersionHistory(templateId)
+      const versions = await getVersionHistory(templateId)
       return NextResponse.json({ template, versions })
     }
 
-    const templates = listTemplates(appSlug)
-    const experiments = listABTests(appSlug)
+    const templates = await listTemplates(appSlug)
+    const experiments = await listABTests(appSlug)
     return NextResponse.json({ templates, experiments })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to list prompts'

@@ -59,10 +59,38 @@ export interface AppStrategy {
 }
 
 // ---------------------------------------------------------------------------
-// In-memory store
+// In-memory store (replaced by DB persistence below)
 // ---------------------------------------------------------------------------
 
-const strategyStore = new Map<string, AppStrategy>();
+import { prisma } from './prisma'
+
+let idCounter = 1;
+
+// ── DB helpers ───────────────────────────────────────────────────────────────
+
+function rowToStrategy(row: {
+  appSlug: string
+  appName: string
+  appType: string
+  goals: string
+  kpis: string
+  recommendations: string
+  strategyState: string
+  lastUpdated?: Date | null
+  updatedAt?: Date | null
+}): AppStrategy {
+  const ts = row.lastUpdated ?? row.updatedAt ?? new Date()
+  return {
+    appSlug: row.appSlug,
+    appName: row.appName,
+    appType: row.appType,
+    goals: JSON.parse(row.goals) as AppGoal[],
+    kpis: JSON.parse(row.kpis) as KpiTarget[],
+    recommendations: JSON.parse(row.recommendations) as StrategyRecommendation[],
+    strategyState: row.strategyState as AppStrategy['strategyState'],
+    lastUpdated: ts instanceof Date ? ts.toISOString() : String(ts),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Default strategies by app type
@@ -152,9 +180,8 @@ const STRATEGY_TEMPLATES: Record<string, StrategyTemplate> = {
 // Core functions
 // ---------------------------------------------------------------------------
 
-let idCounter = 0;
 function nextId(prefix: string): string {
-  return `${prefix}_${++idCounter}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}_${idCounter++}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function kpiStatus(kpi: Pick<KpiTarget, 'targetValue' | 'currentValue' | 'direction'>): KpiTarget['status'] {
@@ -180,11 +207,11 @@ function kpiStatus(kpi: Pick<KpiTarget, 'targetValue' | 'currentValue' | 'direct
 /**
  * Initialize strategy for an app based on its type.
  */
-export function initializeStrategy(
+export async function initializeStrategy(
   appSlug: string,
   appName: string,
   appType: string,
-): AppStrategy {
+): Promise<AppStrategy> {
   const template = STRATEGY_TEMPLATES[appType] ?? STRATEGY_TEMPLATES.general;
   const now = new Date().toISOString();
 
@@ -212,25 +239,49 @@ export function initializeStrategy(
     lastUpdated: now,
   };
 
-  strategyStore.set(appSlug, strategy);
+  await prisma.appStrategyRecord.upsert({
+    where: { appSlug },
+    create: {
+      appSlug,
+      appName,
+      appType,
+      goals: JSON.stringify(goals),
+      kpis: JSON.stringify(kpis),
+      recommendations: '[]',
+      strategyState: 'setup',
+    },
+    update: {
+      appName,
+      appType,
+      goals: JSON.stringify(goals),
+      kpis: JSON.stringify(kpis),
+      recommendations: '[]',
+      strategyState: 'setup',
+    },
+  });
   return strategy;
 }
 
 /**
  * Get strategy for an app. Returns null if not initialized.
  */
-export function getAppStrategy(appSlug: string): AppStrategy | null {
-  return strategyStore.get(appSlug) ?? null;
+export async function getAppStrategy(appSlug: string): Promise<AppStrategy | null> {
+  try {
+    const row = await prisma.appStrategyRecord.findUnique({ where: { appSlug } });
+    return row ? rowToStrategy(row) : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Update KPI current values and recompute status.
  */
-export function updateKpis(
+export async function updateKpis(
   appSlug: string,
   updates: Record<string, number>,
-): AppStrategy | null {
-  const strategy = strategyStore.get(appSlug);
+): Promise<AppStrategy | null> {
+  const strategy = await getAppStrategy(appSlug);
   if (!strategy) return null;
 
   for (const kpi of strategy.kpis) {
@@ -239,53 +290,56 @@ export function updateKpis(
       kpi.status = kpiStatus(kpi);
     }
   }
-
-  // Also update goal current values
   for (const goal of strategy.goals) {
     if (updates[goal.metric] !== undefined) {
       goal.currentValue = updates[goal.metric];
     }
   }
 
-  strategy.lastUpdated = new Date().toISOString();
+  await prisma.appStrategyRecord.update({
+    where: { appSlug },
+    data: { goals: JSON.stringify(strategy.goals), kpis: JSON.stringify(strategy.kpis) },
+  });
   return strategy;
 }
 
 /**
  * Add a custom goal.
  */
-export function addGoal(
+export async function addGoal(
   appSlug: string,
   goal: Omit<AppGoal, 'id' | 'createdAt'>,
-): AppStrategy | null {
-  const strategy = strategyStore.get(appSlug);
+): Promise<AppStrategy | null> {
+  const strategy = await getAppStrategy(appSlug);
   if (!strategy) return null;
 
-  strategy.goals.push({
-    ...goal,
-    id: nextId('goal'),
-    createdAt: new Date().toISOString(),
+  strategy.goals.push({ ...goal, id: nextId('goal'), createdAt: new Date().toISOString() });
+  await prisma.appStrategyRecord.update({
+    where: { appSlug },
+    data: { goals: JSON.stringify(strategy.goals) },
   });
-  strategy.lastUpdated = new Date().toISOString();
   return strategy;
 }
 
 /**
  * Remove a goal by id.
  */
-export function removeGoal(appSlug: string, goalId: string): boolean {
-  const strategy = strategyStore.get(appSlug);
+export async function removeGoal(appSlug: string, goalId: string): Promise<boolean> {
+  const strategy = await getAppStrategy(appSlug);
   if (!strategy) return false;
   const before = strategy.goals.length;
   strategy.goals = strategy.goals.filter((g) => g.id !== goalId);
-  strategy.lastUpdated = new Date().toISOString();
+  await prisma.appStrategyRecord.update({
+    where: { appSlug },
+    data: { goals: JSON.stringify(strategy.goals) },
+  });
   return strategy.goals.length < before;
 }
 
 /**
  * Generate recommendations based on current KPI state and outcome data.
  */
-export function generateRecommendations(
+export async function generateRecommendations(
   appSlug: string,
   outcomeData?: {
     successRate?: number;
@@ -294,14 +348,13 @@ export function generateRecommendations(
     topModel?: string;
     monthlySpend?: number;
   },
-): StrategyRecommendation[] {
-  const strategy = strategyStore.get(appSlug);
+): Promise<StrategyRecommendation[]> {
+  const strategy = await getAppStrategy(appSlug);
   if (!strategy) return [];
 
   const recs: StrategyRecommendation[] = [];
   const now = new Date().toISOString();
 
-  // Recommend based on KPI status
   for (const kpi of strategy.kpis) {
     if (kpi.status === 'behind') {
       recs.push({
@@ -328,7 +381,6 @@ export function generateRecommendations(
     }
   }
 
-  // Outcome-based recommendations
   if (outcomeData) {
     if (outcomeData.successRate !== undefined && outcomeData.successRate < 90) {
       recs.push({
@@ -342,7 +394,6 @@ export function generateRecommendations(
         createdAt: now,
       });
     }
-
     if (outcomeData.fallbackRate !== undefined && outcomeData.fallbackRate > 15) {
       recs.push({
         id: nextId('rec'),
@@ -355,7 +406,6 @@ export function generateRecommendations(
         createdAt: now,
       });
     }
-
     if (outcomeData.avgLatencyMs !== undefined && outcomeData.avgLatencyMs > 2000) {
       recs.push({
         id: nextId('rec'),
@@ -370,48 +420,52 @@ export function generateRecommendations(
     }
   }
 
-  // Update strategy with new recommendations
-  strategy.recommendations = recs;
-  strategy.lastUpdated = now;
-  if (strategy.strategyState === 'setup' && recs.length > 0) {
-    strategy.strategyState = 'active';
-  }
-
+  const newState = strategy.strategyState === 'setup' && recs.length > 0 ? 'active' : strategy.strategyState;
+  await prisma.appStrategyRecord.update({
+    where: { appSlug },
+    data: { recommendations: JSON.stringify(recs), strategyState: newState },
+  });
   return recs;
 }
 
 /**
  * Activate/pause strategy for an app.
  */
-export function setStrategyState(
+export async function setStrategyState(
   appSlug: string,
   state: AppStrategy['strategyState'],
-): boolean {
-  const strategy = strategyStore.get(appSlug);
-  if (!strategy) return false;
-  strategy.strategyState = state;
-  strategy.lastUpdated = new Date().toISOString();
-  return true;
+): Promise<boolean> {
+  try {
+    await prisma.appStrategyRecord.update({ where: { appSlug }, data: { strategyState: state } });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Get all app strategies.
  */
-export function getAllStrategies(): AppStrategy[] {
-  return Array.from(strategyStore.values());
+export async function getAllStrategies(): Promise<AppStrategy[]> {
+  try {
+    const rows = await prisma.appStrategyRecord.findMany();
+    return rows.map(rowToStrategy);
+  } catch {
+    return [];
+  }
 }
 
 /**
  * Get strategy summary for dashboard.
  */
-export function getStrategySummary(): {
+export async function getStrategySummary(): Promise<{
   totalApps: number;
   activeStrategies: number;
   atRiskKpis: number;
   behindKpis: number;
   totalRecommendations: number;
-} {
-  const all = getAllStrategies();
+}> {
+  const all = await getAllStrategies();
   let atRiskKpis = 0;
   let behindKpis = 0;
   let totalRecommendations = 0;
@@ -436,14 +490,19 @@ export function getStrategySummary(): {
 /**
  * Remove strategy for an app.
  */
-export function removeStrategy(appSlug: string): boolean {
-  return strategyStore.delete(appSlug);
+export async function removeStrategy(appSlug: string): Promise<boolean> {
+  try {
+    await prisma.appStrategyRecord.delete({ where: { appSlug } });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Reset all strategies (for testing).
  */
-export function resetStrategies(): void {
-  strategyStore.clear();
-  idCounter = 0;
+export async function resetStrategies(): Promise<void> {
+  await prisma.appStrategyRecord.deleteMany();
+  idCounter = 1;
 }

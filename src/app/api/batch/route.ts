@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       if (!items?.length) {
         return NextResponse.json({ error: 'items array required' }, { status: 400 })
       }
-      const job = createBatchJob({
+      const job = await createBatchJob({
         appSlug: appSlug || 'default',
         items,
         config,
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       if (!jobId) {
         return NextResponse.json({ error: 'jobId required' }, { status: 400 })
       }
-      const cancelled = cancelBatchJob(jobId)
+      const cancelled = await cancelBatchJob(jobId)
       return NextResponse.json({ success: cancelled })
     }
 
@@ -53,15 +53,15 @@ export async function GET(req: NextRequest) {
     const appSlug = searchParams.get('appSlug') || 'default'
 
     if (jobId) {
-      const job = getBatchJob(jobId)
+      const job = await getBatchJob(jobId)
       if (!job) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 })
       }
-      const result = getBatchResult(jobId)
+      const result = await getBatchResult(jobId)
       return NextResponse.json({ job, result })
     }
 
-    const jobs = listBatchJobs(appSlug)
+    const jobs = await listBatchJobs(appSlug)
     return NextResponse.json({ jobs })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to get batch status'

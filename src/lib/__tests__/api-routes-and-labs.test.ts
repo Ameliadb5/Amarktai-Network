@@ -39,17 +39,178 @@ vi.mock('../vector-store', () => ({
 
 // Mock prisma so coding-agent's selectCodeProvider returns no DB providers,
 // triggering scaffold-only generation — safe for unit tests without a real DB.
-vi.mock('../prisma', () => ({
-  prisma: {
-    aiProvider: {
-      findMany: vi.fn().mockResolvedValue([]),
+vi.mock('../prisma', () => {
+  type Row = Record<string, unknown>
+  function makeTable(pk: string) {
+    const store = new Map<unknown, Row>()
+    let intPk = 1
+    function resolveWhere(where: Row): Row | undefined {
+      for (const [, row] of store) {
+        if (Object.entries(where).every(([k, v]) => row[k] === v)) return row
+      }
+    }
+    return {
+      store,
+      async create({ data }: { data: Row }) {
+        const clean: Row = {}
+        for (const [k, v] of Object.entries(data)) { if (!(v && typeof v === 'object' && 'create' in (v as object))) clean[k] = v }
+        if (!clean[pk]) clean[pk] = intPk++
+        clean.createdAt = clean.createdAt ?? new Date()
+        clean.updatedAt = clean.updatedAt ?? new Date()
+        store.set(clean[pk], clean)
+        return clean
+      },
+      async findUnique({ where }: { where: Row }) { return store.get(where[pk]) ?? null },
+      async findMany({ where }: { where?: Row } = {}) {
+        const rows: Row[] = []
+        for (const [, row] of store) {
+          if (!where || Object.entries(where).every(([k, v]) => row[k] === v)) rows.push(row)
+        }
+        return rows
+      },
+      async update({ where, data }: { where: Row; data: Row }) {
+        const existing = (where[pk] !== undefined ? store.get(where[pk]) : resolveWhere(where)) as Row
+        if (!existing) throw new Error('Not found')
+        const clean: Row = {}
+        for (const [k, v] of Object.entries(data)) { if (!(v && typeof v === 'object' && 'create' in (v as object))) clean[k] = v }
+        Object.assign(existing, { ...clean, updatedAt: new Date() })
+        // Handle nested versions.create
+        const vn = data.versions as { create?: Row | Row[] } | undefined
+        if (vn?.create) {
+          const items = Array.isArray(vn.create) ? vn.create : [vn.create]
+          for (const item of items) {
+            promptVersionStore.store.set(promptVersionStore.store.size + 1, { ...item, templateId: where[pk], id: promptVersionStore.store.size + 1, createdAt: new Date() })
+          }
+        }
+        return existing
+      },
+      async delete({ where }: { where: Row }) {
+        const deleted = store.has(where[pk])
+        store.delete(where[pk])
+        return deleted ? {} : null
+      },
+      async upsert({ where, create, update: upd }: { where: Row; create: Row; update: Row }) {
+        const key = where[pk]
+        const existing = key !== undefined ? store.get(key) : resolveWhere(where)
+        if (existing) { Object.assign(existing as object, { ...upd, updatedAt: new Date() }); return existing }
+        const row = { ...create, [pk]: create[pk] ?? intPk++, createdAt: new Date(), updatedAt: new Date() }
+        store.set(row[pk], row)
+        return row
+      },
+      async deleteMany({ where }: { where?: Row } = {}) {
+        if (!where) { const c = store.size; store.clear(); return { count: c } }
+        let count = 0
+        for (const [k, row] of store) {
+          if (Object.entries(where).every(([wk, wv]) => row[wk] === wv)) { store.delete(k); count++ }
+        }
+        return { count }
+      },
+      async count() { return store.size },
+    }
+  }
+  const promptVersionStore = makeTable('id')
+  const promptTemplateStore = (() => {
+    const base = makeTable('id')
+    return {
+      ...base,
+      async create({ data }: { data: Row }) {
+        const vn = data.versions as { create?: Row | Row[] } | undefined
+        const clean: Row = {}
+        for (const [k, v] of Object.entries(data)) { if (k !== 'versions') clean[k] = v }
+        clean.createdAt = new Date(); clean.updatedAt = new Date()
+        base.store.set(data.id, clean)
+        if (vn?.create) {
+          const items = Array.isArray(vn.create) ? vn.create : [vn.create]
+          for (const item of items) await promptVersionStore.create({ data: { ...(item as Row), templateId: data.id } })
+        }
+        return clean
+      },
+      async update({ where, data }: { where: Row; data: Row }) {
+        const vn = data.versions as { create?: Row | Row[] } | undefined
+        const clean: Row = {}
+        for (const [k, v] of Object.entries(data)) { if (k !== 'versions') clean[k] = v }
+        const existing = base.store.get(where.id) as Row
+        if (!existing) throw new Error('Not found')
+        Object.assign(existing, { ...clean, updatedAt: new Date() })
+        if (vn?.create) {
+          const items = Array.isArray(vn.create) ? vn.create : [vn.create]
+          for (const item of items) await promptVersionStore.create({ data: { ...(item as Row), templateId: where.id } })
+        }
+        return existing
+      },
+    }
+  })()
+  return {
+    prisma: {
+      aiProvider: { findMany: vi.fn().mockResolvedValue([]) },
+      promptTemplate: promptTemplateStore,
+      promptTemplateVersion: promptVersionStore,
+      promptABTest: makeTable('id'),
+      appStrategyRecord: makeTable('appSlug'),
+      webhookRegistrationRecord: makeTable('id'),
+      webhookDeliveryRecord: makeTable('id'),
+      batchJob: (() => {
+        const bjiStore = makeTable('id')
+        const base = makeTable('id')
+        return {
+          ...base,
+          async create({ data }: { data: Row }) {
+            const itemsNested = data.items as { create?: Row[] } | undefined
+            const clean: Row = {}
+            for (const [k, v] of Object.entries(data)) { if (k !== 'items') clean[k] = v }
+            clean.createdAt = new Date(); clean.updatedAt = new Date()
+            base.store.set(data.id, clean)
+            if (itemsNested?.create) {
+              let idx = 0
+              for (const item of itemsNested.create) {
+                bjiStore.store.set(bjiStore.store.size + 1 + idx++, { ...item, id: bjiStore.store.size + 1, batchId: data.id, createdAt: new Date() })
+              }
+            }
+            return { ...clean, items: itemsNested?.create?.map((item, i) => ({ ...item, id: i + 1, batchId: data.id })) ?? [] }
+          },
+          async findUnique({ where, include }: { where: Row; include?: { items?: unknown } }) {
+            const row = base.store.get(where.id) as Row | undefined
+            if (!row) return null
+            if (include?.items) {
+              const items: Row[] = []
+              for (const [, r] of bjiStore.store) { if (r.batchId === row.id) items.push(r) }
+              return { ...row, items }
+            }
+            return row
+          },
+          async findMany({ where, include }: { where?: Row; include?: { items?: unknown } }) {
+            const rows: Row[] = []
+            for (const [, row] of base.store) {
+              if (!where || Object.entries(where).every(([k, v]) => row[k] === v)) rows.push(row)
+            }
+            if (include?.items) {
+              return rows.map(r => {
+                const items: Row[] = []
+                for (const [, item] of bjiStore.store) { if (item.batchId === r.id) items.push(item) }
+                return { ...r, items }
+              })
+            }
+            return rows
+          },
+          async update({ where, data }: { where: Row; data: Row }) {
+            const existing = base.store.get(where.id) as Row
+            if (!existing) throw new Error('Not found')
+            Object.assign(existing, { ...data, updatedAt: new Date() })
+            return existing
+          },
+        }
+      })(),
+      batchJobItem: makeTable('id'),
+      workflowDefinition: makeTable('id'),
+      workflowRun: makeTable('id'),
     },
-  },
-}))
+  }
+})
 
 // Mock callProvider so no real network calls are made in unit tests.
 vi.mock('../brain', () => ({
   callProvider: vi.fn().mockResolvedValue({ ok: false, output: null, error: 'mocked', latencyMs: 0, model: '', providerKey: '' }),
+  getVaultApiKey: vi.fn().mockResolvedValue(null),
 }))
 
 // ── Coding Agent ─────────────────────────────────────────────────────────────
@@ -256,8 +417,8 @@ describe('Webhook Manager', () => {
     expect(Array.isArray(RETRY_DELAYS_MS)).toBe(true)
   })
 
-  it('registerWebhook creates a webhook with correct fields', () => {
-    const wh = registerWebhook('my-app', 'https://example.com/hook', ['app.event'])
+  it('registerWebhook creates a webhook with correct fields', async () => {
+    const wh = await registerWebhook('my-app', 'https://example.com/hook', ['app.event'])
     expect(wh.id).toBeTruthy()
     expect(wh.appSlug).toBe('my-app')
     expect(wh.url).toBe('https://example.com/hook')
@@ -266,37 +427,37 @@ describe('Webhook Manager', () => {
     expect(wh.secret).toBeTruthy()
   })
 
-  it('getWebhook retrieves a registered webhook', () => {
-    const wh = registerWebhook('app-a', 'https://a.com/wh', ['app.event'])
-    const found = getWebhook(wh.id)
+  it('getWebhook retrieves a registered webhook', async () => {
+    const wh = await registerWebhook('app-a', 'https://a.com/wh', ['app.event'])
+    const found = await getWebhook(wh.id)
     expect(found).toBeDefined()
     expect(found!.id).toBe(wh.id)
   })
 
-  it('getWebhooksForApp returns only the app webhooks', () => {
-    registerWebhook('app-x', 'https://x.com/wh1', ['app.event'])
-    registerWebhook('app-x', 'https://x.com/wh2', ['app.event'])
-    const hooks = getWebhooksForApp('app-x')
+  it('getWebhooksForApp returns only the app webhooks', async () => {
+    await registerWebhook('app-x', 'https://x.com/wh1', ['app.event'])
+    await registerWebhook('app-x', 'https://x.com/wh2', ['app.event'])
+    const hooks = await getWebhooksForApp('app-x')
     expect(hooks.length).toBeGreaterThanOrEqual(2)
     for (const h of hooks) expect(h.appSlug).toBe('app-x')
   })
 
-  it('unregisterWebhook removes a webhook', () => {
-    const wh = registerWebhook('app-del', 'https://del.com', ['app.event'])
-    expect(unregisterWebhook(wh.id)).toBe(true)
-    expect(getWebhook(wh.id)).toBeUndefined()
+  it('unregisterWebhook removes a webhook', async () => {
+    const wh = await registerWebhook('app-del', 'https://del.com', ['app.event'])
+    expect(await unregisterWebhook(wh.id)).toBe(true)
+    expect(await getWebhook(wh.id)).toBeUndefined()
   })
 
-  it('unregisterWebhook returns false for unknown id', () => {
-    expect(unregisterWebhook('nonexistent')).toBe(false)
+  it('unregisterWebhook returns false for unknown id', async () => {
+    expect(await unregisterWebhook('nonexistent')).toBe(false)
   })
 
-  it('setWebhookActive toggles active flag', () => {
-    const wh = registerWebhook('app-toggle', 'https://t.com', ['app.event'])
-    expect(setWebhookActive(wh.id, false)).toBe(true)
-    expect(getWebhook(wh.id)!.active).toBe(false)
-    expect(setWebhookActive(wh.id, true)).toBe(true)
-    expect(getWebhook(wh.id)!.active).toBe(true)
+  it('setWebhookActive toggles active flag', async () => {
+    const wh = await registerWebhook('app-toggle', 'https://t.com', ['app.event'])
+    expect(await setWebhookActive(wh.id, false)).toBe(true)
+    expect((await getWebhook(wh.id))!.active).toBe(false)
+    expect(await setWebhookActive(wh.id, true)).toBe(true)
+    expect((await getWebhook(wh.id))!.active).toBe(true)
   })
 
   it('generateSignature produces a hex string', () => {
@@ -316,13 +477,13 @@ describe('Webhook Manager', () => {
     expect(verifySignature('data', 'bad-sig', 'secret')).toBe(false)
   })
 
-  it('getDeliveryLog returns an array', () => {
-    const log = getDeliveryLog()
+  it('getDeliveryLog returns an array', async () => {
+    const log = await getDeliveryLog()
     expect(Array.isArray(log)).toBe(true)
   })
 
-  it('getDeliveryStats returns summary with expected fields', () => {
-    const stats = getDeliveryStats()
+  it('getDeliveryStats returns summary with expected fields', async () => {
+    const stats = await getDeliveryStats()
     expect(typeof stats.total).toBe('number')
     expect(typeof stats.successful).toBe('number')
     expect(typeof stats.failed).toBe('number')
@@ -352,8 +513,8 @@ describe('Batch Processor', () => {
     expect(typeof DEFAULT_MAX_RETRIES).toBe('number')
   })
 
-  it('createBatchJob returns a job with pending status', () => {
-    const job = createBatchJob({
+  it('createBatchJob returns a job with pending status', async () => {
+    const job = await createBatchJob({
       appSlug: 'batch-app',
       items: [{ input: 'Summarise this', taskType: 'summarise' }],
     })
@@ -365,45 +526,45 @@ describe('Batch Processor', () => {
     expect(job.progress.pending).toBe(1)
   })
 
-  it('getBatchJob retrieves a created job', () => {
-    const job = createBatchJob({
+  it('getBatchJob retrieves a created job', async () => {
+    const job = await createBatchJob({
       appSlug: 'batch-get',
       items: [{ input: 'Hello', taskType: 'greet' }],
     })
-    const found = getBatchJob(job.id)
+    const found = await getBatchJob(job.id)
     expect(found).not.toBeNull()
     expect(found!.id).toBe(job.id)
   })
 
-  it('getBatchJob returns null for unknown id', () => {
-    expect(getBatchJob('nonexistent')).toBeNull()
+  it('getBatchJob returns null for unknown id', async () => {
+    expect(await getBatchJob('nonexistent')).toBeNull()
   })
 
-  it('cancelBatchJob cancels a pending job', () => {
-    const job = createBatchJob({
+  it('cancelBatchJob cancels a pending job', async () => {
+    const job = await createBatchJob({
       appSlug: 'batch-cancel',
       items: [{ input: 'data', taskType: 'process' }],
     })
-    expect(cancelBatchJob(job.id)).toBe(true)
-    expect(getBatchJob(job.id)!.status).toBe('cancelled')
+    expect(await cancelBatchJob(job.id)).toBe(true)
+    expect((await getBatchJob(job.id))!.status).toBe('cancelled')
   })
 
-  it('cancelBatchJob returns false for unknown id', () => {
-    expect(cancelBatchJob('nonexistent')).toBe(false)
+  it('cancelBatchJob returns false for unknown id', async () => {
+    expect(await cancelBatchJob('nonexistent')).toBe(false)
   })
 
-  it('listBatchJobs filters by appSlug', () => {
-    createBatchJob({
+  it('listBatchJobs filters by appSlug', async () => {
+    await createBatchJob({
       appSlug: 'batch-list-test',
       items: [{ input: 'test', taskType: 'test' }],
     })
-    const jobs = listBatchJobs('batch-list-test')
+    const jobs = await listBatchJobs('batch-list-test')
     expect(jobs.length).toBeGreaterThanOrEqual(1)
     for (const j of jobs) expect(j.appSlug).toBe('batch-list-test')
   })
 
   it('submitBatchJob resolves for a valid job', async () => {
-    const job = createBatchJob({
+    const job = await createBatchJob({
       appSlug: 'batch-submit',
       items: [{ input: 'item', taskType: 'run' }],
     })
@@ -411,8 +572,8 @@ describe('Batch Processor', () => {
     expect(typeof ok).toBe('boolean')
   })
 
-  it('getBatchResult returns null for pending job', () => {
-    const job = createBatchJob({
+  it('getBatchResult returns null for pending job', async () => {
+    const job = await createBatchJob({
       appSlug: 'batch-result',
       items: [{ input: 'data', taskType: 'test' }],
     })
@@ -775,12 +936,12 @@ describe('Workflow Engine', () => {
     expect(WORKFLOW_STATUSES).toContain('archived')
   })
 
-  it('createWorkflow creates a workflow in draft status', () => {
+  it('createWorkflow creates a workflow in draft status', async () => {
     const steps: WorkflowStep[] = [
       { id: 'step-1', type: 'input', name: 'Start', config: {} },
       { id: 'step-2', type: 'output', name: 'End', config: {} },
     ]
-    const wf = createWorkflow({
+    const wf = await createWorkflow({
       name: 'Test Workflow',
       description: 'A test workflow',
       appSlug: 'wf-app',
@@ -793,70 +954,70 @@ describe('Workflow Engine', () => {
     expect(wf.steps.size).toBe(2)
   })
 
-  it('getWorkflow retrieves a created workflow', () => {
-    const wf = createWorkflow({
+  it('getWorkflow retrieves a created workflow', async () => {
+    const wf = await createWorkflow({
       name: 'Retrieve Test',
       description: 'test',
       appSlug: 'wf-get',
       steps: [{ id: 's1', type: 'input', name: 'In', config: {} }],
       entryStepId: 's1',
     })
-    const found = getWorkflow(wf.id)
+    const found = await getWorkflow(wf.id)
     expect(found).not.toBeNull()
     expect(found!.id).toBe(wf.id)
   })
 
-  it('getWorkflow returns null for unknown id', () => {
-    expect(getWorkflow('nonexistent')).toBeNull()
+  it('getWorkflow returns null for unknown id', async () => {
+    expect(await getWorkflow('nonexistent')).toBeNull()
   })
 
-  it('listWorkflows filters by appSlug', () => {
-    createWorkflow({
+  it('listWorkflows filters by appSlug', async () => {
+    await createWorkflow({
       name: 'List Test',
       description: 'test',
       appSlug: 'wf-list-unique',
       steps: [{ id: 's1', type: 'input', name: 'In', config: {} }],
       entryStepId: 's1',
     })
-    const wfs = listWorkflows('wf-list-unique')
+    const wfs = await listWorkflows('wf-list-unique')
     expect(wfs.length).toBeGreaterThanOrEqual(1)
     for (const wf of wfs) expect(wf.appSlug).toBe('wf-list-unique')
   })
 
-  it('activateWorkflow changes status to active', () => {
-    const wf = createWorkflow({
+  it('activateWorkflow changes status to active', async () => {
+    const wf = await createWorkflow({
       name: 'Activate Test',
       description: 'test',
       appSlug: 'wf-activate',
       steps: [{ id: 's1', type: 'input', name: 'In', config: {} }],
       entryStepId: 's1',
     })
-    expect(activateWorkflow(wf.id)).toBe(true)
-    expect(getWorkflow(wf.id)!.status).toBe('active')
+    expect(await activateWorkflow(wf.id)).toBe(true)
+    expect((await getWorkflow(wf.id))!.status).toBe('active')
   })
 
-  it('deleteWorkflow removes a workflow', () => {
-    const wf = createWorkflow({
+  it('deleteWorkflow removes a workflow', async () => {
+    const wf = await createWorkflow({
       name: 'Delete Test',
       description: 'test',
       appSlug: 'wf-del',
       steps: [{ id: 's1', type: 'input', name: 'In', config: {} }],
       entryStepId: 's1',
     })
-    expect(deleteWorkflow(wf.id)).toBe(true)
-    expect(getWorkflow(wf.id)).toBeNull()
+    expect(await deleteWorkflow(wf.id)).toBe(true)
+    expect(await getWorkflow(wf.id)).toBeNull()
   })
 
-  it('deleteWorkflow returns false for unknown id', () => {
-    expect(deleteWorkflow('nonexistent')).toBe(false)
+  it('deleteWorkflow returns false for unknown id', async () => {
+    expect(await deleteWorkflow('nonexistent')).toBe(false)
   })
 
-  it('getWorkflowRun returns null for unknown run', () => {
-    expect(getWorkflowRun('no-such-run')).toBeNull()
+  it('getWorkflowRun returns null for unknown run', async () => {
+    expect(await getWorkflowRun('no-such-run')).toBeNull()
   })
 
-  it('listWorkflowRuns returns empty for unknown workflow', () => {
-    expect(listWorkflowRuns('no-such-wf')).toEqual([])
+  it('listWorkflowRuns returns empty for unknown workflow', async () => {
+    expect(await listWorkflowRuns('no-such-wf')).toEqual([])
   })
 })
 
@@ -889,8 +1050,8 @@ describe('Prompt Studio', () => {
   })
 
   describe('Template CRUD', () => {
-    it('createTemplate creates a template with correct fields', () => {
-      const tmpl = createTemplate({
+    it('createTemplate creates a template with correct fields', async () => {
+      const tmpl = await createTemplate({
         name: 'Greeting Template',
         description: 'Greets the user',
         appSlug: 'ps-app',
@@ -906,70 +1067,70 @@ describe('Prompt Studio', () => {
       expect(tmpl.variables.length).toBe(1)
     })
 
-    it('getTemplate retrieves a created template', () => {
-      const tmpl = createTemplate({
+    it('getTemplate retrieves a created template', async () => {
+      const tmpl = await createTemplate({
         name: 'Get Test',
         description: 'test',
         appSlug: 'ps-get',
         template: 'Test {{x}}',
       })
-      const found = getTemplate(tmpl.id)
+      const found = await getTemplate(tmpl.id)
       expect(found).not.toBeNull()
       expect(found!.id).toBe(tmpl.id)
     })
 
-    it('getTemplate returns null for unknown id', () => {
-      expect(getTemplate('no-such-id')).toBeNull()
+    it('getTemplate returns null for unknown id', async () => {
+      expect(await getTemplate('no-such-id')).toBeNull()
     })
 
-    it('updateTemplate bumps version', () => {
-      const tmpl = createTemplate({
+    it('updateTemplate bumps version', async () => {
+      const tmpl = await createTemplate({
         name: 'Update Test',
         description: 'test',
         appSlug: 'ps-upd',
         template: 'v1: {{msg}}',
       })
-      const updated = updateTemplate(tmpl.id, { template: 'v2: {{msg}}' })
+      const updated = await updateTemplate(tmpl.id, { template: 'v2: {{msg}}' })
       expect(updated).not.toBeNull()
       expect(updated!.version).toBe(2)
       expect(updated!.template).toBe('v2: {{msg}}')
     })
 
-    it('updateTemplate returns null for unknown id', () => {
-      expect(updateTemplate('nonexistent', { template: 'x' })).toBeNull()
+    it('updateTemplate returns null for unknown id', async () => {
+      expect(await updateTemplate('nonexistent', { template: 'x' })).toBeNull()
     })
 
-    it('listTemplates filters by appSlug', () => {
-      createTemplate({
+    it('listTemplates filters by appSlug', async () => {
+      await createTemplate({
         name: 'List Test',
         description: 'test',
         appSlug: 'ps-list-unique',
         template: 'hi',
       })
-      const list = listTemplates('ps-list-unique')
+      const list = await listTemplates('ps-list-unique')
       expect(list.length).toBeGreaterThanOrEqual(1)
       for (const t of list) expect(t.appSlug).toBe('ps-list-unique')
     })
 
-    it('deleteTemplate removes a template', () => {
-      const tmpl = createTemplate({
+    it('deleteTemplate removes a template', async () => {
+      const tmpl = await createTemplate({
         name: 'Del Test',
         description: 'test',
         appSlug: 'ps-del',
         template: 'bye',
       })
-      expect(deleteTemplate(tmpl.id)).toBe(true)
-      expect(getTemplate(tmpl.id)).toBeNull()
+      expect(await deleteTemplate(tmpl.id)).toBe(true)
+      expect(await getTemplate(tmpl.id)).toBeNull()
     })
 
-    it('deleteTemplate returns false for unknown id', () => {
-      expect(deleteTemplate('nonexistent')).toBe(false)
+    it('deleteTemplate returns false for unknown id', async () => {
+      expect(await deleteTemplate('nonexistent')).toBe(false)
     })
   })
 
   describe('renderTemplate', () => {
-    it('renders template with variables', () => {
-      const tmpl = createTemplate({
+    it('renders template with variables', async () => {
+      const tmpl = await createTemplate({
         name: 'Render Test',
         description: 'test',
         appSlug: 'ps-render',
@@ -979,37 +1140,37 @@ describe('Prompt Studio', () => {
           { name: 'age', description: 'Age', type: 'number', required: true },
         ],
       })
-      const result = renderTemplate(tmpl.id, { name: 'Alice', age: 30 })
+      const result = await renderTemplate(tmpl.id, { name: 'Alice', age: 30 })
       expect(result).not.toBeNull()
       expect(result!.rendered).toContain('Alice')
       expect(result!.rendered).toContain('30')
     })
 
-    it('returns null for unknown template', () => {
-      expect(renderTemplate('unknown', { x: 'y' })).toBeNull()
+    it('returns null for unknown template', async () => {
+      expect(await renderTemplate('unknown', { x: 'y' })).toBeNull()
     })
   })
 
   describe('Version History', () => {
-    it('tracks version changes', () => {
-      const tmpl = createTemplate({
+    it('tracks version changes', async () => {
+      const tmpl = await createTemplate({
         name: 'Version Test',
         description: 'test',
         appSlug: 'ps-ver',
         template: 'v1',
       })
-      updateTemplate(tmpl.id, { template: 'v2' })
-      updateTemplate(tmpl.id, { template: 'v3' })
-      const history = getVersionHistory(tmpl.id)
+      await updateTemplate(tmpl.id, { template: 'v2' })
+      await updateTemplate(tmpl.id, { template: 'v3' })
+      const history = await getVersionHistory(tmpl.id)
       expect(history.length).toBeGreaterThanOrEqual(3)
     })
   })
 
   describe('A/B Testing', () => {
-    it('createABTest creates a test in draft status', () => {
-      const t1 = createTemplate({ name: 'A', description: 'a', appSlug: 'ab-app', template: 'a' })
-      const t2 = createTemplate({ name: 'B', description: 'b', appSlug: 'ab-app', template: 'b' })
-      const ab = createABTest({
+    it('createABTest creates a test in draft status', async () => {
+      const t1 = await createTemplate({ name: 'A', description: 'a', appSlug: 'ab-app', template: 'a' })
+      const t2 = await createTemplate({ name: 'B', description: 'b', appSlug: 'ab-app', template: 'b' })
+      const ab = await createABTest({
         name: 'AB Test 1',
         appSlug: 'ab-app',
         variants: [
@@ -1022,10 +1183,10 @@ describe('Prompt Studio', () => {
       expect(ab.variants.length).toBe(2)
     })
 
-    it('startABTest changes status to running', () => {
-      const t1 = createTemplate({ name: 'C', description: 'c', appSlug: 'ab-start', template: 'c' })
-      const t2 = createTemplate({ name: 'D', description: 'd', appSlug: 'ab-start', template: 'd' })
-      const ab = createABTest({
+    it('startABTest changes status to running', async () => {
+      const t1 = await createTemplate({ name: 'C', description: 'c', appSlug: 'ab-start', template: 'c' })
+      const t2 = await createTemplate({ name: 'D', description: 'd', appSlug: 'ab-start', template: 'd' })
+      const ab = await createABTest({
         name: 'AB Start Test',
         appSlug: 'ab-start',
         variants: [
@@ -1033,15 +1194,15 @@ describe('Prompt Studio', () => {
           { name: 'V2', templateId: t2.id },
         ],
       })
-      expect(startABTest(ab.id)).toBe(true)
-      const found = getABTest(ab.id)
+      expect(await startABTest(ab.id)).toBe(true)
+      const found = await getABTest(ab.id)
       expect(found!.status).toBe('running')
     })
 
-    it('selectVariant returns a variant from a running test', () => {
-      const t1 = createTemplate({ name: 'E', description: 'e', appSlug: 'ab-sel', template: 'e' })
-      const t2 = createTemplate({ name: 'F', description: 'f', appSlug: 'ab-sel', template: 'f' })
-      const ab = createABTest({
+    it('selectVariant returns a variant from a running test', async () => {
+      const t1 = await createTemplate({ name: 'E', description: 'e', appSlug: 'ab-sel', template: 'e' })
+      const t2 = await createTemplate({ name: 'F', description: 'f', appSlug: 'ab-sel', template: 'f' })
+      const ab = await createABTest({
         name: 'AB Select Test',
         appSlug: 'ab-sel',
         variants: [
@@ -1049,24 +1210,24 @@ describe('Prompt Studio', () => {
           { name: 'V2', templateId: t2.id },
         ],
       })
-      startABTest(ab.id)
-      const variant = selectVariant(ab.id)
+      await startABTest(ab.id)
+      const variant = await selectVariant(ab.id)
       expect(variant).not.toBeNull()
       expect(variant!.name).toBeTruthy()
     })
 
-    it('getABTest returns null for unknown id', () => {
-      expect(getABTest('nonexistent')).toBeNull()
+    it('getABTest returns null for unknown id', async () => {
+      expect(await getABTest('nonexistent')).toBeNull()
     })
 
-    it('listABTests filters by appSlug', () => {
-      const t1 = createTemplate({ name: 'G', description: 'g', appSlug: 'ab-list-unique', template: 'g' })
-      createABTest({
+    it('listABTests filters by appSlug', async () => {
+      const t1 = await createTemplate({ name: 'G', description: 'g', appSlug: 'ab-list-unique', template: 'g' })
+      await createABTest({
         name: 'AB List Test',
         appSlug: 'ab-list-unique',
         variants: [{ name: 'V1', templateId: t1.id }],
       })
-      const tests = listABTests('ab-list-unique')
+      const tests = await listABTests('ab-list-unique')
       expect(tests.length).toBeGreaterThanOrEqual(1)
     })
   })

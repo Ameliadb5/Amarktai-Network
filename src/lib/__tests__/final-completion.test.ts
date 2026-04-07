@@ -347,18 +347,18 @@ describe('Capability Map — No Fake Badges', () => {
     expect(caps.length).toBe(mapKeys.length)
   })
 
-  it('at least 26 capabilities have backend routes (previously blocked ones now implemented)', () => {
+  it('at least 25 capabilities have backend routes (previously blocked ones now implemented)', () => {
     const available = Object.entries(BACKEND_ROUTE_EXISTS)
       .filter(([, v]) => v === true)
-    expect(available.length).toBeGreaterThanOrEqual(26)
+    expect(available.length).toBeGreaterThanOrEqual(25)
   })
 
-  it('exactly 1 capability has no backend route (adult_18plus_image — NOT IMPLEMENTED)', () => {
+  it('exactly 2 capabilities have no backend route (adult_18plus_image and image_editing — NOT IMPLEMENTED)', () => {
     const unavailable = Object.entries(BACKEND_ROUTE_EXISTS)
       .filter(([, v]) => v === false)
-    expect(unavailable.length).toBe(1)
+    expect(unavailable.length).toBe(2)
     const names = unavailable.map(([k]) => k).sort()
-    expect(names).toEqual(['adult_18plus_image'])
+    expect(names).toEqual(['adult_18plus_image', 'image_editing'])
   })
 
   it('getDetailedCapabilityStatus returns status for all capabilities', () => {
@@ -375,7 +375,7 @@ describe('Capability Map — No Fake Badges', () => {
   it('capabilities without routes show as unavailable', () => {
     const status = getDetailedCapabilityStatus()
     const noRoute = status.filter((s) => !s.routeExists)
-    expect(noRoute.length).toBe(1) // only adult_18plus_image
+    expect(noRoute.length).toBe(2) // adult_18plus_image and image_editing
     for (const entry of noRoute) {
       expect(entry.available).toBe(false)
     }

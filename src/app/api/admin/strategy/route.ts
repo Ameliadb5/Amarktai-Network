@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const appSlug = searchParams.get('app')
 
   if (appSlug) {
-    const strategy = getAppStrategy(appSlug)
+    const strategy = await getAppStrategy(appSlug)
     if (!strategy) {
       return NextResponse.json({ error: 'No strategy configured for this app', appSlug }, { status: 404 })
     }
@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    summary: getStrategySummary(),
-    strategies: getAllStrategies(),
+    summary: await getStrategySummary(),
+    strategies: await getAllStrategies(),
   })
 }
 
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         if (!appSlug || !appName) {
           return NextResponse.json({ error: 'appSlug and appName are required' }, { status: 400 })
         }
-        const strategy = initializeStrategy(appSlug, appName, appType ?? 'general')
+        const strategy = await initializeStrategy(appSlug, appName, appType ?? 'general')
         return NextResponse.json(strategy, { status: 201 })
       }
 
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         if (!appSlug || !kpis) {
           return NextResponse.json({ error: 'appSlug and kpis are required' }, { status: 400 })
         }
-        const strategy = updateKpis(appSlug, kpis)
+        const strategy = await updateKpis(appSlug, kpis)
         if (!strategy) return NextResponse.json({ error: 'Strategy not found' }, { status: 404 })
         return NextResponse.json(strategy)
       }
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         if (!appSlug || !goal) {
           return NextResponse.json({ error: 'appSlug and goal are required' }, { status: 400 })
         }
-        const strategy = addGoal(appSlug, goal)
+        const strategy = await addGoal(appSlug, goal)
         if (!strategy) return NextResponse.json({ error: 'Strategy not found' }, { status: 404 })
         return NextResponse.json(strategy)
       }
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         if (!appSlug || !goalId) {
           return NextResponse.json({ error: 'appSlug and goalId are required' }, { status: 400 })
         }
-        const removed = removeGoal(appSlug, goalId)
+        const removed = await removeGoal(appSlug, goalId)
         if (!removed) return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
         return NextResponse.json({ success: true })
       }
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         if (!appSlug) {
           return NextResponse.json({ error: 'appSlug is required' }, { status: 400 })
         }
-        const recs = generateRecommendations(appSlug, outcomeData)
+        const recs = await generateRecommendations(appSlug, outcomeData)
         return NextResponse.json({ recommendations: recs })
       }
 
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         if (!appSlug || !state) {
           return NextResponse.json({ error: 'appSlug and state are required' }, { status: 400 })
         }
-        const ok = setStrategyState(appSlug, state)
+        const ok = await setStrategyState(appSlug, state)
         if (!ok) return NextResponse.json({ error: 'Strategy not found' }, { status: 404 })
         return NextResponse.json({ success: true })
       }

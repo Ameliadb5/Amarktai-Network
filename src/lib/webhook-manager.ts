@@ -67,64 +67,103 @@ export interface WebhookDeliveryResult {
   latencyMs: number
 }
 
-// ── In-Memory Registry (production would use DB) ─────────────────────────────
+// ── DB Store (replaces in-memory Maps) ───────────────────────────────────────
 
-const registrations = new Map<string, WebhookRegistration>()
-const deliveryLog: WebhookDelivery[] = []
+import { prisma } from './prisma'
 
 const MAX_DELIVERY_LOG = 1000
 const MAX_RETRY_ATTEMPTS = 5
 const RETRY_DELAYS_MS = [1000, 5000, 30000, 120000, 600000] // 1s, 5s, 30s, 2m, 10m
 
+function rowToRegistration(row: {
+  id: string
+  appSlug: string
+  url: string
+  secret: string
+  events: string
+  active: boolean
+  metadata: string
+  createdAt: Date
+}): WebhookRegistration {
+  return {
+    id: row.id,
+    appSlug: row.appSlug,
+    url: row.url,
+    secret: row.secret,
+    events: JSON.parse(row.events) as WebhookEventType[],
+    active: row.active,
+    createdAt: row.createdAt,
+    metadata: JSON.parse(row.metadata) as Record<string, unknown>,
+  }
+}
+
 // ── Registration ─────────────────────────────────────────────────────────────
 
 /** Register a new webhook endpoint. */
-export function registerWebhook(
+export async function registerWebhook(
   appSlug: string,
   url: string,
   events: WebhookEventType[],
   metadata?: Record<string, unknown>,
-): WebhookRegistration {
+): Promise<WebhookRegistration> {
   if (!url.startsWith('https://')) {
     throw new Error('Webhook URL must use HTTPS')
   }
 
-  const registration: WebhookRegistration = {
-    id: randomUUID(),
-    appSlug,
-    url,
-    secret: randomUUID(),
-    events,
-    active: true,
-    createdAt: new Date(),
-    metadata,
-  }
-
-  registrations.set(registration.id, registration)
-  return registration
+  const row = await prisma.webhookRegistrationRecord.create({
+    data: {
+      id: randomUUID(),
+      appSlug,
+      url,
+      secret: randomUUID(),
+      events: JSON.stringify(events),
+      active: true,
+      metadata: JSON.stringify(metadata ?? {}),
+    },
+  })
+  return rowToRegistration(row)
 }
 
 /** Unregister a webhook. */
-export function unregisterWebhook(id: string): boolean {
-  return registrations.delete(id)
+export async function unregisterWebhook(id: string): Promise<boolean> {
+  try {
+    await prisma.webhookRegistrationRecord.delete({ where: { id } })
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Get all webhooks for an app. */
-export function getWebhooksForApp(appSlug: string): WebhookRegistration[] {
-  return Array.from(registrations.values()).filter((w) => w.appSlug === appSlug && w.active)
+export async function getWebhooksForApp(appSlug: string): Promise<WebhookRegistration[]> {
+  try {
+    const rows = await prisma.webhookRegistrationRecord.findMany({
+      where: { appSlug, active: true },
+    })
+    return rows.map(rowToRegistration)
+  } catch {
+    return []
+  }
 }
 
 /** Get a specific webhook by ID. */
-export function getWebhook(id: string): WebhookRegistration | undefined {
-  return registrations.get(id)
+export async function getWebhook(id: string): Promise<WebhookRegistration | undefined> {
+  try {
+    const row = await prisma.webhookRegistrationRecord.findUnique({ where: { id } })
+    return row ? rowToRegistration(row) : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** Update webhook active status. */
-export function setWebhookActive(id: string, active: boolean): boolean {
-  const webhook = registrations.get(id)
-  if (!webhook) return false
-  webhook.active = active
-  return true
+export async function setWebhookActive(id: string, active: boolean): Promise<boolean> {
+  try {
+    await prisma.webhookRegistrationRecord.update({ where: { id }, data: { active } })
+    return true
+  } catch {
+    return false
+  }
 }
 
 // ── Signature Generation ─────────────────────────────────────────────────────
@@ -182,17 +221,7 @@ async function deliverToEndpoint(
     }
 
     // Log delivery
-    logDelivery({
-      id: deliveryId,
-      webhookId: registration.id,
-      eventId: event.id,
-      url: registration.url,
-      status: success ? 'success' : 'failed',
-      statusCode: res.status,
-      attempts: 1,
-      maxAttempts: MAX_RETRY_ATTEMPTS,
-      lastAttemptAt: new Date(),
-    })
+    logDelivery(registration.id, event, deliveryId, true, res.status, undefined, Date.now() - start)
 
     return result
   } catch (err) {
@@ -203,27 +232,35 @@ async function deliverToEndpoint(
       latencyMs: Date.now() - start,
     }
 
-    logDelivery({
-      id: deliveryId,
-      webhookId: registration.id,
-      eventId: event.id,
-      url: registration.url,
-      status: 'failed',
-      attempts: 1,
-      maxAttempts: MAX_RETRY_ATTEMPTS,
-      lastAttemptAt: new Date(),
-      error: result.error,
-    })
+    logDelivery(registration.id, event, deliveryId, false, undefined, result.error, Date.now() - start)
 
     return result
   }
 }
 
-function logDelivery(delivery: WebhookDelivery): void {
-  deliveryLog.push(delivery)
-  if (deliveryLog.length > MAX_DELIVERY_LOG) {
-    deliveryLog.splice(0, deliveryLog.length - MAX_DELIVERY_LOG)
-  }
+function logDelivery(
+  webhookId: string,
+  event: WebhookEvent,
+  deliveryId: string,
+  success: boolean,
+  statusCode: number | undefined,
+  error: string | undefined,
+  _latencyMs: number,
+): void {
+  prisma.webhookDeliveryRecord.create({
+    data: {
+      webhookId,
+      eventId: event.id,
+      eventType: event.type,
+      url: '', // populated by caller if needed; kept for referential integrity
+      status: success ? 'success' : 'failed',
+      statusCode: statusCode ?? null,
+      attempts: 1,
+      maxAttempts: MAX_RETRY_ATTEMPTS,
+      lastAttemptAt: new Date(),
+      error: error ?? null,
+    },
+  }).catch(() => { /* non-critical logging */ })
 }
 
 // ── Event Dispatching ────────────────────────────────────────────────────────
@@ -245,7 +282,7 @@ export async function dispatchEvent(
     data,
   }
 
-  const webhooks = getWebhooksForApp(appSlug).filter((w) => w.events.includes(eventType))
+  const webhooks = (await getWebhooksForApp(appSlug)).filter((w) => w.events.includes(eventType))
   if (webhooks.length === 0) return { delivered: 0, failed: 0, queued: 0 }
 
   let delivered = 0
@@ -285,32 +322,49 @@ export async function dispatchEvent(
 // ── Delivery Log Access ──────────────────────────────────────────────────────
 
 /** Get recent deliveries for a webhook. */
-export function getDeliveryLog(webhookId?: string, limit: number = 50): WebhookDelivery[] {
-  let log = deliveryLog
-  if (webhookId) {
-    log = log.filter((d) => d.webhookId === webhookId)
+export async function getDeliveryLog(webhookId?: string, limit: number = 50): Promise<WebhookDelivery[]> {
+  try {
+    const rows = await prisma.webhookDeliveryRecord.findMany({
+      where: webhookId ? { webhookId } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(limit, MAX_DELIVERY_LOG),
+    })
+    return rows.map((r) => ({
+      id: String(r.id),
+      webhookId: r.webhookId,
+      eventId: r.eventId,
+      url: r.url,
+      status: r.status as WebhookDelivery['status'],
+      statusCode: r.statusCode ?? undefined,
+      attempts: r.attempts,
+      maxAttempts: r.maxAttempts,
+      lastAttemptAt: r.lastAttemptAt ?? undefined,
+      nextRetryAt: r.nextRetryAt ?? undefined,
+      error: r.error ?? undefined,
+    }))
+  } catch {
+    return []
   }
-  return log.slice(-limit)
 }
 
 /** Get delivery statistics. */
-export function getDeliveryStats(): {
+export async function getDeliveryStats(): Promise<{
   total: number
   successful: number
   failed: number
   pending: number
   successRate: number
-} {
-  const total = deliveryLog.length
-  const successful = deliveryLog.filter((d) => d.status === 'success').length
-  const failed = deliveryLog.filter((d) => d.status === 'failed').length
-  const pending = deliveryLog.filter((d) => d.status === 'pending' || d.status === 'retrying').length
-  return {
-    total,
-    successful,
-    failed,
-    pending,
-    successRate: total > 0 ? successful / total : 0,
+}> {
+  try {
+    const [total, successful, failed, pending] = await Promise.all([
+      prisma.webhookDeliveryRecord.count(),
+      prisma.webhookDeliveryRecord.count({ where: { status: 'success' } }),
+      prisma.webhookDeliveryRecord.count({ where: { status: 'failed' } }),
+      prisma.webhookDeliveryRecord.count({ where: { status: { in: ['pending', 'retrying'] } } }),
+    ])
+    return { total, successful, failed, pending, successRate: total > 0 ? successful / total : 0 }
+  } catch {
+    return { total: 0, successful: 0, failed: 0, pending: 0, successRate: 0 }
   }
 }
 

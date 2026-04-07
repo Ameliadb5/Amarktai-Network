@@ -9,7 +9,67 @@
  *  - Connector SDK (class structure, snippet generation)
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+
+// Prisma mock for strategy-engine
+vi.mock('../prisma', () => {
+  type Row = Record<string, unknown>
+  function makeTable(pk: string) {
+    const store = new Map<unknown, Row>()
+    let intPk = 1
+    function resolveWhere(where: Row): Row | undefined {
+      for (const [, row] of store) {
+        if (Object.entries(where).every(([k, v]) => row[k] === v)) return row
+      }
+    }
+    return {
+      store,
+      async create({ data }: { data: Row }) {
+        const clean: Row = { ...data }
+        if (!clean[pk]) clean[pk] = intPk++
+        clean.createdAt = clean.createdAt ?? new Date()
+        clean.updatedAt = clean.updatedAt ?? new Date()
+        store.set(clean[pk], clean)
+        return clean
+      },
+      async findUnique({ where }: { where: Row }) {
+        return store.get(where[pk]) ?? null
+      },
+      async findMany({ where }: { where?: Row } = {}) {
+        const rows: Row[] = []
+        for (const [, row] of store) {
+          if (!where || Object.entries(where).every(([k, v]) => row[k] === v)) rows.push(row)
+        }
+        return rows
+      },
+      async update({ where, data }: { where: Row; data: Row }) {
+        const existing = (where[pk] !== undefined ? store.get(where[pk]) : resolveWhere(where)) as Row
+        if (!existing) throw new Error('Not found')
+        Object.assign(existing, { ...data, updatedAt: new Date() })
+        return existing
+      },
+      async upsert({ where, create, update: upd }: { where: Row; create: Row; update: Row }) {
+        const key = where[pk]
+        const existing = key !== undefined ? store.get(key) : resolveWhere(where)
+        if (existing) { Object.assign(existing as object, { ...upd, updatedAt: new Date() }); return existing }
+        const row = { ...create, [pk]: create[pk] ?? intPk++, createdAt: new Date(), updatedAt: new Date() }
+        store.set(row[pk], row)
+        return row
+      },
+      async delete({ where }: { where: Row }) {
+        store.delete(where[pk])
+        return {}
+      },
+      async deleteMany() { store.clear(); return { count: 0 } },
+    }
+  }
+  return {
+    prisma: {
+      appStrategyRecord: makeTable('appSlug'),
+      aiProvider: { findMany: () => Promise.resolve([]) },
+    },
+  }
+})
 import {
   classifyCapabilities,
   resolveCapabilityRoutes,
@@ -372,13 +432,13 @@ describe('Capability Engine', () => {
  * ================================================================ */
 
 describe('Strategy Engine', () => {
-  beforeEach(() => {
-    resetStrategies()
+  beforeEach(async () => {
+    await resetStrategies()
   })
 
   describe('initializeStrategy', () => {
-    it('creates strategy with template goals and KPIs for marketing app', () => {
-      const strategy = initializeStrategy('app1', 'Marketing App', 'marketing')
+    it('creates strategy with template goals and KPIs for marketing app', async () => {
+      const strategy = await initializeStrategy('app1', 'Marketing App', 'marketing')
       expect(strategy.appSlug).toBe('app1')
       expect(strategy.appType).toBe('marketing')
       expect(strategy.goals.length).toBeGreaterThan(0)
@@ -386,63 +446,63 @@ describe('Strategy Engine', () => {
       expect(strategy.strategyState).toBe('setup')
     })
 
-    it('creates strategy with general template for unknown app type', () => {
-      const strategy = initializeStrategy('app2', 'My App', 'unknown_type')
+    it('creates strategy with general template for unknown app type', async () => {
+      const strategy = await initializeStrategy('app2', 'My App', 'unknown_type')
       expect(strategy.goals.length).toBeGreaterThan(0)
       expect(strategy.kpis.length).toBeGreaterThan(0)
     })
 
-    it('creates strategy with support template', () => {
-      const strategy = initializeStrategy('support1', 'Help Desk', 'support')
+    it('creates strategy with support template', async () => {
+      const strategy = await initializeStrategy('support1', 'Help Desk', 'support')
       expect(strategy.goals.some(g => g.metric === 'unresolved_tickets')).toBe(true)
       expect(strategy.kpis.some(k => k.metric === 'csat')).toBe(true)
     })
 
-    it('creates strategy with trading template', () => {
-      const strategy = initializeStrategy('trade1', 'Trading Bot', 'trading')
+    it('creates strategy with trading template', async () => {
+      const strategy = await initializeStrategy('trade1', 'Trading Bot', 'trading')
       expect(strategy.goals.some(g => g.metric === 'decision_accuracy')).toBe(true)
     })
   })
 
   describe('getAppStrategy', () => {
-    it('returns null for non-existent app', () => {
-      expect(getAppStrategy('nonexistent')).toBeNull()
+    it('returns null for non-existent app', async () => {
+      expect(await getAppStrategy('nonexistent')).toBeNull()
     })
 
-    it('returns initialized strategy', () => {
-      initializeStrategy('app1', 'My App', 'general')
-      const strategy = getAppStrategy('app1')
+    it('returns initialized strategy', async () => {
+      await initializeStrategy('app1', 'My App', 'general')
+      const strategy = await getAppStrategy('app1')
       expect(strategy).not.toBeNull()
       expect(strategy!.appSlug).toBe('app1')
     })
   })
 
   describe('updateKpis', () => {
-    it('updates KPI current values and computes status', () => {
-      initializeStrategy('app1', 'My App', 'general')
-      const updated = updateKpis('app1', { task_success_rate: 98 })
+    it('updates KPI current values and computes status', async () => {
+      await initializeStrategy('app1', 'My App', 'general')
+      const updated = await updateKpis('app1', { task_success_rate: 98 })
       expect(updated).not.toBeNull()
       const kpi = updated!.kpis.find(k => k.metric === 'task_success_rate')
       expect(kpi!.currentValue).toBe(98)
       expect(kpi!.status).toBe('achieved')
     })
 
-    it('marks KPI as behind when far from target', () => {
-      initializeStrategy('app1', 'My App', 'general')
-      const updated = updateKpis('app1', { task_success_rate: 30 })
+    it('marks KPI as behind when far from target', async () => {
+      await initializeStrategy('app1', 'My App', 'general')
+      const updated = await updateKpis('app1', { task_success_rate: 30 })
       const kpi = updated!.kpis.find(k => k.metric === 'task_success_rate')
       expect(kpi!.status).toBe('behind')
     })
 
-    it('returns null for unknown app', () => {
-      expect(updateKpis('nonexistent', { x: 1 })).toBeNull()
+    it('returns null for unknown app', async () => {
+      expect(await updateKpis('nonexistent', { x: 1 })).toBeNull()
     })
   })
 
   describe('goals management', () => {
-    it('adds a custom goal', () => {
-      initializeStrategy('app1', 'My App', 'general')
-      const updated = addGoal('app1', {
+    it('adds a custom goal', async () => {
+      await initializeStrategy('app1', 'My App', 'general')
+      const updated = await addGoal('app1', {
         label: 'Custom Goal',
         metric: 'custom',
         targetValue: 100,
@@ -453,32 +513,32 @@ describe('Strategy Engine', () => {
       expect(updated!.goals.some(g => g.label === 'Custom Goal')).toBe(true)
     })
 
-    it('removes a goal', () => {
-      initializeStrategy('app1', 'My App', 'general')
-      const strategy = getAppStrategy('app1')!
+    it('removes a goal', async () => {
+      await initializeStrategy('app1', 'My App', 'general')
+      const strategy = (await getAppStrategy('app1'))!
       const goalId = strategy.goals[0].id
-      expect(removeGoal('app1', goalId)).toBe(true)
-      expect(getAppStrategy('app1')!.goals.find(g => g.id === goalId)).toBeUndefined()
+      expect(await removeGoal('app1', goalId)).toBe(true)
+      expect((await getAppStrategy('app1'))!.goals.find(g => g.id === goalId)).toBeUndefined()
     })
 
-    it('returns false when removing nonexistent goal', () => {
-      initializeStrategy('app1', 'My App', 'general')
-      expect(removeGoal('app1', 'fake_id')).toBe(false)
+    it('returns false when removing nonexistent goal', async () => {
+      await initializeStrategy('app1', 'My App', 'general')
+      expect(await removeGoal('app1', 'fake_id')).toBe(false)
     })
   })
 
   describe('generateRecommendations', () => {
-    it('generates recommendations based on KPI state', () => {
-      initializeStrategy('app1', 'My App', 'general')
-      updateKpis('app1', { task_success_rate: 30 })
-      const recs = generateRecommendations('app1')
+    it('generates recommendations based on KPI state', async () => {
+      await initializeStrategy('app1', 'My App', 'general')
+      await updateKpis('app1', { task_success_rate: 30 })
+      const recs = await generateRecommendations('app1')
       expect(recs.length).toBeGreaterThan(0)
       expect(recs.some(r => r.title.includes('behind'))).toBe(true)
     })
 
-    it('generates recommendations from outcome data', () => {
-      initializeStrategy('app1', 'My App', 'general')
-      const recs = generateRecommendations('app1', {
+    it('generates recommendations from outcome data', async () => {
+      await initializeStrategy('app1', 'My App', 'general')
+      const recs = await generateRecommendations('app1', {
         successRate: 70,
         fallbackRate: 25,
         avgLatencyMs: 3000,
@@ -486,33 +546,33 @@ describe('Strategy Engine', () => {
       expect(recs.some(r => r.type === 'routing')).toBe(true)
     })
 
-    it('returns empty for unknown app', () => {
-      expect(generateRecommendations('nonexistent')).toEqual([])
+    it('returns empty for unknown app', async () => {
+      expect(await generateRecommendations('nonexistent')).toEqual([])
     })
   })
 
   describe('strategy state and summary', () => {
-    it('sets strategy state', () => {
-      initializeStrategy('app1', 'My App', 'general')
-      expect(setStrategyState('app1', 'active')).toBe(true)
-      expect(getAppStrategy('app1')!.strategyState).toBe('active')
+    it('sets strategy state', async () => {
+      await initializeStrategy('app1', 'My App', 'general')
+      expect(await setStrategyState('app1', 'active')).toBe(true)
+      expect((await getAppStrategy('app1'))!.strategyState).toBe('active')
     })
 
-    it('returns false for unknown app', () => {
-      expect(setStrategyState('nonexistent', 'active')).toBe(false)
+    it('returns false for unknown app', async () => {
+      expect(await setStrategyState('nonexistent', 'active')).toBe(false)
     })
 
-    it('provides summary across all strategies', () => {
-      initializeStrategy('app1', 'App 1', 'general')
-      initializeStrategy('app2', 'App 2', 'marketing')
-      const summary = getStrategySummary()
+    it('provides summary across all strategies', async () => {
+      await initializeStrategy('app1', 'App 1', 'general')
+      await initializeStrategy('app2', 'App 2', 'marketing')
+      const summary = await getStrategySummary()
       expect(summary.totalApps).toBe(2)
     })
 
-    it('lists all strategies', () => {
-      initializeStrategy('app1', 'App 1', 'general')
-      initializeStrategy('app2', 'App 2', 'support')
-      expect(getAllStrategies()).toHaveLength(2)
+    it('lists all strategies', async () => {
+      await initializeStrategy('app1', 'App 1', 'general')
+      await initializeStrategy('app2', 'App 2', 'support')
+      expect(await getAllStrategies()).toHaveLength(2)
     })
   })
 })

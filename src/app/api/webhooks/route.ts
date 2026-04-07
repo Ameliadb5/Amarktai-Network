@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       if (!url || !events?.length) {
         return NextResponse.json({ error: 'url and events required' }, { status: 400 })
       }
-      const webhook = registerWebhook(
+      const webhook = await registerWebhook(
         appSlug || 'default',
         url,
         events as WebhookEventType[],
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       if (!webhookId) {
         return NextResponse.json({ error: 'webhookId required' }, { status: 400 })
       }
-      const removed = unregisterWebhook(webhookId)
+      const removed = await unregisterWebhook(webhookId)
       return NextResponse.json({ success: removed })
     }
 
@@ -62,9 +62,9 @@ export async function GET(req: NextRequest) {
     const appSlug = searchParams.get('appSlug') || 'default'
     const webhookId = searchParams.get('webhookId')
 
-    const webhooks = getWebhooksForApp(appSlug)
-    const stats = getDeliveryStats()
-    const deliveries = getDeliveryLog(webhookId || undefined, 50)
+    const webhooks = await getWebhooksForApp(appSlug)
+    const stats = await getDeliveryStats()
+    const deliveries = await getDeliveryLog(webhookId || undefined, 50)
 
     return NextResponse.json({ webhooks, stats, deliveries })
   } catch (err) {

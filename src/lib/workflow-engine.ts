@@ -84,66 +84,149 @@ export interface StepResult {
 
 // ── Storage ──────────────────────────────────────────────────────────────────
 
-const workflows = new Map<string, Workflow>()
-const workflowRuns = new Map<string, WorkflowRun>()
+import { prisma } from './prisma'
+
+// ── DB Helpers ───────────────────────────────────────────────────────────────
+
+function stepsToMap(stepsJson: string): Map<string, WorkflowStep> {
+  try {
+    const obj = JSON.parse(stepsJson) as Record<string, WorkflowStep>
+    return new Map(Object.entries(obj))
+  } catch {
+    return new Map()
+  }
+}
+
+function mapToStepsJson(steps: Map<string, WorkflowStep>): string {
+  const obj: Record<string, WorkflowStep> = {}
+  for (const [k, v] of steps) obj[k] = v
+  return JSON.stringify(obj)
+}
+
+function rowToWorkflow(row: {
+  id: string
+  name: string
+  description: string
+  appSlug: string
+  version: number
+  steps: string
+  entryStepId: string
+  status: string
+  metadata: string
+  createdAt: Date
+  updatedAt: Date
+}): Workflow {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    appSlug: row.appSlug,
+    version: row.version,
+    steps: stepsToMap(row.steps),
+    entryStepId: row.entryStepId,
+    status: row.status as Workflow['status'],
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    metadata: JSON.parse(row.metadata) as Record<string, unknown>,
+  }
+}
+
+function rowToRun(row: {
+  id: string
+  workflowId: string
+  status: string
+  input: string
+  output: string | null
+  stepResults: string
+  startedAt: Date
+  completedAt: Date | null
+  totalLatency: number
+  error: string | null
+}): WorkflowRun {
+  const stepResultsObj = JSON.parse(row.stepResults) as Record<string, StepResult>
+  return {
+    id: row.id,
+    workflowId: row.workflowId,
+    status: row.status as WorkflowRun['status'],
+    input: JSON.parse(row.input),
+    output: row.output ? JSON.parse(row.output) : null,
+    stepResults: new Map(Object.entries(stepResultsObj)),
+    startedAt: row.startedAt.toISOString(),
+    completedAt: row.completedAt?.toISOString(),
+    totalLatencyMs: row.totalLatency,
+    error: row.error ?? undefined,
+  }
+}
 
 // ── Workflow CRUD ────────────────────────────────────────────────────────────
 
 /** Create a new workflow. */
-export function createWorkflow(input: {
+export async function createWorkflow(input: {
   name: string
   description: string
   appSlug: string
   steps: WorkflowStep[]
   entryStepId: string
-}): Workflow {
+}): Promise<Workflow> {
   const id = randomUUID()
-  const now = new Date().toISOString()
   const stepMap = new Map<string, WorkflowStep>()
   for (const step of input.steps) {
     stepMap.set(step.id, step)
   }
 
-  const workflow: Workflow = {
-    id,
-    name: input.name,
-    description: input.description,
-    appSlug: input.appSlug,
-    version: 1,
-    steps: stepMap,
-    entryStepId: input.entryStepId,
-    status: 'draft',
-    createdAt: now,
-    updatedAt: now,
-    metadata: {},
-  }
-
-  workflows.set(id, workflow)
-  return workflow
+  const row = await prisma.workflowDefinition.create({
+    data: {
+      id,
+      name: input.name,
+      description: input.description,
+      appSlug: input.appSlug,
+      steps: mapToStepsJson(stepMap),
+      entryStepId: input.entryStepId,
+      status: 'draft',
+      metadata: '{}',
+    },
+  })
+  return rowToWorkflow(row)
 }
 
 /** Get a workflow by ID. */
-export function getWorkflow(id: string): Workflow | null {
-  return workflows.get(id) ?? null
+export async function getWorkflow(id: string): Promise<Workflow | null> {
+  try {
+    const row = await prisma.workflowDefinition.findUnique({ where: { id } })
+    return row ? rowToWorkflow(row) : null
+  } catch {
+    return null
+  }
 }
 
 /** List workflows for an app. */
-export function listWorkflows(appSlug: string): Workflow[] {
-  return Array.from(workflows.values()).filter((w) => w.appSlug === appSlug)
+export async function listWorkflows(appSlug: string): Promise<Workflow[]> {
+  try {
+    const rows = await prisma.workflowDefinition.findMany({ where: { appSlug } })
+    return rows.map(rowToWorkflow)
+  } catch {
+    return []
+  }
 }
 
 /** Activate a workflow. */
-export function activateWorkflow(id: string): boolean {
-  const wf = workflows.get(id)
-  if (!wf) return false
-  wf.status = 'active'
-  wf.updatedAt = new Date().toISOString()
-  return true
+export async function activateWorkflow(id: string): Promise<boolean> {
+  try {
+    await prisma.workflowDefinition.update({ where: { id }, data: { status: 'active' } })
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Delete a workflow. */
-export function deleteWorkflow(id: string): boolean {
-  return workflows.delete(id)
+export async function deleteWorkflow(id: string): Promise<boolean> {
+  try {
+    await prisma.workflowDefinition.delete({ where: { id } })
+    return true
+  } catch {
+    return false
+  }
 }
 
 // ── Step Execution ───────────────────────────────────────────────────────────
@@ -261,31 +344,37 @@ export async function executeWorkflow(
   workflowId: string,
   input: unknown,
 ): Promise<WorkflowRun> {
-  const workflow = workflows.get(workflowId)
+  const workflow = await getWorkflow(workflowId)
   if (!workflow) {
     throw new Error(`Workflow "${workflowId}" not found`)
   }
 
-  const run: WorkflowRun = {
-    id: randomUUID(),
-    workflowId,
-    status: 'running',
-    input,
-    output: null,
-    stepResults: new Map(),
-    startedAt: new Date().toISOString(),
-    totalLatencyMs: 0,
-  }
-  workflowRuns.set(run.id, run)
+  const runId = randomUUID()
+  const runStart = Date.now()
+
+  // Create the run record in DB immediately so status is visible
+  await prisma.workflowRun.create({
+    data: {
+      id: runId,
+      workflowId,
+      status: 'running',
+      input: JSON.stringify(input),
+      stepResults: '{}',
+    },
+  })
+
+  const stepResultsMap = new Map<string, StepResult>()
 
   const context: ExecutionContext = {
     workflowId,
-    runId: run.id,
+    runId,
     variables: {},
-    results: run.stepResults,
+    results: stepResultsMap,
   }
 
-  const runStart = Date.now()
+  let runStatus: WorkflowRun['status'] = 'running'
+  let runOutput: unknown = null
+  let runError: string | undefined
 
   try {
     let currentStepId: string | undefined = workflow.entryStepId
@@ -313,7 +402,6 @@ export async function executeWorkflow(
       }
 
       try {
-        // Handle parallel steps
         if (step.type === 'parallel' && step.parallelSteps) {
           const parallelResults = await Promise.allSettled(
             step.parallelSteps.map(async (stepId) => {
@@ -326,9 +414,7 @@ export async function executeWorkflow(
           currentInput = parallelResults.map((r) =>
             r.status === 'fulfilled' ? r.value : { error: r.reason?.message ?? 'Failed' },
           )
-        }
-        // Handle loop steps
-        else if (step.type === 'loop' && step.loopStepId && Array.isArray(currentInput)) {
+        } else if (step.type === 'loop' && step.loopStepId && Array.isArray(currentInput)) {
           const loopStep = workflow.steps.get(step.loopStepId)
           if (!loopStep) throw new Error(`Loop step "${step.loopStepId}" not found`)
           const executor = stepExecutors[loopStep.type]
@@ -337,9 +423,7 @@ export async function executeWorkflow(
             results.push(await executor(loopStep, item, context))
           }
           currentInput = results
-        }
-        // Normal step execution
-        else {
+        } else {
           const executor = stepExecutors[step.type]
           currentInput = await executor(step, currentInput, context)
         }
@@ -354,9 +438,7 @@ export async function executeWorkflow(
         stepResult.latencyMs = Date.now() - stepStart
         stepResult.completedAt = new Date().toISOString()
 
-        // Retry logic
         if (step.retries && step.retries > 0) {
-          // Simple retry (decrement and try again)
           step.retries--
           continue
         }
@@ -364,9 +446,8 @@ export async function executeWorkflow(
         throw err
       }
 
-      run.stepResults.set(step.id, stepResult)
+      stepResultsMap.set(step.id, stepResult)
 
-      // Determine next step
       if (step.type === 'condition' && step.branches) {
         const condResult = context.variables._conditionResult
         const branch = step.branches.find((b) =>
@@ -378,28 +459,66 @@ export async function executeWorkflow(
       }
     }
 
-    run.output = currentInput
-    run.status = 'completed'
+    runOutput = currentInput
+    runStatus = 'completed'
   } catch (err) {
-    run.status = 'failed'
-    run.error = err instanceof Error ? err.message : 'Workflow execution failed'
+    runStatus = 'failed'
+    runError = err instanceof Error ? err.message : 'Workflow execution failed'
   }
 
-  run.completedAt = new Date().toISOString()
-  run.totalLatencyMs = Date.now() - runStart
-  return run
+  const totalLatencyMs = Date.now() - runStart
+
+  // Persist final results to DB
+  const stepResultsObj: Record<string, StepResult> = {}
+  for (const [k, v] of stepResultsMap) stepResultsObj[k] = v
+
+  await prisma.workflowRun.update({
+    where: { id: runId },
+    data: {
+      status: runStatus,
+      output: JSON.stringify(runOutput),
+      stepResults: JSON.stringify(stepResultsObj),
+      completedAt: new Date(),
+      totalLatency: totalLatencyMs,
+      error: runError ?? null,
+    },
+  })
+
+  return {
+    id: runId,
+    workflowId,
+    status: runStatus,
+    input,
+    output: runOutput,
+    stepResults: stepResultsMap,
+    startedAt: new Date(Date.now() - totalLatencyMs).toISOString(),
+    completedAt: new Date().toISOString(),
+    totalLatencyMs,
+    error: runError,
+  }
 }
 
 /** Get a workflow run by ID. */
-export function getWorkflowRun(runId: string): WorkflowRun | null {
-  return workflowRuns.get(runId) ?? null
+export async function getWorkflowRun(runId: string): Promise<WorkflowRun | null> {
+  try {
+    const row = await prisma.workflowRun.findUnique({ where: { id: runId } })
+    return row ? rowToRun(row) : null
+  } catch {
+    return null
+  }
 }
 
 /** List runs for a workflow. */
-export function listWorkflowRuns(workflowId: string): WorkflowRun[] {
-  return Array.from(workflowRuns.values())
-    .filter((r) => r.workflowId === workflowId)
-    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+export async function listWorkflowRuns(workflowId: string): Promise<WorkflowRun[]> {
+  try {
+    const rows = await prisma.workflowRun.findMany({
+      where: { workflowId },
+      orderBy: { startedAt: 'desc' },
+    })
+    return rows.map(rowToRun)
+  } catch {
+    return []
+  }
 }
 
 // ── Exports for Testing ──────────────────────────────────────────────────────

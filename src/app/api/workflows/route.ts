@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
           { status: 400 },
         )
       }
-      const workflow = createWorkflow({
+      const workflow = await createWorkflow({
         name,
         description: description || '',
         appSlug: appSlug || 'default',
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       if (!workflowId) {
         return NextResponse.json({ error: 'workflowId required' }, { status: 400 })
       }
-      const deleted = deleteWorkflow(workflowId)
+      const deleted = await deleteWorkflow(workflowId)
       return NextResponse.json({ success: deleted })
     }
 
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     const appSlug = searchParams.get('appSlug') || 'default'
 
     if (runId) {
-      const run = getWorkflowRun(runId)
+      const run = await getWorkflowRun(runId)
       if (!run) {
         return NextResponse.json({ error: 'Workflow run not found' }, { status: 404 })
       }
@@ -76,15 +76,15 @@ export async function GET(req: NextRequest) {
     }
 
     if (workflowId) {
-      const workflow = getWorkflow(workflowId)
+      const workflow = await getWorkflow(workflowId)
       if (!workflow) {
         return NextResponse.json({ error: 'Workflow not found' }, { status: 404 })
       }
-      const runs = listWorkflowRuns(workflowId)
+      const runs = await listWorkflowRuns(workflowId)
       return NextResponse.json({ workflow, runs })
     }
 
-    const workflows = listWorkflows(appSlug)
+    const workflows = await listWorkflows(appSlug)
     return NextResponse.json({ workflows })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to list workflows'

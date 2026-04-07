@@ -7,7 +7,255 @@
  * Tests cover exports, type integrity, core logic, and edge cases.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+
+// ── Mocks (must use vi.mock with self-contained factories) ────────────────────
+
+// Also mock redis/cache so federated-memory doesn't fail on redis connection
+vi.mock('../cache', () => ({
+  cacheGet: vi.fn().mockResolvedValue(null),
+  cacheSet: vi.fn().mockResolvedValue(undefined),
+  cacheDel: vi.fn().mockResolvedValue(undefined),
+}))
+
+// Mock vector DB calls used by federated-memory
+vi.mock('../qdrant', () => ({
+  upsertVectors: vi.fn().mockResolvedValue(undefined),
+  searchVectors: vi.fn().mockResolvedValue([]),
+  ensureCollection: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('../embeddings', () => ({
+  generateEmbedding: vi.fn().mockResolvedValue(null),
+}))
+
+// Prisma mock — in-memory tables for all new models (factory is self-contained to avoid hoisting issues)
+vi.mock('../prisma', () => {
+  type Row = Record<string, unknown>
+
+  function makeTable(pk: string) {
+    const store = new Map<unknown, Row>()
+    let intPk = 1
+
+    function resolveWhere(where: Row): Row | undefined {
+      for (const [, row] of store) {
+        const match = Object.entries(where).every(([k, v]) => {
+          const rv = row[k]
+          if (v !== null && typeof v === 'object' && 'in' in (v as object)) return ((v as { in: unknown[] }).in).includes(rv)
+          return rv === v
+        })
+        if (match) return row
+      }
+    }
+
+    return {
+      store,
+      async create({ data }: { data: Row }) {
+        const clean: Row = {}
+        for (const [k, v] of Object.entries(data)) {
+          if (v && typeof v === 'object' && ('create' in (v as object))) continue
+          clean[k] = v
+        }
+        if (!clean[pk]) clean[pk] = intPk++
+        clean.createdAt = clean.createdAt ?? new Date()
+        clean.updatedAt = clean.updatedAt ?? new Date()
+        store.set(clean[pk], clean)
+        return clean
+      },
+      async findUnique({ where }: { where: Row; include?: unknown }) {
+        const key = where[pk]
+        if (key !== undefined) return store.get(key) ?? null
+        return resolveWhere(where) ?? null
+      },
+      async findFirst({ where }: { where?: Row }) {
+        if (!where) return (store.values().next().value as Row | undefined) ?? null
+        return resolveWhere(where) ?? null
+      },
+      async findMany({ where, orderBy: _ob, take: _t }: { where?: Row; orderBy?: unknown; take?: number } = {}) {
+        function matchRow(row: Row, filter: Row): boolean {
+          for (const [k, v] of Object.entries(filter)) {
+            if (k === 'OR') {
+              const ors = v as Row[]
+              if (!ors.some((o) => matchRow(row, o))) return false
+              continue
+            }
+            const rv = row[k]
+            if (v !== null && typeof v === 'object') {
+              const op = v as Record<string, unknown>
+              if ('in' in op) { if (!(op.in as unknown[]).includes(rv)) return false; continue }
+              if ('lt' in op) { if (rv === null || (rv as number) >= (op.lt as number)) return false; continue }
+              if ('gt' in op) { if (rv === null || (rv as number) <= (op.gt as number)) return false; continue }
+              if ('startsWith' in op) { if (typeof rv !== 'string' || !rv.startsWith(op.startsWith as string)) return false; continue }
+              if ('contains' in op) { if (typeof rv !== 'string' || !rv.includes(op.contains as string)) return false; continue }
+            } else {
+              if (rv !== v) return false
+            }
+          }
+          return true
+        }
+        const rows: Row[] = []
+        for (const [, row] of store) {
+          if (!where || matchRow(row, where)) rows.push(row)
+        }
+        return rows
+      },
+      async update({ where, data }: { where: Row; data: Row }) {
+        const existing = (where[pk] !== undefined ? store.get(where[pk]) : resolveWhere(where)) as Row | undefined
+        if (!existing) throw new Error('Record not found')
+        const cleanData: Row = {}
+        for (const [k, v] of Object.entries(data)) {
+          if (v && typeof v === 'object' && 'create' in (v as object)) continue
+          cleanData[k] = v
+        }
+        Object.assign(existing, { ...cleanData, updatedAt: new Date() })
+        return existing
+      },
+      async updateMany({ where, data }: { where: Row; data: Row }) {
+        let count = 0
+        for (const [, row] of store) {
+          const match = Object.entries(where).every(([k, v]) => row[k] === v)
+          if (match) { Object.assign(row, data); count++ }
+        }
+        return { count }
+      },
+      async delete({ where }: { where: Row }) {
+        const key = where[pk] ?? resolveWhere(where)?.[pk]
+        if (key !== undefined) store.delete(key)
+        return {}
+      },
+      async deleteMany({ where }: { where?: Row } = {}) {
+        let count = 0
+        if (!where) { count = store.size; store.clear(); return { count } }
+        for (const [k, row] of store) {
+          const match = Object.entries(where).every(([wk, wv]) => row[wk] === wv)
+          if (match) { store.delete(k); count++ }
+        }
+        return { count }
+      },
+      async upsert({ where, create, update: upd }: { where: Row; create: Row; update: Row }) {
+        const key = where[pk]
+        const existing = key !== undefined ? store.get(key) : resolveWhere(where)
+        if (existing) { Object.assign(existing as object, { ...upd, updatedAt: new Date() }); return existing }
+        const row = { ...create, [pk]: create[pk] ?? intPk++, createdAt: new Date(), updatedAt: new Date() }
+        store.set(row[pk], row)
+        return row
+      },
+      async count({ where }: { where?: Row } = {}) {
+        if (!where) return store.size
+        let count = 0
+        for (const [, row] of store) {
+          const match = Object.entries(where).every(([k, v]) => {
+            const rv = row[k]
+            if (v !== null && typeof v === 'object' && 'in' in (v as object)) return ((v as { in: unknown[] }).in).includes(rv)
+            return rv === v
+          })
+          if (match) count++
+        }
+        return count
+      },
+    }
+  }
+
+  const batchJobItemTable = makeTable('id')
+  const batchJobTable = (() => {
+    const base = makeTable('id')
+    return {
+      ...base,
+      async create({ data }: { data: Row }) {
+        const itemsNested = data.items as { create?: Row[] } | undefined
+        const clean: Row = {}
+        for (const [k, v] of Object.entries(data)) { if (k !== 'items') clean[k] = v }
+        clean.createdAt = new Date(); clean.updatedAt = new Date()
+        base.store.set(data.id, clean)
+        if (itemsNested?.create) {
+          let idx = 0
+          for (const item of itemsNested.create) {
+            await batchJobItemTable.create({ data: { ...item, id: batchJobItemTable.store.size + 1 + idx++, batchId: data.id } })
+          }
+        }
+        return clean
+      },
+      async findUnique({ where, include }: { where: Row; include?: { items?: unknown } }) {
+        const row = base.store.get(where.id) as Row | undefined
+        if (!row) return null
+        if (include?.items) {
+          const items = await batchJobItemTable.findMany({ where: { batchId: row.id } })
+          return { ...row, items }
+        }
+        return row
+      },
+      async findMany({ where, include, orderBy }: { where?: Row; include?: { items?: unknown }; orderBy?: unknown }) {
+        const rows: Row[] = []
+        for (const [, row] of base.store) {
+          if (!where) { rows.push(row); continue }
+          const match = Object.entries(where).every(([k, v]) => row[k] === v)
+          if (match) rows.push(row)
+        }
+        if (include?.items) {
+          return Promise.all(rows.map(async (r) => ({ ...r, items: await batchJobItemTable.findMany({ where: { batchId: r.id } }) })))
+        }
+        return rows
+      },
+      async update({ where, data }: { where: Row; data: Row }) {
+        const existing = base.store.get(where.id) as Row
+        if (!existing) throw new Error('Not found')
+        Object.assign(existing, { ...data, updatedAt: new Date() })
+        return existing
+      },
+    }
+  })()
+
+  const promptVersionTable = makeTable('id')
+  const promptTemplateTable = (() => {
+    const base = makeTable('id')
+    return {
+      ...base,
+      async create({ data }: { data: Row }) {
+        const vn = data.versions as { create?: Row | Row[] } | undefined
+        const clean: Row = {}
+        for (const [k, v] of Object.entries(data)) { if (k !== 'versions') clean[k] = v }
+        clean.createdAt = new Date(); clean.updatedAt = new Date()
+        base.store.set(data.id, clean)
+        if (vn?.create) {
+          const items = Array.isArray(vn.create) ? vn.create : [vn.create]
+          for (const item of items) await promptVersionTable.create({ data: { ...item, templateId: data.id } })
+        }
+        return clean
+      },
+      async update({ where, data }: { where: Row; data: Row }) {
+        const vn = data.versions as { create?: Row | Row[] } | undefined
+        const clean: Row = {}
+        for (const [k, v] of Object.entries(data)) { if (k !== 'versions') clean[k] = v }
+        const existing = base.store.get(where.id) as Row
+        if (!existing) throw new Error('Not found')
+        Object.assign(existing, { ...clean, updatedAt: new Date() })
+        if (vn?.create) {
+          const items = Array.isArray(vn.create) ? vn.create : [vn.create]
+          for (const item of items) await promptVersionTable.create({ data: { ...(item as Row), templateId: where.id } })
+        }
+        return existing
+      },
+    }
+  })()
+
+  return {
+    prisma: {
+      memoryEntry: makeTable('id'),
+      batchJob: batchJobTable,
+      batchJobItem: batchJobItemTable,
+      workflowDefinition: makeTable('id'),
+      workflowRun: makeTable('id'),
+      promptTemplate: promptTemplateTable,
+      promptTemplateVersion: promptVersionTable,
+      promptABTest: makeTable('id'),
+      appStrategyRecord: makeTable('appSlug'),
+      webhookRegistrationRecord: makeTable('id'),
+      webhookDeliveryRecord: makeTable('id'),
+      fineTuneJob: makeTable('jobId'),
+      aiProvider: { findMany: () => Promise.resolve([]) },
+    },
+  }
+})
 
 // ── Tool Runtime ─────────────────────────────────────────────────────────────
 
@@ -273,8 +521,8 @@ describe('Webhook Manager', () => {
     expect(MAX_RETRY_ATTEMPTS).toBe(5)
   })
 
-  it('registerWebhook creates webhook', () => {
-    const webhook = registerWebhook('test-app', 'https://example.com/webhook', ['brain.request.completed'])
+  it('registerWebhook creates webhook', async () => {
+    const webhook = await registerWebhook('test-app', 'https://example.com/webhook', ['brain.request.completed'])
     expect(webhook.id).toBeTruthy()
     expect(webhook.appSlug).toBe('test-app')
     expect(webhook.url).toBe('https://example.com/webhook')
@@ -282,13 +530,13 @@ describe('Webhook Manager', () => {
     expect(webhook.active).toBe(true)
   })
 
-  it('registerWebhook rejects non-HTTPS URLs', () => {
-    expect(() => registerWebhook('test', 'http://insecure.com', ['app.event'])).toThrow('HTTPS')
+  it('registerWebhook rejects non-HTTPS URLs', async () => {
+    await expect(registerWebhook('test', 'http://insecure.com', ['app.event'])).rejects.toThrow('HTTPS')
   })
 
-  it('getWebhooksForApp lists active webhooks', () => {
-    registerWebhook('list-test', 'https://example.com/a', ['app.event'])
-    const webhooks = getWebhooksForApp('list-test')
+  it('getWebhooksForApp lists active webhooks', async () => {
+    await registerWebhook('list-test', 'https://example.com/a', ['app.event'])
+    const webhooks = await getWebhooksForApp('list-test')
     expect(webhooks.length).toBeGreaterThanOrEqual(1)
   })
 
@@ -300,8 +548,8 @@ describe('Webhook Manager', () => {
     expect(verifySignature(payload, 'wrong-sig' + sig.slice(9), secret)).toBe(false)
   })
 
-  it('getDeliveryStats returns structure', () => {
-    const stats = getDeliveryStats()
+  it('getDeliveryStats returns structure', async () => {
+    const stats = await getDeliveryStats()
     expect(typeof stats.total).toBe('number')
     expect(typeof stats.successful).toBe('number')
     expect(typeof stats.failed).toBe('number')
@@ -370,22 +618,22 @@ describe('Prompt Studio', () => {
     expect(TEMPLATE_CATEGORIES).toContain('creative')
   })
 
-  it('createTemplate creates a template', () => {
-    const t = createTemplate({ name: 'Test', description: 'A test', appSlug: 'test-app', template: 'Hello {{name}}!' })
+  it('createTemplate creates a template', async () => {
+    const t = await createTemplate({ name: 'Test', description: 'A test', appSlug: 'test-app', template: 'Hello {{name}}!' })
     expect(t.id).toBeTruthy()
     expect(t.version).toBe(1)
     expect(t.isActive).toBe(true)
   })
 
-  it('updateTemplate creates new version', () => {
-    const t = createTemplate({ name: 'Versioned', description: 'V', appSlug: 'test', template: 'v1' })
-    const updated = updateTemplate(t.id, { template: 'v2' })
+  it('updateTemplate creates new version', async () => {
+    const t = await createTemplate({ name: 'Versioned', description: 'V', appSlug: 'test', template: 'v1' })
+    const updated = await updateTemplate(t.id, { template: 'v2' })
     expect(updated!.version).toBe(2)
     expect(updated!.template).toBe('v2')
   })
 
-  it('renderTemplate substitutes variables', () => {
-    const t = createTemplate({
+  it('renderTemplate substitutes variables', async () => {
+    const t = await createTemplate({
       name: 'Greeting', description: 'G', appSlug: 'test',
       template: 'Hello {{name}}, you are {{age}} years old.',
       variables: [
@@ -393,23 +641,23 @@ describe('Prompt Studio', () => {
         { name: 'age', description: 'Age', type: 'number', required: false, defaultValue: '25' },
       ],
     })
-    const result = renderTemplate(t.id, { name: 'Alice' })
+    const result = await renderTemplate(t.id, { name: 'Alice' })
     expect(result!.rendered).toContain('Hello Alice')
     expect(result!.rendered).toContain('25')
   })
 
-  it('getVersionHistory tracks versions', () => {
-    const t = createTemplate({ name: 'VH', description: 'V', appSlug: 'test', template: 'original' })
-    updateTemplate(t.id, { template: 'updated' })
-    const history = getVersionHistory(t.id)
+  it('getVersionHistory tracks versions', async () => {
+    const t = await createTemplate({ name: 'VH', description: 'V', appSlug: 'test', template: 'original' })
+    await updateTemplate(t.id, { template: 'updated' })
+    const history = await getVersionHistory(t.id)
     expect(history).toHaveLength(2)
   })
 
-  it('A/B test lifecycle works', () => {
-    const t1 = createTemplate({ name: 'A', description: 'A', appSlug: 'ab-test', template: 'variant A' })
-    const t2 = createTemplate({ name: 'B', description: 'B', appSlug: 'ab-test', template: 'variant B' })
+  it('A/B test lifecycle works', async () => {
+    const t1 = await createTemplate({ name: 'A', description: 'A', appSlug: 'ab-test', template: 'variant A' })
+    const t2 = await createTemplate({ name: 'B', description: 'B', appSlug: 'ab-test', template: 'variant B' })
 
-    const test = createABTest({
+    const test = await createABTest({
       name: 'Test Experiment',
       appSlug: 'ab-test',
       variants: [
@@ -423,8 +671,8 @@ describe('Prompt Studio', () => {
     expect(test.status).toBe('draft')
     expect(test.variants).toHaveLength(2)
 
-    startABTest(test.id)
-    const variant = selectVariant(test.id)
+    await startABTest(test.id)
+    const variant = await selectVariant(test.id)
     expect(variant).toBeTruthy()
   })
 })
@@ -587,8 +835,8 @@ describe('Workflow Engine', () => {
     expect(STEP_TYPES).toContain('output')
   })
 
-  it('creates a workflow', () => {
-    const wf = createWorkflow({
+  it('creates a workflow', async () => {
+    const wf = await createWorkflow({
       name: 'Test Workflow',
       description: 'A test',
       appSlug: 'test-app',
@@ -606,7 +854,7 @@ describe('Workflow Engine', () => {
   })
 
   it('executes a simple workflow', async () => {
-    const wf = createWorkflow({
+    const wf = await createWorkflow({
       name: 'Simple',
       description: 'S',
       appSlug: 'test',
@@ -624,10 +872,10 @@ describe('Workflow Engine', () => {
     expect(run.stepResults.size).toBe(3)
   })
 
-  it('activateWorkflow changes status', () => {
-    const wf = createWorkflow({ name: 'A', description: 'A', appSlug: 't', steps: [{ id: 's', type: 'input', name: 'I', config: {} }], entryStepId: 's' })
-    expect(activateWorkflow(wf.id)).toBe(true)
-    expect(getWorkflow(wf.id)!.status).toBe('active')
+  it('activateWorkflow changes status', async () => {
+    const wf = await createWorkflow({ name: 'A', description: 'A', appSlug: 't', steps: [{ id: 's', type: 'input', name: 'I', config: {} }], entryStepId: 's' })
+    expect(await activateWorkflow(wf.id)).toBe(true)
+    expect((await getWorkflow(wf.id))!.status).toBe('active')
   })
 })
 
@@ -756,7 +1004,7 @@ describe('Federated Memory', () => {
     await storeMemory({ userId: 'profile-user', appSlug: 'profile-app', type: 'preference', content: 'Likes dark mode' })
     await storeMemory({ userId: 'profile-user', appSlug: 'profile-app', type: 'instruction', content: 'Use metric units' })
 
-    const profile = getUserProfile('profile-user', 'profile-app')
+    const profile = await getUserProfile('profile-user', 'profile-app')
     expect(profile.totalMemories).toBeGreaterThanOrEqual(2)
     expect(profile.preferences.length).toBeGreaterThanOrEqual(1)
     expect(profile.instructions.length).toBeGreaterThanOrEqual(1)
@@ -790,8 +1038,8 @@ describe('Batch Processor', () => {
     expect(DEFAULT_CONCURRENCY).toBe(10)
   })
 
-  it('createBatchJob creates job', () => {
-    const job = createBatchJob({
+  it('createBatchJob creates job', async () => {
+    const job = await createBatchJob({
       appSlug: 'batch-test',
       items: [
         { input: 'prompt 1', taskType: 'chat' },
@@ -804,12 +1052,12 @@ describe('Batch Processor', () => {
     expect(job.progress.total).toBe(2)
   })
 
-  it('createBatchJob rejects empty items', () => {
-    expect(() => createBatchJob({ appSlug: 'test', items: [] })).toThrow('at least 1')
+  it('createBatchJob rejects empty items', async () => {
+    await expect(createBatchJob({ appSlug: 'test', items: [] })).rejects.toThrow('at least 1')
   })
 
   it('submitBatchJob processes inline when queue unavailable', async () => {
-    const job = createBatchJob({
+    const job = await createBatchJob({
       appSlug: 'submit-test',
       items: [{ input: 'test', taskType: 'chat' }],
     })
@@ -817,19 +1065,19 @@ describe('Batch Processor', () => {
     expect(submitted).toBe(true)
     // Wait a bit for async processing
     await new Promise(r => setTimeout(r, 100))
-    const result = getBatchJob(job.id)
+    const result = await getBatchJob(job.id)
     expect(result).toBeTruthy()
   })
 
-  it('cancelBatchJob works', () => {
-    const job = createBatchJob({ appSlug: 'cancel-test', items: [{ input: 't', taskType: 'c' }] })
-    expect(cancelBatchJob(job.id)).toBe(true)
-    expect(getBatchJob(job.id)!.status).toBe('cancelled')
+  it('cancelBatchJob works', async () => {
+    const job = await createBatchJob({ appSlug: 'cancel-test', items: [{ input: 't', taskType: 'c' }] })
+    expect(await cancelBatchJob(job.id)).toBe(true)
+    expect((await getBatchJob(job.id))!.status).toBe('cancelled')
   })
 
-  it('listBatchJobs filters by app', () => {
-    createBatchJob({ appSlug: 'list-test-app', items: [{ input: 'a', taskType: 'b' }] })
-    const jobs = listBatchJobs('list-test-app')
+  it('listBatchJobs filters by app', async () => {
+    await createBatchJob({ appSlug: 'list-test-app', items: [{ input: 'a', taskType: 'b' }] })
+    const jobs = await listBatchJobs('list-test-app')
     expect(jobs.length).toBeGreaterThanOrEqual(1)
   })
 })

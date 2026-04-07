@@ -4,11 +4,15 @@
  * Submit 1000s of prompts → process in background → get results.
  * Uses BullMQ job queue for reliable async processing.
  *
+ * Persistence: Job headers and items are stored in the BatchJob / BatchJobItem
+ * DB tables so that status survives server restarts.
+ *
  * Truthful: Job status reflects actual processing state.
  */
 
 import { randomUUID } from 'crypto'
 import { enqueueJob } from './job-queue'
+import { prisma } from './prisma'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,21 +83,58 @@ export interface BatchResult {
 
 // ── Storage ──────────────────────────────────────────────────────────────────
 
-const batchJobs = new Map<string, BatchJob>()
 const MAX_ITEMS_PER_BATCH = 10_000
 const DEFAULT_CONCURRENCY = 10
 const DEFAULT_MAX_RETRIES = 3
 
+// ── DB helpers ───────────────────────────────────────────────────────────────
+
+async function jobFromDb(id: string): Promise<BatchJob | null> {
+  try {
+    const row = await prisma.batchJob.findUnique({
+      where: { id },
+      include: { items: { orderBy: { itemIndex: 'asc' } } },
+    })
+    if (!row) return null
+    return {
+      id: row.id,
+      appSlug: row.appSlug,
+      status: row.status as BatchJob['status'],
+      config: JSON.parse(row.config) as BatchConfig,
+      progress: JSON.parse(row.progress) as BatchProgress,
+      items: row.items.map((i) => ({
+        id: i.itemId,
+        index: i.itemIndex,
+        input: i.input,
+        taskType: i.taskType,
+        status: i.status as BatchItem['status'],
+        output: i.output ?? undefined,
+        error: i.error ?? undefined,
+        provider: i.provider ?? undefined,
+        model: i.model ?? undefined,
+        latencyMs: i.latencyMs ?? undefined,
+        tokens: i.tokens ?? undefined,
+      })),
+      createdAt: row.createdAt.toISOString(),
+      startedAt: row.startedAt?.toISOString(),
+      completedAt: row.completedAt?.toISOString(),
+      error: row.error ?? undefined,
+    }
+  } catch {
+    return null
+  }
+}
+
 // ── Batch Job Management ─────────────────────────────────────────────────────
 
 /**
- * Create a new batch processing job.
+ * Create a new batch processing job and persist to DB.
  */
-export function createBatchJob(input: {
+export async function createBatchJob(input: {
   appSlug: string
   items: Array<{ input: string; taskType: string }>
   config?: Partial<BatchConfig>
-}): BatchJob {
+}): Promise<BatchJob> {
   if (input.items.length === 0) {
     throw new Error('Batch must have at least 1 item')
   }
@@ -102,51 +143,58 @@ export function createBatchJob(input: {
   }
 
   const id = randomUUID()
-  const job: BatchJob = {
-    id,
-    appSlug: input.appSlug,
-    status: 'pending',
-    items: input.items.map((item, i) => ({
-      id: randomUUID(),
-      index: i,
-      input: item.input,
-      taskType: item.taskType,
-      status: 'pending',
-    })),
-    config: {
-      concurrency: input.config?.concurrency ?? DEFAULT_CONCURRENCY,
-      maxRetries: input.config?.maxRetries ?? DEFAULT_MAX_RETRIES,
-      stopOnError: input.config?.stopOnError ?? false,
-      provider: input.config?.provider,
-      model: input.config?.model,
-      systemPrompt: input.config?.systemPrompt,
-      maxTokens: input.config?.maxTokens,
-      callbackUrl: input.config?.callbackUrl,
-    },
-    progress: {
-      total: input.items.length,
-      completed: 0,
-      failed: 0,
-      pending: input.items.length,
-      processing: 0,
-      avgLatencyMs: 0,
-    },
-    createdAt: new Date().toISOString(),
+  const config: BatchConfig = {
+    concurrency: input.config?.concurrency ?? DEFAULT_CONCURRENCY,
+    maxRetries: input.config?.maxRetries ?? DEFAULT_MAX_RETRIES,
+    stopOnError: input.config?.stopOnError ?? false,
+    provider: input.config?.provider,
+    model: input.config?.model,
+    systemPrompt: input.config?.systemPrompt,
+    maxTokens: input.config?.maxTokens,
+    callbackUrl: input.config?.callbackUrl,
+  }
+  const progress: BatchProgress = {
+    total: input.items.length,
+    completed: 0,
+    failed: 0,
+    pending: input.items.length,
+    processing: 0,
+    avgLatencyMs: 0,
   }
 
-  batchJobs.set(id, job)
-  return job
+  await prisma.batchJob.create({
+    data: {
+      id,
+      appSlug: input.appSlug,
+      status: 'pending',
+      config: JSON.stringify(config),
+      progress: JSON.stringify(progress),
+      items: {
+        create: input.items.map((item, i) => ({
+          itemId: randomUUID(),
+          itemIndex: i,
+          input: item.input,
+          taskType: item.taskType,
+          status: 'pending',
+        })),
+      },
+    },
+  })
+
+  return (await jobFromDb(id))!
 }
 
 /**
  * Submit a batch job for background processing.
  */
 export async function submitBatchJob(jobId: string): Promise<boolean> {
-  const job = batchJobs.get(jobId)
+  const job = await jobFromDb(jobId)
   if (!job || job.status !== 'pending') return false
 
-  job.status = 'processing'
-  job.startedAt = new Date().toISOString()
+  await prisma.batchJob.update({
+    where: { id: jobId },
+    data: { status: 'processing', startedAt: new Date() },
+  })
 
   // Enqueue to BullMQ for background processing
   try {
@@ -167,90 +215,112 @@ export async function submitBatchJob(jobId: string): Promise<boolean> {
  * In production, the BullMQ worker would handle this.
  */
 async function processJobInline(jobId: string): Promise<void> {
-  const job = batchJobs.get(jobId)
+  const job = await jobFromDb(jobId)
   if (!job) return
 
-  const _startTime = Date.now()
   let totalLatency = 0
   let processedCount = 0
 
-  // Process items with concurrency limit
+  // Reload progress from DB to keep it mutable during processing
+  const progress: BatchProgress = { ...job.progress }
+
   const pendingItems = job.items.filter((i) => i.status === 'pending')
   const chunks: BatchItem[][] = []
   for (let i = 0; i < pendingItems.length; i += job.config.concurrency) {
     chunks.push(pendingItems.slice(i, i + job.config.concurrency))
   }
 
+  let shouldStop = false
+
   for (const chunk of chunks) {
-    if (job.status === 'cancelled') break
+    // Check for cancellation before each chunk
+    const current = await jobFromDb(jobId)
+    if (current?.status === 'cancelled') break
 
     const results = await Promise.allSettled(
       chunk.map(async (item) => {
-        item.status = 'processing'
-        job.progress.processing++
-        job.progress.pending--
+        progress.processing++
+        progress.pending--
 
         const itemStart = Date.now()
+        const latencyMs = Date.now() - itemStart
+
         try {
-          // Simulate processing (real implementation would call brain.callProvider)
-          item.output = `[Batch result for: "${item.input.slice(0, 100)}"]`
-          item.provider = job.config.provider ?? 'auto'
-          item.model = job.config.model ?? 'auto'
-          item.latencyMs = Date.now() - itemStart
-          item.status = 'completed'
-          job.progress.completed++
-          totalLatency += item.latencyMs
+          // Real implementation: call brain.callProvider with job.config
+          const output = `[Batch result for: "${item.input.slice(0, 100)}"]`
+          const provider = job.config.provider ?? 'auto'
+          const model = job.config.model ?? 'auto'
+          const itemLatency = Date.now() - itemStart
+
+          await prisma.batchJobItem.updateMany({
+            where: { batchId: jobId, itemId: item.id },
+            data: { status: 'completed', output, provider, model, latencyMs: itemLatency },
+          })
+
+          progress.completed++
+          totalLatency += itemLatency
           processedCount++
         } catch (err) {
-          item.status = 'failed'
-          item.error = err instanceof Error ? err.message : 'Processing failed'
-          item.latencyMs = Date.now() - itemStart
-          job.progress.failed++
+          const errorMsg = err instanceof Error ? err.message : 'Processing failed'
+          await prisma.batchJobItem.updateMany({
+            where: { batchId: jobId, itemId: item.id },
+            data: { status: 'failed', error: errorMsg, latencyMs },
+          })
+          progress.failed++
 
           if (job.config.stopOnError) {
             throw err
           }
         } finally {
-          job.progress.processing--
+          progress.processing--
         }
       }),
     )
 
-    // Update average latency
-    job.progress.avgLatencyMs = processedCount > 0 ? totalLatency / processedCount : 0
-
-    // Estimate remaining time
-    const remainingItems = job.progress.pending
+    progress.avgLatencyMs = processedCount > 0 ? totalLatency / processedCount : 0
+    const remainingItems = progress.pending
     if (processedCount > 0) {
-      job.progress.estimatedTimeRemainingMs =
-        (remainingItems / job.config.concurrency) * job.progress.avgLatencyMs
+      progress.estimatedTimeRemainingMs =
+        (remainingItems / job.config.concurrency) * progress.avgLatencyMs
     }
 
-    // Check for fatal errors
+    // Persist progress after each chunk
+    await prisma.batchJob.update({
+      where: { id: jobId },
+      data: { progress: JSON.stringify(progress) },
+    })
+
     if (job.config.stopOnError && results.some((r) => r.status === 'rejected')) {
-      job.status = 'failed'
-      job.error = 'Batch stopped due to item failure (stopOnError=true)'
+      shouldStop = true
       break
     }
   }
 
-  if (job.status === 'processing') {
-    job.status = job.progress.failed > 0 && job.progress.completed === 0 ? 'failed' : 'completed'
-  }
+  const finalStatus = shouldStop
+    ? 'failed'
+    : (progress.failed > 0 && progress.completed === 0 ? 'failed' : 'completed')
 
-  job.completedAt = new Date().toISOString()
+  await prisma.batchJob.update({
+    where: { id: jobId },
+    data: {
+      status: finalStatus,
+      completedAt: new Date(),
+      progress: JSON.stringify(progress),
+      error: shouldStop ? 'Batch stopped due to item failure (stopOnError=true)' : null,
+    },
+  })
 }
 
 // ── Job Query ────────────────────────────────────────────────────────────────
 
 /** Get a batch job by ID. */
-export function getBatchJob(jobId: string): BatchJob | null {
-  return batchJobs.get(jobId) ?? null
+export async function getBatchJob(jobId: string): Promise<BatchJob | null> {
+  return jobFromDb(jobId)
 }
 
 /** Get batch results. */
-export function getBatchResult(jobId: string): BatchResult | null {
-  const job = batchJobs.get(jobId)
+export async function getBatchResult(jobId: string): Promise<BatchResult | null> {
+  const job = await jobFromDb(jobId)
   if (!job) return null
 
   const totalLatency = job.items.reduce((sum, i) => sum + (i.latencyMs ?? 0), 0)
@@ -262,24 +332,60 @@ export function getBatchResult(jobId: string): BatchResult | null {
     progress: job.progress,
     items: job.items,
     totalLatencyMs: totalLatency,
-    totalCostEstimate: totalTokens * 0.000002, // Rough estimate
+    totalCostEstimate: totalTokens * 0.000002,
   }
 }
 
 /** Cancel a batch job. */
-export function cancelBatchJob(jobId: string): boolean {
-  const job = batchJobs.get(jobId)
-  if (!job || job.status === 'completed' || job.status === 'failed') return false
-  job.status = 'cancelled'
-  job.completedAt = new Date().toISOString()
-  return true
+export async function cancelBatchJob(jobId: string): Promise<boolean> {
+  try {
+    const row = await prisma.batchJob.findUnique({ where: { id: jobId } })
+    if (!row || row.status === 'completed' || row.status === 'failed') return false
+    await prisma.batchJob.update({
+      where: { id: jobId },
+      data: { status: 'cancelled', completedAt: new Date() },
+    })
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** List batch jobs for an app. */
-export function listBatchJobs(appSlug: string): BatchJob[] {
-  return Array.from(batchJobs.values())
-    .filter((j) => j.appSlug === appSlug)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+export async function listBatchJobs(appSlug: string): Promise<BatchJob[]> {
+  try {
+    const rows = await prisma.batchJob.findMany({
+      where: { appSlug },
+      include: { items: { orderBy: { itemIndex: 'asc' } } },
+      orderBy: { createdAt: 'desc' },
+    })
+    return rows.map((row) => ({
+      id: row.id,
+      appSlug: row.appSlug,
+      status: row.status as BatchJob['status'],
+      config: JSON.parse(row.config) as BatchConfig,
+      progress: JSON.parse(row.progress) as BatchProgress,
+      items: row.items.map((i) => ({
+        id: i.itemId,
+        index: i.itemIndex,
+        input: i.input,
+        taskType: i.taskType,
+        status: i.status as BatchItem['status'],
+        output: i.output ?? undefined,
+        error: i.error ?? undefined,
+        provider: i.provider ?? undefined,
+        model: i.model ?? undefined,
+        latencyMs: i.latencyMs ?? undefined,
+        tokens: i.tokens ?? undefined,
+      })),
+      createdAt: row.createdAt.toISOString(),
+      startedAt: row.startedAt?.toISOString(),
+      completedAt: row.completedAt?.toISOString(),
+      error: row.error ?? undefined,
+    }))
+  } catch {
+    return []
+  }
 }
 
 // ── Exports for Testing ──────────────────────────────────────────────────────
