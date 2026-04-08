@@ -88,8 +88,8 @@ beforeEach(() => {
 // ─── Phase 1 — Advanced Emotion Detection ───────────────────────────────────
 
 describe('Phase 1 — Emotion Detection', () => {
-  it('exports 12 emotion types', () => {
-    expect(EMOTION_TYPE_COUNT).toBe(12)
+  it('exports 14 emotion types', () => {
+    expect(EMOTION_TYPE_COUNT).toBe(14)
     expect(EMOTION_TYPES).toContain('joy')
     expect(EMOTION_TYPES).toContain('sadness')
     expect(EMOTION_TYPES).toContain('anger')
@@ -98,6 +98,8 @@ describe('Phase 1 — Emotion Detection', () => {
     expect(EMOTION_TYPES).toContain('frustration')
     expect(EMOTION_TYPES).toContain('confusion')
     expect(EMOTION_TYPES).toContain('neutral')
+    expect(EMOTION_TYPES).toContain('longing')
+    expect(EMOTION_TYPES).toContain('affection')
   })
 
   it('exports 3 HuggingFace model tiers', () => {
@@ -259,13 +261,15 @@ describe('Phase 3 — Emotional Drift', () => {
 // ─── Phase 4 — Personality Engine ───────────────────────────────────────────
 
 describe('Phase 4 — Personality Engine', () => {
-  it('exports 8 personality types', () => {
-    expect(PERSONALITY_TYPE_COUNT).toBe(8)
+  it('exports 10 personality types', () => {
+    expect(PERSONALITY_TYPE_COUNT).toBe(10)
     expect(PERSONALITY_TYPES).toContain('professional')
     expect(PERSONALITY_TYPES).toContain('calm')
     expect(PERSONALITY_TYPES).toContain('empathetic')
     expect(PERSONALITY_TYPES).toContain('analytical')
     expect(PERSONALITY_TYPES).toContain('energetic')
+    expect(PERSONALITY_TYPES).toContain('romantic')
+    expect(PERSONALITY_TYPES).toContain('passionate')
   })
 
   it('returns base personality when no profile exists', () => {

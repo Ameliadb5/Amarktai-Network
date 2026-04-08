@@ -59,16 +59,16 @@ const MODELS = {
 const GO_EMOTIONS_MAP: Record<string, EmotionType> = {
   // Direct mappings
   joy: 'joy',
-  love: 'joy',
-  admiration: 'joy',
+  love: 'affection',
+  admiration: 'affection',
   amusement: 'joy',
   gratitude: 'joy',
   optimism: 'anticipation',
   pride: 'joy',
   relief: 'joy',
   approval: 'trust',
-  caring: 'trust',
-  desire: 'anticipation',
+  caring: 'affection',
+  desire: 'longing',
   excitement: 'excitement',
   curiosity: 'anticipation',
   // Negative mappings

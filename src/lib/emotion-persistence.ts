@@ -42,11 +42,12 @@ const TTL_1D = 24 * 60 * 60       // 1 day
 const TTL_30D = 30 * 24 * 60 * 60 // 30 days
 
 const EMOTION_COLLECTION = 'amarktai_emotions'
-const EMOTION_VECTOR_SIZE = 12 // one dimension per emotion type
+const EMOTION_VECTOR_SIZE = 14 // one dimension per emotion type
 
 const EMOTION_DIMS: EmotionType[] = [
   'joy', 'sadness', 'anger', 'fear', 'surprise', 'disgust',
   'trust', 'anticipation', 'frustration', 'confusion', 'excitement', 'neutral',
+  'longing', 'affection',
 ]
 
 // ─── Redis Persistence ──────────────────────────────────────────────────────

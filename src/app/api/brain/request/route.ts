@@ -10,10 +10,11 @@ import { orchestrate } from '@/lib/orchestrator'
 import { saveMemory } from '@/lib/memory'
 import { retrieve } from '@/lib/retrieval-engine'
 import { logRouteOutcome } from '@/lib/learning-engine'
-import { scanContent, blockedExplanation, loadAppSafetyConfigFromDB } from '@/lib/content-filter'
+import { scanContent, blockedExplanation, loadAppSafetyConfigFromDB, getAppSafetyConfig } from '@/lib/content-filter'
 import { getBudgetSummary } from '@/lib/budget-tracker'
 import { runEmotionPipeline, setAppContextWindow, type PersonalityType } from '@/lib/emotion-engine'
 import { runModerationPipeline } from '@/lib/moderation-pipeline'
+import { buildMemoryContext } from '@/lib/federated-memory'
 import { prisma } from '@/lib/prisma'
 
 // ── Request schema ────────────────────────────────────────────────────────────
@@ -135,6 +136,13 @@ export async function POST(request: NextRequest) {
   // calls in this request reflect the persisted safety policy.
   await loadAppSafetyConfigFromDB(app.slug)
 
+  // Build a safety-mode context note for the model when suggestive mode is active.
+  // This informs the model it may generate suggestive (but never explicit/illegal) content.
+  const safetyConfig = getAppSafetyConfig(app.slug)
+  const suggestiveModeNote = (!safetyConfig.safeMode && safetyConfig.suggestiveMode)
+    ? '[App safety mode: Suggestive language, flirting, swearing, and tasteful adult themes are permitted. Explicit sexual acts, genitalia, minors in any adult context, and illegal content are strictly prohibited.]\n\n'
+    : ''
+
   // ── Emotion engine — detect user emotion and build personality context ─
   // Uses the synchronous pipeline to avoid adding streaming latency.
   // Emotion state is persisted to Redis/Qdrant in a fire-and-forget manner.
@@ -185,6 +193,24 @@ export async function POST(request: NextRequest) {
     // Retrieval engine unavailable — proceed without context
   }
 
+  // ── Federated memory context (semantic + typed user memories) ─────
+  // Enriches the base retrieval with richer per-user memory (preferences,
+  // instructions, facts). Runs concurrently; failure is silent.
+  let federatedMemoryContext = ''
+  try {
+    const fedCtx = await buildMemoryContext(
+      body.externalUserId || app.slug,
+      app.slug,
+      body.message,
+    )
+    if (fedCtx) {
+      federatedMemoryContext = fedCtx + '\n\n'
+      memoryUsed = true
+    }
+  } catch {
+    // Federated memory unavailable — proceed without it
+  }
+
   // ── Budget enforcement — block if all providers are over critical ────
   try {
     const budgetSummary = await getBudgetSummary()
@@ -209,7 +235,9 @@ export async function POST(request: NextRequest) {
     appSlug: app.slug,
     appCategory: app.category,
     taskType: body.taskType,
-    message: emotionContext + memoryContext + body.message,
+    message: suggestiveModeNote + emotionContext + federatedMemoryContext + memoryContext + body.message,
+    providerOverride: typeof body.metadata?.provider_override === 'string' ? body.metadata.provider_override : undefined,
+    modelOverride: typeof body.metadata?.model_override === 'string' ? body.metadata.model_override : undefined,
   })
 
   const latencyMs = Date.now() - start

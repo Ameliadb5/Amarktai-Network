@@ -14,6 +14,7 @@
 import { prisma } from '@/lib/prisma'
 import { timingSafeEqual } from 'crypto'
 import { getDefaultModelForProvider } from '@/lib/model-registry'
+import { decryptVaultKey } from '@/lib/crypto-vault'
 
 // ── Request / Response Contracts ─────────────────────────────────────────────
 
@@ -109,6 +110,10 @@ export async function authenticateApp(appId: string, appSecret: string): Promise
     return { ok: false, statusCode: 409, error: 'AI is not enabled for this app' }
   }
 
+  if (!product.connectedToBrain) {
+    return { ok: false, statusCode: 409, error: 'App is not connected to the Brain — enable Brain connection in app settings' }
+  }
+
   // Return app without exposing the secret
   const { appSecret: _omit, ...safeApp } = product
   return { ok: true, statusCode: 200, app: safeApp }
@@ -153,7 +158,7 @@ export async function getVaultApiKey(providerKey: string): Promise<string | null
       where: { providerKey },
       select: { apiKey: true },
     })
-    if (row?.apiKey) return row.apiKey
+    if (row?.apiKey) return decryptVaultKey(row.apiKey)
   } catch {
     // DB unavailable — fall through to env
   }
@@ -209,6 +214,15 @@ export async function callProvider(
     }
   }
 
+  const resolvedApiKey = decryptVaultKey(vault.apiKey) ?? ''
+  if (!resolvedApiKey) {
+    return {
+      ok: false, output: null,
+      error: `Provider "${providerKey}" API key could not be decrypted`,
+      latencyMs: Date.now() - start, model, providerKey,
+    }
+  }
+
   const resolvedModel = model || vault.defaultModel || defaultModelFor(providerKey)
   const timeout = 30_000
 
@@ -234,7 +248,7 @@ export async function callProvider(
         const base = vault.baseUrl || baseMap[providerKey] || 'https://api.openai.com'
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${vault.apiKey}`,
+          Authorization: `Bearer ${resolvedApiKey}`,
         }
         // OpenRouter requires a site URL header
         if (providerKey === 'openrouter') {
@@ -282,7 +296,7 @@ export async function callProvider(
 
       // ── Gemini ──────────────────────────────────────────────────────────────
       case 'gemini': {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${encodeURIComponent(vault.apiKey)}`
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${encodeURIComponent(resolvedApiKey)}`
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -302,7 +316,7 @@ export async function callProvider(
       case 'huggingface': {
         const base = vault.baseUrl || 'https://api-inference.huggingface.co'
         const headers: Record<string, string> = {
-          Authorization: `Bearer ${vault.apiKey}`,
+          Authorization: `Bearer ${resolvedApiKey}`,
         }
 
         // Detect task type from model name patterns to send correct payload
@@ -366,7 +380,7 @@ export async function callProvider(
         const base = vault.baseUrl || 'https://integrate.api.nvidia.com/v1'
         const res = await fetch(`${base}/chat/completions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${vault.apiKey}` },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resolvedApiKey}` },
           body: JSON.stringify({
             model: resolvedModel,
             messages: [{ role: 'user', content: message }],
@@ -388,7 +402,7 @@ export async function callProvider(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': vault.apiKey,
+            'x-api-key': resolvedApiKey,
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
@@ -414,7 +428,7 @@ export async function callProvider(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${vault.apiKey}`,
+            Authorization: `Bearer ${resolvedApiKey}`,
           },
           body: JSON.stringify({
             model: resolvedModel,
@@ -438,7 +452,7 @@ export async function callProvider(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${vault.apiKey}`,
+            Authorization: `Bearer ${resolvedApiKey}`,
           },
           body: JSON.stringify({
             model: resolvedModel,
@@ -466,7 +480,7 @@ export async function callProvider(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Token ${vault.apiKey}`,
+            Authorization: `Token ${resolvedApiKey}`,
           },
           body: JSON.stringify({ input: { prompt: message } }),
           signal: AbortSignal.timeout(timeout),
@@ -495,7 +509,7 @@ export async function callProvider(
           }
           await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
           const pollRes = await fetch(pollUrl, {
-            headers: { Authorization: `Token ${vault.apiKey}` },
+            headers: { Authorization: `Token ${resolvedApiKey}` },
           })
           if (!pollRes.ok) break
           pollResult = await pollRes.json() as typeof prediction

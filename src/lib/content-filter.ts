@@ -416,6 +416,13 @@ function mapOpenAIModerationResult(
 /**
  * Apply per-app safety configuration to a filter result.
  * CSAM, non-consensual, violence, self-harm, and hate speech are ALWAYS blocked.
+ *
+ * When suggestiveMode=true (and safeMode=false), non-ALWAYS_BLOCKED content
+ * is allowed through. Since all our current FlagCategories are in ALWAYS_BLOCKED,
+ * this primarily affects future categories and ensures the flag is respected.
+ * More importantly, this extends to the moderation pipeline: when suggestiveMode=true,
+ * OpenAI Moderation's "sexual" flag (which we don't map to our categories) is
+ * not escalated, and guardrails toxicity checks do not block suggestive language.
  */
 function applySafetyConfig(result: ContentFilterResult, appSlug: string): ContentFilterResult {
   // Always block these categories regardless of mode
@@ -424,10 +431,17 @@ function applySafetyConfig(result: ContentFilterResult, appSlug: string): Conten
     return result; // Cannot bypass these
   }
 
-  // In non-safe + adult mode, relax non-harmful content blocks
-  // (Currently all our categories are always-blocked, but this is future-ready
-  //  for when adult content categories are added)
   const config = getAppSafetyConfig(appSlug);
+
+  // In suggestive mode (non-safe), allow suggestive content that doesn't hit ALWAYS_BLOCKED
+  if (!config.safeMode && config.suggestiveMode) {
+    const blocked = result.categories.filter(c => ALWAYS_BLOCKED.includes(c));
+    if (blocked.length === 0) {
+      return { flagged: false, categories: [], message: '', confidence: 0, scanner: result.scanner };
+    }
+  }
+
+  // In adult mode (non-safe), relax non-harmful adult content blocks
   if (!config.safeMode && config.adultMode) {
     const blocked = result.categories.filter(c => ALWAYS_BLOCKED.includes(c));
     if (blocked.length === 0) {

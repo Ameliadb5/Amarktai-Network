@@ -22,6 +22,7 @@ import {
   scanContent,
   scanContentWithModeration,
   buildModerationAlert,
+  getAppSafetyConfig,
   type ContentFilterResult,
   type ModerationAlert,
 } from './content-filter'
@@ -119,9 +120,23 @@ export async function runModerationPipeline(
   }
 
   // ── Step 3: Determine if content should be blocked ───────────────────
+  // When suggestiveMode is enabled for this app (output direction only),
+  // guardrail toxicity failures do NOT block — the app has opted into
+  // allowing suggestive language. ALWAYS_BLOCKED categories are still enforced
+  // via the content filter (contentFilter.flagged checks ALWAYS_BLOCKED only).
+  const appSafety = context.appSlug ? getAppSafetyConfig(context.appSlug) : null
+  const suggestiveModeActive =
+    direction === 'output' &&
+    appSafety != null &&
+    !appSafety.safeMode &&
+    appSafety.suggestiveMode
+
   const blocked =
     contentFilter.flagged ||
-    (guardrails !== null && !guardrails.passed && guardrails.metadata.criticalFailures > 0)
+    (!suggestiveModeActive &&
+      guardrails !== null &&
+      !guardrails.passed &&
+      guardrails.metadata.criticalFailures > 0)
 
   // ── Step 4: Build moderation alert ───────────────────────────────────
   const alert = blocked

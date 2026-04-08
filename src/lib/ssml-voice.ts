@@ -81,6 +81,8 @@ const EMOTION_PROSODY_MAP: Record<EmotionType, SSMLProsody> = {
   frustration:  { pitch: 'medium',  rate: '-10%',  volume: 'loud' },
   confusion:    { pitch: 'medium',  rate: '-10%',  volume: 'soft' },
   neutral:      { pitch: 'medium',  rate: 'medium', volume: 'medium' },
+  longing:      { pitch: 'low',     rate: '-10%',  volume: 'soft' },
+  affection:    { pitch: 'medium',  rate: '-5%',   volume: 'medium' },
 }
 
 // ── Emotion → OpenAI Voice Mapping ───────────────────────────────────────────
@@ -109,6 +111,8 @@ const OPENAI_EMOTION_VOICE: Record<EmotionType, string> = {
   frustration:  'echo',
   confusion:    'shimmer',
   neutral:      'alloy',
+  longing:      'shimmer',
+  affection:    'nova',
 }
 
 /** Groq uses PlayAI voices — fewer options, mapped by tone. */
@@ -125,6 +129,8 @@ const GROQ_EMOTION_VOICE: Record<EmotionType, string> = {
   frustration:  'Atlas-PlayAI',
   confusion:    'Atlas-PlayAI',
   neutral:      'Arista-PlayAI',
+  longing:      'Atlas-PlayAI',
+  affection:    'Arista-PlayAI',
 }
 
 /** Gemini voice mapping by emotion. */
@@ -141,6 +147,8 @@ const GEMINI_EMOTION_VOICE: Record<EmotionType, string> = {
   frustration:  'Charon',
   confusion:    'Charon',
   neutral:      'Kore',
+  longing:      'Charon',
+  affection:    'Kore',
 }
 
 // ── Speed mapping ────────────────────────────────────────────────────────────
@@ -162,6 +170,8 @@ const EMOTION_SPEED_MAP: Record<EmotionType, number> = {
   frustration:  0.9,
   confusion:    0.9,
   neutral:      1.0,
+  longing:      0.85,
+  affection:    0.95,
 }
 
 // ── Provider SSML support ────────────────────────────────────────────────────

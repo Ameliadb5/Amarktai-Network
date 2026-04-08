@@ -62,22 +62,24 @@ describe('Emotion Persistence', () => {
     expect(EMOTION_COLLECTION).toBe('amarktai_emotions')
   })
 
-  it('EMOTION_VECTOR_SIZE matches 12 emotion types', () => {
-    expect(EMOTION_VECTOR_SIZE).toBe(12)
+  it('EMOTION_VECTOR_SIZE matches 14 emotion types', () => {
+    expect(EMOTION_VECTOR_SIZE).toBe(14)
   })
 
-  it('EMOTION_DIMS contains all 12 emotion types', () => {
-    expect(EMOTION_DIMS).toHaveLength(12)
+  it('EMOTION_DIMS contains all 14 emotion types', () => {
+    expect(EMOTION_DIMS).toHaveLength(14)
     expect(EMOTION_DIMS).toContain('joy')
     expect(EMOTION_DIMS).toContain('sadness')
     expect(EMOTION_DIMS).toContain('anger')
     expect(EMOTION_DIMS).toContain('neutral')
+    expect(EMOTION_DIMS).toContain('longing')
+    expect(EMOTION_DIMS).toContain('affection')
   })
 
-  it('analysisToVector returns 12-dimensional vector', () => {
+  it('analysisToVector returns 14-dimensional vector', () => {
     const analysis = makeFullAnalysis()
     const vector = analysisToVector(analysis)
-    expect(vector).toHaveLength(12)
+    expect(vector).toHaveLength(14)
   })
 
   it('analysisToVector maps scores correctly', () => {
@@ -98,11 +100,11 @@ describe('Emotion Persistence', () => {
       latencyMs: 1,
     }
     const vector = analysisToVector(analysis)
-    expect(vector).toHaveLength(12)
+    expect(vector).toHaveLength(14)
     const angerIdx = EMOTION_DIMS.indexOf('anger')
     expect(vector[angerIdx]).toBe(0.5)
     // All others should be 0
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 14; i++) {
       if (i !== angerIdx) expect(vector[i]).toBe(0)
     }
   })
@@ -116,12 +118,12 @@ describe('Emotion Persistence', () => {
       latencyMs: 1,
     }
     const vector = analysisToVector(analysis)
-    expect(vector).toHaveLength(12)
+    expect(vector).toHaveLength(14)
     expect(vector.every(v => v === 0)).toBe(true)
   })
 
   it('analysisToVector handles all emotions present', () => {
-    const emotions = EMOTION_DIMS.map((type, i) => ({ type, score: (i + 1) / 12 }))
+    const emotions = EMOTION_DIMS.map((type, i) => ({ type, score: (i + 1) / 14 }))
     const analysis: EmotionAnalysis = {
       emotions,
       dominant: 'neutral',
@@ -130,9 +132,9 @@ describe('Emotion Persistence', () => {
       latencyMs: 1,
     }
     const vector = analysisToVector(analysis)
-    expect(vector).toHaveLength(12)
-    for (let i = 0; i < 12; i++) {
-      expect(vector[i]).toBeCloseTo((i + 1) / 12)
+    expect(vector).toHaveLength(14)
+    for (let i = 0; i < 14; i++) {
+      expect(vector[i]).toBeCloseTo((i + 1) / 14)
     }
   })
 })

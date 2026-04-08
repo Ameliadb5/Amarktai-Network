@@ -50,6 +50,8 @@ export type EmotionType =
   | 'confusion'
   | 'excitement'
   | 'neutral'
+  | 'longing'
+  | 'affection'
 
 export interface EmotionScore {
   type: EmotionType
@@ -90,6 +92,8 @@ export type PersonalityType =
   | 'calm'
   | 'energetic'
   | 'empathetic'
+  | 'romantic'
+  | 'passionate'
 
 export interface PersonalityState {
   base: PersonalityType
@@ -176,6 +180,7 @@ export interface SentimentResult {
 export const EMOTION_TYPES: EmotionType[] = [
   'joy', 'sadness', 'anger', 'fear', 'surprise', 'disgust',
   'trust', 'anticipation', 'frustration', 'confusion', 'excitement', 'neutral',
+  'longing', 'affection',
 ]
 
 export const EMOTION_TYPE_COUNT = EMOTION_TYPES.length
@@ -183,6 +188,7 @@ export const EMOTION_TYPE_COUNT = EMOTION_TYPES.length
 export const PERSONALITY_TYPES: PersonalityType[] = [
   'professional', 'friendly', 'assertive', 'flirty',
   'analytical', 'calm', 'energetic', 'empathetic',
+  'romantic', 'passionate',
 ]
 
 export const PERSONALITY_TYPE_COUNT = PERSONALITY_TYPES.length
@@ -201,6 +207,8 @@ const EMOTION_VALENCE: Record<EmotionType, number> = {
   confusion: -0.3,
   excitement: 1,
   neutral: 0,
+  longing: 0.2,    // bittersweet — slight positive lean
+  affection: 0.9,  // warm, positive
 }
 
 /** HuggingFace model tiers for emotion detection */
@@ -837,6 +845,8 @@ const EMOTION_TO_PERSONALITY: Partial<Record<EmotionType, PersonalityType>> = {
   trust: 'friendly',
   anticipation: 'friendly',
   neutral: 'professional',
+  longing: 'romantic',
+  affection: 'romantic',
 }
 
 /**
@@ -1094,6 +1104,14 @@ export function modulateResponse(
       break
     case 'flirty':
       tonePrefix = 'Respond playfully and engagingly.'
+      break
+    case 'romantic':
+      tonePrefix = 'Respond with warmth, tenderness, and emotional intimacy.'
+      notes.push('User is experiencing longing or affection — using romantic tone')
+      break
+    case 'passionate':
+      tonePrefix = 'Respond with intensity, depth, and genuine emotional investment.'
+      notes.push('Applying passionate engagement tone')
       break
     default:
       tonePrefix = 'Respond professionally and helpfully.'

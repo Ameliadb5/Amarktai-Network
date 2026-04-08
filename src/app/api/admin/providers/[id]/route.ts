@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session'
 import { z } from 'zod'
 import { maskApiKey } from '@/lib/providers'
 import { validateConfig, classifyDbError, configErrorResponse } from '@/lib/config-validator'
+import { encryptVaultKey } from '@/lib/crypto-vault'
 
 const patchSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
@@ -99,7 +100,7 @@ export async function PATCH(
         updateData.healthMessage = 'No API key configured'
         updateData.lastCheckedAt = null
       } else {
-        updateData.apiKey = data.apiKey.trim()
+        updateData.apiKey = encryptVaultKey(data.apiKey.trim())
         updateData.maskedPreview = maskApiKey(data.apiKey.trim())
         // Reset health to "configured but not tested" after key change
         updateData.healthStatus = 'configured'

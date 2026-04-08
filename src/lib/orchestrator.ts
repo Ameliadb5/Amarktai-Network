@@ -38,6 +38,8 @@ import { prisma } from '@/lib/prisma'
 import {
   getDefaultModelForProvider,
   getModelRegistry,
+  isProviderUsable,
+  getModelById,
   setProviderHealth,
   type ProviderHealthStatus,
 } from '@/lib/model-registry'
@@ -46,6 +48,9 @@ import { isProviderWithinBudget } from '@/lib/budget-tracker'
 import { createAgentTask, executeAgent, handoffTask, isAgentPermitted } from '@/lib/agent-runtime'
 import { retrieve, type RetrievalResult } from '@/lib/retrieval-engine'
 import { generateContent, type MultimodalResult } from '@/lib/multimodal-router'
+import { getAppProfileFromDb, runtimeProfileOverrides } from '@/lib/app-profiles'
+import { recordPerformance, loadSmartRouterState } from '@/lib/smart-router'
+import { lookupCache, storeInCache } from '@/lib/semantic-cache'
 
 // Consensus synthesizer: prefer longer response if it exceeds primary by this ratio
 const CONSENSUS_LENGTH_RATIO_THRESHOLD = 1.2
@@ -467,9 +472,16 @@ export async function orchestrate(opts: {
   appCategory: string
   taskType: string
   message: string
+  /** Optional provider key to override routing (validated against registry). */
+  providerOverride?: string
+  /** Optional model ID to use when providerOverride is set. */
+  modelOverride?: string
 }): Promise<OrchestrationResult> {
   const start = Date.now()
-  const { appSlug, appCategory, taskType, message } = opts
+  const { appSlug, appCategory, taskType, message, providerOverride, modelOverride } = opts
+
+  // Hydrate smart-router state from Redis on first request (fire-and-forget)
+  loadSmartRouterState().catch(() => {})
 
   // 1. Classify
   const classification = classifyTask(appCategory, taskType, message)
@@ -496,6 +508,20 @@ export async function orchestrate(opts: {
 
   syncProviderHealthCache(filteredAvailable)
 
+  // 2c. Hydrate per-app DB profile into runtimeProfileOverrides so the routing
+  //     engine picks up DB-configured allowedProviders, preferredModels, etc.
+  //     Runs async; failure falls back to static defaults silently.
+  if (appSlug && appSlug !== 'unknown') {
+    try {
+      const dbProfile = await getAppProfileFromDb(appSlug)
+      if (dbProfile) {
+        runtimeProfileOverrides.set(appSlug.toLowerCase().trim(), dbProfile)
+      }
+    } catch {
+      // DB lookup failure — routing engine falls back to static default profile
+    }
+  }
+
   // 3. Build routing context with signal detection
   const isMultimodal = detectMultimodal(appCategory, taskType)
   const isRetrieval = detectRetrieval(taskType, message)
@@ -518,6 +544,49 @@ export async function orchestrate(opts: {
 
   // 5. Build decision from routing-engine result (also uses health-aware cache internally)
   const decision = await decideExecution(classification, filteredAvailable, appSlug)
+
+  // 5a. CRITICAL: When the modality-aware routing produced a valid primary model
+  //     (e.g. dall-e-3 for image tasks), use IT instead of decideExecution's internally-
+  //     routed model (which has no modality signal and selects a chat model).
+  //     This fixes the bug where image tasks received text output.
+  if (routingDecision.primaryModel) {
+    decision.primaryProvider = {
+      providerKey: routingDecision.primaryModel.provider,
+      model: routingDecision.primaryModel.model_id,
+      healthStatus: routingDecision.primaryModel.health_status,
+      isHealthy:
+        routingDecision.primaryModel.health_status === 'healthy' ||
+        routingDecision.primaryModel.health_status === 'configured',
+    }
+  }
+
+  // 5b. Apply provider/model override from app metadata (Phase 2).
+  //     Validate the override is actually a configured, usable provider before applying.
+  if (providerOverride) {
+    const overrideUsable = isProviderUsable(providerOverride)
+    if (overrideUsable) {
+      // Resolve model: use explicit modelOverride if provided and valid,
+      // otherwise fall back to the DB-loaded default for that provider,
+      // otherwise keep the current primary model (if any).
+      const resolvedModel =
+        (modelOverride && getModelById(providerOverride, modelOverride)?.model_id) ||
+        filteredAvailable.find(p => p.providerKey === providerOverride)?.model ||
+        decision.primaryProvider?.model
+      decision.primaryProvider = {
+        providerKey: providerOverride,
+        model: resolvedModel ?? providerOverride,
+        healthStatus: 'configured',
+        isHealthy: true,
+      }
+      decision.warnings = decision.warnings ?? []
+      decision.warnings.push(`Provider override applied: using ${providerOverride}/${resolvedModel}`)
+    } else {
+      decision.warnings = decision.warnings ?? []
+      decision.warnings.push(
+        `Provider override "${providerOverride}" is not configured or usable — using routed provider instead`,
+      )
+    }
+  }
 
   // Override the execution mode with the routing engine's mode when it returns valid models
   let effectiveMode: ExecutionMode = decision.executionMode
@@ -662,11 +731,59 @@ export async function orchestrate(opts: {
     // ── Direct / Specialist ─────────────────────────────────────────────
     case 'direct':
     case 'specialist': {
+      // ── Semantic cache lookup (text-only tasks) ──────────────────────
+      // Skip cache for image/TTS/STT tasks — those return binary/URL outputs
+      // that can't be meaningfully cached by text similarity.
+      if (!isImageTask && appSlug) {
+        try {
+          const cacheHit = await lookupCache(message, appSlug, taskType)
+          if (cacheHit.hit && cacheHit.entry) {
+            warnings.push(`Semantic cache hit (similarity: ${(cacheHit.similarity ?? 0).toFixed(3)}) — returning cached response`)
+            const confidence = computeConfidenceScore({
+              primaryProvider: decision.primaryProvider,
+              fallbackUsed: false,
+              validationPassed: null,
+              warnings,
+            })
+            return {
+              output: cacheHit.entry.response,
+              executionMode: decision.executionMode,
+              routedProvider: cacheHit.entry.provider,
+              routedModel: cacheHit.entry.model,
+              confidenceScore: confidence,
+              validationUsed: false,
+              consensusUsed: false,
+              fallbackUsed: false,
+              memoryUsed: false,
+              warnings,
+              errors,
+              latencyMs: Date.now() - start,
+              classification,
+            }
+          }
+        } catch {
+          // Cache lookup failure — proceed normally
+        }
+      }
+
       const result = await callProvider(
         decision.primaryProvider.providerKey,
         decision.primaryProvider.model,
         specialistMessage,
       )
+
+      // Record performance for smart-router learning (fire-and-forget)
+      recordPerformance({
+        modelId: result.model ?? decision.primaryProvider.model,
+        provider: result.providerKey ?? decision.primaryProvider.providerKey,
+        taskType,
+        success: result.ok,
+        latencyMs: Date.now() - start,
+        confidence: result.ok ? 0.8 : 0.0,
+        costEstimate: 0.001, // coarse estimate; refined later
+        timestamp: Date.now(),
+      })
+
       if (!result.ok) {
         errors.push(result.error ?? 'Provider call failed')
         // Attempt fallback if a secondary is available
@@ -684,6 +801,15 @@ export async function orchestrate(opts: {
               validationPassed: null,
               warnings,
             })
+            // Cache successful fallback response
+            if (!isImageTask && appSlug && fallback.output) {
+              storeInCache(message, fallback.output, {
+                provider: fallback.providerKey ?? decision.secondaryProvider.providerKey,
+                model: fallback.model ?? decision.secondaryProvider.model,
+                taskType,
+                appSlug,
+              }).catch(() => {})
+            }
             return {
               output: fallback.output,
               executionMode: decision.executionMode,
@@ -703,6 +829,17 @@ export async function orchestrate(opts: {
           errors.push(fallback.error ?? 'Fallback provider also failed')
         }
       }
+
+      // Cache successful primary response
+      if (result.ok && !isImageTask && appSlug && result.output) {
+        storeInCache(message, result.output, {
+          provider: result.providerKey ?? decision.primaryProvider.providerKey,
+          model: result.model ?? decision.primaryProvider.model,
+          taskType,
+          appSlug,
+        }).catch(() => {})
+      }
+
       const confidence = result.ok
         ? computeConfidenceScore({ primaryProvider: decision.primaryProvider, fallbackUsed: decision.fallbackUsed, validationPassed: null, warnings })
         : null

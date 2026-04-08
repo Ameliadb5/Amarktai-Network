@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session'
 import { z } from 'zod'
 import { maskApiKey } from '@/lib/providers'
 import { validateConfig, classifyDbError, configErrorResponse } from '@/lib/config-validator'
+import { encryptVaultKey } from '@/lib/crypto-vault'
 
 const createSchema = z.object({
   providerKey: z.string().min(1).max(50),
@@ -74,9 +75,11 @@ export async function POST(request: Request) {
     const body = await request.json()
     const data = createSchema.parse(body)
     const masked = maskApiKey(data.apiKey)
+    const encryptedKey = data.apiKey ? encryptVaultKey(data.apiKey) : ''
     const provider = await prisma.aiProvider.create({
       data: {
         ...data,
+        apiKey: encryptedKey,
         maskedPreview: masked,
         healthStatus: data.apiKey ? 'configured' : 'unconfigured',
         healthMessage: data.apiKey ? 'Key configured · not yet tested' : 'No API key configured',
