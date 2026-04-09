@@ -85,9 +85,9 @@ vi.mock('../prisma', () => {
         return existing
       },
       async delete({ where }: { where: Row }) {
-        const deleted = store.has(where[pk])
+        if (!store.has(where[pk])) throw new Error('Record to delete does not exist.')
         store.delete(where[pk])
-        return deleted ? {} : null
+        return {}
       },
       async upsert({ where, create, update: upd }: { where: Row; create: Row; update: Row }) {
         const key = where[pk]
@@ -577,7 +577,7 @@ describe('Batch Processor', () => {
       appSlug: 'batch-result',
       items: [{ input: 'data', taskType: 'test' }],
     })
-    const result = getBatchResult(job.id)
+    const result = await getBatchResult(job.id)
     // Pending job may return null or a result with pending status
     if (result !== null) {
       expect(result.jobId).toBe(job.id)

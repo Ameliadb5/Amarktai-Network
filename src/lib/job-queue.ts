@@ -58,6 +58,7 @@ export type JobType =
   | 'memory_summarization'
   | 'health_sync'
   | 'budget_reconciliation'
+  | 'agent_task'
 
 export interface JobPayload {
   type: JobType

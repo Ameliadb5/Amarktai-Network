@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getVaultApiKey } from '@/lib/brain';
+import { dispatchEvent } from '@/lib/webhook-manager';
 
 async function pollReplicateJob(
   predictionId: string,
@@ -143,6 +144,27 @@ export async function GET(
         resultMeta: updated.meta ?? job.resultMeta ?? null,
       },
     });
+
+    // Dispatch webhook notification when job reaches terminal state
+    if (
+      (dbUpdated.status === 'succeeded' || dbUpdated.status === 'failed') &&
+      job.status !== 'succeeded' && job.status !== 'failed' &&
+      dbUpdated.appSlug
+    ) {
+      const eventType = dbUpdated.status === 'succeeded'
+        ? 'video.generation.completed' as const
+        : 'video.generation.failed' as const;
+      dispatchEvent(dbUpdated.appSlug, eventType, {
+        jobId: dbUpdated.id,
+        status: dbUpdated.status,
+        provider: dbUpdated.provider,
+        model: dbUpdated.modelId,
+        resultUrl: dbUpdated.resultUrl ?? null,
+        errorMessage: dbUpdated.errorMessage ?? null,
+      }).catch(() => {
+        // Webhook dispatch is best-effort; never block the poll response
+      });
+    }
 
     return NextResponse.json({
       capability: 'video_generation',

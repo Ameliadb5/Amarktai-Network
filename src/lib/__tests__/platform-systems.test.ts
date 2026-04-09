@@ -184,7 +184,7 @@ vi.mock('../prisma', () => {
         }
         return row
       },
-      async findMany({ where, include, orderBy }: { where?: Row; include?: { items?: unknown }; orderBy?: unknown }) {
+      async findMany({ where, include, orderBy: _orderBy }: { where?: Row; include?: { items?: unknown }; orderBy?: unknown }) {
         const rows: Row[] = []
         for (const [, row] of base.store) {
           if (!where) { rows.push(row); continue }
