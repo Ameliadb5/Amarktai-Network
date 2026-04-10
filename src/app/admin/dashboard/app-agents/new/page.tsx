@@ -112,7 +112,7 @@ export default function NewAppAgentPage() {
       setError('App slug and App name are required.')
       return
     }
-    if (!/^[a-z0-9-]+$/.test(appSlug)) {
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(appSlug)) {
       setError('App slug must contain only lowercase letters, numbers, and hyphens.')
       return
     }

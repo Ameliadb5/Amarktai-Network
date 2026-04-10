@@ -559,21 +559,35 @@ export async function processAppAgentRequest(
 
 /**
  * Map a task type keyword to a canonical capability for permission checking.
+ * Uses exact prefix/suffix matching to avoid false positives (e.g. 'invoice_search').
  * Returns null if the task type doesn't map to a restricted capability.
  */
 function mapTaskTypeToCapability(taskType: string): string | null {
-  const t = taskType.toLowerCase()
-  if (t.includes('image') || t.includes('dall')) return 'image_generation'
-  if (t.includes('stt') || t.includes('transcrib') || t.includes('speech_to_text')) return 'speech_to_text'
-  if (t.includes('tts') || t.includes('text_to_speech') || t.includes('synthesize')) return 'text_to_speech'
-  if (t.includes('realtime') || t.includes('voice_interaction')) return 'realtime_voice'
-  if (t.includes('embed')) return 'embeddings'
-  if (t.includes('moderat')) return 'moderation'
-  if (t.includes('search') || t.includes('web')) return 'search'
-  if (t.includes('video')) return 'video'
-  if (t.includes('code') || t.includes('coding')) return 'code'
-  if (t.includes('reason') || t.includes('analysis') || t.includes('research')) return 'reasoning'
-  if (t.includes('chat') || t.includes('convers')) return 'chat'
+  const t = taskType.toLowerCase().trim()
+
+  // Exact match table (most common task types)
+  const EXACT: Record<string, string> = {
+    chat: 'chat', conversation: 'chat', converse: 'chat',
+    image: 'image_generation', image_generation: 'image_generation', image_gen: 'image_generation',
+    generate_image: 'image_generation', create_image: 'image_generation',
+    stt: 'speech_to_text', speech_to_text: 'speech_to_text', transcribe: 'speech_to_text', transcription: 'speech_to_text',
+    tts: 'text_to_speech', text_to_speech: 'text_to_speech', synthesize: 'text_to_speech', speak: 'text_to_speech',
+    realtime_voice: 'realtime_voice', voice_interaction: 'realtime_voice', realtime: 'realtime_voice',
+    embeddings: 'embeddings', embedding: 'embeddings', embed: 'embeddings', vector: 'embeddings',
+    moderation: 'moderation', moderate: 'moderation', content_moderation: 'moderation',
+    search: 'search', web_search: 'search',
+    video: 'video', video_generation: 'video', video_planning: 'video',
+    code: 'code', coding: 'code',
+    reasoning: 'reasoning', analysis: 'reasoning', research: 'reasoning',
+  }
+
+  if (EXACT[t]) return EXACT[t]
+
+  // Prefix match for compound types like 'image_edit', 'video_plan'
+  if (t.startsWith('image_') || t.startsWith('generate_image')) return 'image_generation'
+  if (t.startsWith('video_')) return 'video'
+  if (t.startsWith('voice_') || t.startsWith('realtime_')) return 'realtime_voice'
+
   return null // unknown task types are not restricted
 }
 

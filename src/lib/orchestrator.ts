@@ -69,6 +69,13 @@ const EMBEDDINGS_TASK_TYPES_SET = new Set(['embeddings', 'embedding', 'embed', '
 /** Task types that require moderation routing. */
 const MODERATION_TASK_TYPES_SET = new Set(['moderation', 'moderate', 'content_moderation'])
 
+/** Budget mode → max cost tier mapping for routing-engine integration. */
+const BUDGET_TO_COST_TIER: Record<string, string> = {
+  low_cost: 'low',
+  balanced: 'medium',
+  best_quality: 'premium',
+}
+
 /** Task types that require video routing. */
 const VIDEO_TASK_TYPES_SET = new Set(['video', 'video_generation', 'video_gen', 'video_planning'])
 
@@ -557,11 +564,6 @@ export async function orchestrate(opts: {
   else if (isVideoTask) detectedModality = 'video'
 
   // Resolve maxCostTier from budget mode
-  const BUDGET_TO_COST_TIER: Record<string, string> = {
-    low_cost: 'low',
-    balanced: 'medium',
-    best_quality: 'premium',
-  }
   const resolvedMaxCostTier = budgetMode ? BUDGET_TO_COST_TIER[budgetMode] : undefined
 
   const routingCtx = {
