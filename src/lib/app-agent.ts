@@ -557,6 +557,22 @@ export async function processAppAgentRequest(
 
 // ── Capability Permission Helpers ───────────────────────────────────────────
 
+/** Exact match table for task type → capability mapping (module-scoped for performance). */
+const TASK_TYPE_TO_CAPABILITY: Record<string, string> = {
+  chat: 'chat', conversation: 'chat', converse: 'chat',
+  image: 'image_generation', image_generation: 'image_generation', image_gen: 'image_generation',
+  generate_image: 'image_generation', create_image: 'image_generation',
+  stt: 'speech_to_text', speech_to_text: 'speech_to_text', transcribe: 'speech_to_text', transcription: 'speech_to_text',
+  tts: 'text_to_speech', text_to_speech: 'text_to_speech', synthesize: 'text_to_speech', speak: 'text_to_speech',
+  realtime_voice: 'realtime_voice', voice_interaction: 'realtime_voice', realtime: 'realtime_voice',
+  embeddings: 'embeddings', embedding: 'embeddings', embed: 'embeddings', vector: 'embeddings',
+  moderation: 'moderation', moderate: 'moderation', content_moderation: 'moderation',
+  search: 'search', web_search: 'search',
+  video: 'video', video_generation: 'video', video_planning: 'video',
+  code: 'code', coding: 'code',
+  reasoning: 'reasoning', analysis: 'reasoning', research: 'reasoning',
+}
+
 /**
  * Map a task type keyword to a canonical capability for permission checking.
  * Uses exact prefix/suffix matching to avoid false positives (e.g. 'invoice_search').
@@ -565,23 +581,7 @@ export async function processAppAgentRequest(
 function mapTaskTypeToCapability(taskType: string): string | null {
   const t = taskType.toLowerCase().trim()
 
-  // Exact match table (most common task types)
-  const EXACT: Record<string, string> = {
-    chat: 'chat', conversation: 'chat', converse: 'chat',
-    image: 'image_generation', image_generation: 'image_generation', image_gen: 'image_generation',
-    generate_image: 'image_generation', create_image: 'image_generation',
-    stt: 'speech_to_text', speech_to_text: 'speech_to_text', transcribe: 'speech_to_text', transcription: 'speech_to_text',
-    tts: 'text_to_speech', text_to_speech: 'text_to_speech', synthesize: 'text_to_speech', speak: 'text_to_speech',
-    realtime_voice: 'realtime_voice', voice_interaction: 'realtime_voice', realtime: 'realtime_voice',
-    embeddings: 'embeddings', embedding: 'embeddings', embed: 'embeddings', vector: 'embeddings',
-    moderation: 'moderation', moderate: 'moderation', content_moderation: 'moderation',
-    search: 'search', web_search: 'search',
-    video: 'video', video_generation: 'video', video_planning: 'video',
-    code: 'code', coding: 'code',
-    reasoning: 'reasoning', analysis: 'reasoning', research: 'reasoning',
-  }
-
-  if (EXACT[t]) return EXACT[t]
+  if (TASK_TYPE_TO_CAPABILITY[t]) return TASK_TYPE_TO_CAPABILITY[t]
 
   // Prefix match for compound types like 'image_edit', 'video_plan'
   if (t.startsWith('image_') || t.startsWith('generate_image')) return 'image_generation'
