@@ -20,6 +20,7 @@ interface Provider {
   healthMessage: string
   lastCheckedAt: string | null
   notes?: string
+  launchRequired?: boolean
 }
 
 interface ModelEntry {
@@ -395,14 +396,20 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
                 {/* Header row */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">{p.displayName}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-white">{p.displayName}</h3>
+                      {p.launchRequired
+                        ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 uppercase tracking-wider">Required</span>
+                        : <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-500 uppercase tracking-wider">Optional</span>
+                      }
+                    </div>
                     <p className="text-xs text-slate-500 font-mono">{p.providerKey}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    {/* Health badge */}
-                    <span className={`flex items-center gap-1 text-xs ${h.color}`}>
+                    {/* Health badge — optional providers with errors shown as amber, not red */}
+                    <span className={`flex items-center gap-1 text-xs ${p.healthStatus === 'error' && !p.launchRequired ? 'text-amber-400' : h.color}`}>
                       <Icon className="w-3 h-3" />
-                      {h.label}
+                      {p.healthStatus === 'error' && !p.launchRequired ? 'Degraded (optional)' : h.label}
                     </span>
                     {/* Enable toggle */}
                     <button

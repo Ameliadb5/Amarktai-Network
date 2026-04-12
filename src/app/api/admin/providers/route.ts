@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { maskApiKey } from '@/lib/providers'
 import { validateConfig, classifyDbError, configErrorResponse } from '@/lib/config-validator'
 import { encryptVaultKey } from '@/lib/crypto-vault'
+import { getCanonicalProvider } from '@/lib/provider-catalog'
 
 const createSchema = z.object({
   providerKey: z.string().min(1).max(50),
@@ -50,7 +51,15 @@ export async function GET() {
         // apiKey intentionally excluded
       },
     })
-    return NextResponse.json(providers)
+    // Augment each provider with catalog metadata (launchRequired, etc.)
+    const augmented = providers.map((p) => {
+      const catalog = getCanonicalProvider(p.providerKey)
+      return {
+        ...p,
+        launchRequired: catalog?.launchRequired ?? false,
+      }
+    })
+    return NextResponse.json(augmented)
   } catch (error) {
     const { category, message } = classifyDbError(error)
     console.error('[providers] GET failed:', category, message)

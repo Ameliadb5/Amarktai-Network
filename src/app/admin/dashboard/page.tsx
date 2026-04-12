@@ -471,6 +471,9 @@ export default function DashboardOverview() {
                 const unconfigured = providers.filter(p => p.healthStatus === 'unconfigured' || !p.healthStatus)
                 const healthy = providers.filter(p => p.healthStatus === 'healthy')
                 const withErrors = providers.filter(p => p.healthStatus === 'error')
+                // Split errors into blocking (required) and informational (optional)
+                const blockingErrors = withErrors.filter(p => (p as { launchRequired?: boolean }).launchRequired)
+                const optionalErrors = withErrors.filter(p => !(p as { launchRequired?: boolean }).launchRequired)
                 if (providers.length === 0) {
                   return (
                     <div className="py-3 text-center rounded-lg bg-amber-500/5 border border-amber-500/10">
@@ -485,10 +488,16 @@ export default function DashboardOverview() {
                       <span className="text-[11px] text-emerald-400/80">{healthy.length} healthy</span>
                       <span className="text-[11px] text-slate-600 ml-auto">{unconfigured.length} unconfigured</span>
                     </div>
-                    {withErrors.length > 0 && (
+                    {blockingErrors.length > 0 && (
                       <div className="flex items-center gap-2 py-1 px-2 rounded-lg bg-red-500/5 border border-red-500/10">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                        <span className="text-[11px] text-red-400/80">{withErrors.length} provider{withErrors.length !== 1 ? 's' : ''} with errors</span>
+                        <span className="text-[11px] text-red-400/80">{blockingErrors.length} required provider{blockingErrors.length !== 1 ? 's' : ''} with errors</span>
+                      </div>
+                    )}
+                    {optionalErrors.length > 0 && (
+                      <div className="flex items-center gap-2 py-1 px-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        <span className="text-[11px] text-amber-400/80">{optionalErrors.length} optional provider{optionalErrors.length !== 1 ? 's' : ''} degraded</span>
                       </div>
                     )}
                     {unconfigured.slice(0, 3).map(p => (

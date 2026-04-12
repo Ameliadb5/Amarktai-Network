@@ -25,6 +25,13 @@ export interface CanonicalProviderEntry {
   readonly supportedCapabilityFamilies: readonly string[];
   /** Deterministic display ordering (lower = higher priority). */
   readonly sortOrder: number;
+  /**
+   * Whether this provider must be configured for the platform to go live.
+   * Errors on required providers are shown as blocking; errors on optional
+   * providers are shown as degraded warnings and do not affect the system
+   * health score denominator.
+   */
+  readonly launchRequired: boolean;
 }
 
 /**
@@ -51,6 +58,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
       'agent_planning',
     ],
     sortOrder: 0,
+    launchRequired: true,
   },
   {
     key: 'groq',
@@ -59,6 +67,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['chat', 'reasoning', 'code'],
     sortOrder: 1,
+    launchRequired: false,
   },
   {
     key: 'grok',
@@ -67,6 +76,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['chat', 'reasoning', 'code', 'vision'],
     sortOrder: 2,
+    launchRequired: false,
   },
   {
     key: 'deepseek',
@@ -75,6 +85,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['chat', 'reasoning', 'code'],
     sortOrder: 3,
+    launchRequired: false,
   },
   {
     key: 'gemini',
@@ -83,6 +94,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['chat', 'reasoning', 'code', 'vision'],
     sortOrder: 4,
+    launchRequired: false,
   },
   {
     key: 'huggingface',
@@ -98,6 +110,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
       'voice_interaction',
     ],
     sortOrder: 5,
+    launchRequired: false,
   },
   {
     key: 'nvidia',
@@ -106,6 +119,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: false,
     supportedCapabilityFamilies: ['chat', 'embeddings', 'reranking'],
     sortOrder: 6,
+    launchRequired: false,
   },
   {
     key: 'openrouter',
@@ -119,6 +133,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
       'image_generation',
     ],
     sortOrder: 7,
+    launchRequired: false,
   },
   {
     key: 'together',
@@ -127,6 +142,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['chat', 'code', 'image_generation'],
     sortOrder: 8,
+    launchRequired: false,
   },
   {
     key: 'qwen',
@@ -135,6 +151,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['chat', 'reasoning', 'code', 'vision', 'image_generation', 'video_generation', 'embeddings', 'voice_interaction'],
     sortOrder: 9,
+    launchRequired: false,
   },
   {
     key: 'replicate',
@@ -143,6 +160,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['video_generation', 'image_generation'],
     sortOrder: 10,
+    launchRequired: false,
   },
   {
     key: 'anthropic',
@@ -151,6 +169,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['chat', 'reasoning', 'code', 'vision', 'agent_planning'],
     sortOrder: 11,
+    launchRequired: false,
   },
   {
     key: 'cohere',
@@ -159,6 +178,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['chat', 'embeddings', 'reranking'],
     sortOrder: 12,
+    launchRequired: false,
   },
   {
     key: 'mistral',
@@ -167,6 +187,7 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
     healthCheckSupported: true,
     supportedCapabilityFamilies: ['chat', 'reasoning', 'code'],
     sortOrder: 13,
+    launchRequired: false,
   },
 ] as const;
 
