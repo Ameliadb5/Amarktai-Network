@@ -124,6 +124,32 @@ describe('Routing Engine', () => {
     })
   })
 
+  describe('image modality routing', () => {
+    it('routes image tasks to image-capable models only — never a chat model', async () => {
+      const decision = await routeRequest(makeContext({
+        taskType: 'image_generation',
+        requiredModality: 'image',
+        message: 'create image of a sunset',
+      }))
+      expect(decision).toBeDefined()
+      if (decision.primaryModel) {
+        expect(decision.primaryModel.supports_image_generation).toBe(true)
+        expect(decision.primaryModel.supports_chat).toBe(false)
+        expect(decision.primaryModel.category).toBe('image')
+      }
+    })
+
+    it('returns no eligible models when all providers are unconfigured for image', async () => {
+      clearProviderHealthCache()
+      const decision = await routeRequest(makeContext({
+        taskType: 'image_generation',
+        requiredModality: 'image',
+        message: 'create image of a sunset',
+      }))
+      expect(decision.primaryModel).toBeNull()
+    })
+  })
+
   describe('cost-aware routing', () => {
     it('respects maxCostTier constraint', async () => {
       const decision = await routeRequest(makeContext({
