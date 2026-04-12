@@ -479,6 +479,9 @@ export async function routeRequest(context: RoutingContext): Promise<RoutingDeci
   // those that match. If no models match the modality, FAIL immediately.
   if (context.requiredModality && context.requiredModality !== 'text') {
     const modalityFiltered = filterByModality(eligible, context.requiredModality)
+    if (context.requiredModality === 'image') {
+      console.log('[routing-engine] Eligible models for image:', modalityFiltered.map(m => m.model_id))
+    }
     if (modalityFiltered.length === 0) {
       return {
         mode: 'direct',
