@@ -186,8 +186,17 @@ export async function getVaultApiKey(providerKey: string): Promise<string | null
   return null
 }
 
-/** OpenAI image generation models that require /v1/images/generations instead of /v1/chat/completions. */
-export const OPENAI_IMAGE_MODELS = new Set(['dall-e-3', 'dall-e-2', 'gpt-image-1'])
+/**
+ * OpenAI image generation models that require /v1/images/generations instead of /v1/chat/completions.
+ * These models MUST NEVER be routed to the chat/completions endpoint.
+ */
+export const OPENAI_IMAGE_MODELS = new Set([
+  'gpt-image-1.5',
+  'gpt-image-1',
+  'gpt-image-1-mini',
+  'dall-e-3',
+  'dall-e-2',
+])
 
 /**
  * Call an AI provider via the single provider vault.

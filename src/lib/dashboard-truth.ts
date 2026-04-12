@@ -316,15 +316,33 @@ export async function getCapabilityTruth(
     } else if (hasCapableModel && hasActiveProvider) {
       state = 'AVAILABLE_NOW';
       implementationState = 'ACTIVE_NOW';
-      reason = 'Route exists, capable model found, provider is active.';
+      if (cap === 'image_generation') {
+        const activeImageModels = capableModels
+          .filter((m) => activeProviders.has(m.provider))
+          .map((m) => m.model_id);
+        const hasGptImageModel = activeImageModels.some((id) =>
+          id === 'gpt-image-1' || id === 'gpt-image-1.5' || id === 'gpt-image-1-mini',
+        );
+        reason = hasGptImageModel
+          ? `Image generation ready — GPT Image model available (${activeImageModels.filter((id) => id.startsWith('gpt-image')).join(', ')}).`
+          : `Image generation ready via ${activeImageModels.join(', ')}.`;
+      } else {
+        reason = 'Route exists, capable model found, provider is active.';
+      }
     } else {
       state = 'UNAVAILABLE_WITH_CURRENT_CONFIG';
       implementationState = hasCapableModel
         ? 'AVAILABLE_IN_CATALOG'
         : 'IMPLEMENTED_IN_PLATFORM';
-      reason = !hasCapableModel
-        ? 'No model in the registry supports this capability.'
-        : 'Provider for capable model is not active.';
+      if (cap === 'image_generation') {
+        reason = !hasCapableModel
+          ? 'No image generation model in the registry.'
+          : 'OpenAI API key is not configured — add it via Admin → AI Providers to enable GPT Image models (gpt-image-1, gpt-image-1.5, gpt-image-1-mini).';
+      } else {
+        reason = !hasCapableModel
+          ? 'No model in the registry supports this capability.'
+          : 'Provider for capable model is not active.';
+      }
     }
 
     return {

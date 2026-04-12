@@ -496,6 +496,12 @@ export interface OrchestrationResult {
   classification: ClassificationResult
   /** Human-readable explanation of why this provider/model was chosen. */
   routingReason?: string
+  /** Capability name when a non-text capability routing failed (e.g. 'image_generation'). */
+  capability?: string
+  /** Machine-readable failure code (e.g. 'no_eligible_image_model'). */
+  code?: string
+  /** Candidate models that were evaluated and why they were rejected. */
+  candidateModels?: Array<{ model_id: string; provider: string; enabled: boolean; rejection_reason: string }>
 }
 
 /**
@@ -631,6 +637,28 @@ export async function orchestrate(opts: {
     }
     const label = capabilityLabel[detectedModality] ?? detectedModality
     const checkedProviders = filteredAvailable.map(p => p.providerKey)
+
+    // Build diagnostic: which models were considered and why they were rejected.
+    const candidateModels = getModelRegistry()
+      .filter((m) => {
+        if (detectedModality === 'image') return m.supports_image_generation
+        if (detectedModality === 'voice') return m.supports_tts || m.supports_stt
+        if (detectedModality === 'video') return m.supports_video_generation || m.supports_video_planning
+        if (detectedModality === 'embeddings') return m.supports_embeddings
+        if (detectedModality === 'moderation') return m.supports_moderation
+        return false
+      })
+      .map((m) => ({
+        model_id: m.model_id,
+        provider: m.provider,
+        enabled: m.enabled,
+        rejection_reason: !m.enabled
+          ? 'model_disabled'
+          : !checkedProviders.includes(m.provider)
+            ? 'provider_not_configured'
+            : 'provider_unconfigured_or_unhealthy',
+      }))
+
     return {
       output: null,
       executionMode: 'direct',
@@ -648,6 +676,9 @@ export async function orchestrate(opts: {
         `Providers checked: [${checkedProviders.join(', ') || 'none'}]. ` +
         `Cross-capability fallback to text models is strictly prohibited.`,
       ],
+      capability: detectedModality === 'image' ? 'image_generation' : detectedModality,
+      code: detectedModality === 'image' ? 'no_eligible_image_model' : `no_eligible_${detectedModality}_model`,
+      candidateModels,
       latencyMs: Date.now() - start,
       classification,
       routingReason: routingDecision.reason,
@@ -914,8 +945,23 @@ export async function orchestrate(opts: {
 
       if (!result.ok) {
         errors.push(result.error ?? 'Provider call failed')
-        // Attempt fallback if a secondary is available
+        // Attempt fallback if a secondary is available, but ONLY if the secondary
+        // supports the required modality. Never fall back to a text model for an
+        // image/voice/video/embeddings task — that produces wrong-type output.
         if (decision.secondaryProvider) {
+          const secondaryModel = getModelById(
+            decision.secondaryProvider.providerKey,
+            decision.secondaryProvider.model,
+          )
+          const fallbackCapabilityOk = detectedModality === 'text'
+            || checkModalitySupport(secondaryModel, detectedModality)
+          if (!fallbackCapabilityOk) {
+            warnings.push(
+              `Fallback skipped: secondary model "${decision.secondaryProvider.model}" ` +
+              `(${decision.secondaryProvider.providerKey}) does not support ${detectedModality}. ` +
+              `Cross-capability fallback is strictly prohibited.`,
+            )
+          } else {
           warnings.push(`Primary provider failed — attempting fallback to ${decision.secondaryProvider.providerKey}`)
           const fallback = await callProvider(
             decision.secondaryProvider.providerKey,
@@ -955,6 +1001,7 @@ export async function orchestrate(opts: {
             }
           }
           errors.push(fallback.error ?? 'Fallback provider also failed')
+          } // end fallbackCapabilityOk else
         }
       }
 
