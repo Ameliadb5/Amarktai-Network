@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getVaultApiKey, OPENAI_IMAGE_MODELS } from '@/lib/brain';
+import { getUsableModels } from '@/lib/model-registry';
 
 /**
  * POST /api/brain/image — Standard image generation
  *
- * Calls the OpenAI images endpoint (DALL-E 3 → DALL-E 2 fallback),
- * or Together AI FLUX as a second fallback.
+ * Prefers GPT Image models (gpt-image-1.5 → gpt-image-1 → gpt-image-1-mini),
+ * then falls back to DALL-E 3 → DALL-E 2, then Together AI FLUX.
  *
- * Unlike /api/brain/suggestive-image, this route has no suggestive-mode
- * gating and does not enforce a style prefix. It is intended for general
- * image generation requests (diagrams, product shots, illustrations, etc.).
+ * Returns a structured error with code=no_eligible_image_model when no
+ * image-capable provider is configured — never silently falls back to text.
  *
  * Accepts JSON body:
  *   - prompt  (string, required)
- *   - model   (string, optional) — override model (default: dall-e-3)
+ *   - model   (string, optional) — override model (must be an image model)
  *   - size    (string, optional) — '1024x1024' | '1024x1792' | '1792x1024'
- *   - quality (string, optional) — 'standard' | 'hd' (dall-e-3 only)
+ *   - quality (string, optional) — 'standard' | 'hd' (DALL-E 3 only)
  *
  * Returns:
  *   { executed, imageUrl?, imageBase64?, provider, model, error? }
@@ -26,6 +26,17 @@ type ImageSize = (typeof ALLOWED_SIZES)[number];
 
 /** Sizes supported by DALL-E 2 (subset of ALLOWED_SIZES). */
 const DALLE2_SIZES = new Set<string>(['256x256', '512x512', '1024x1024']);
+
+/**
+ * GPT Image family — the canonical OpenAI image-generation models.
+ * These must NEVER be routed to the chat/completions endpoint.
+ * Ordered: highest-capability first.
+ */
+const GPT_IMAGE_MODELS_ORDERED = [
+  'gpt-image-1.5',
+  'gpt-image-1',
+  'gpt-image-1-mini',
+] as const;
 
 /** Together AI FLUX models tried in order for fallback image generation. */
 const FLUX_MODELS = [
@@ -59,60 +70,85 @@ export async function POST(request: NextRequest) {
       ? (size as ImageSize)
       : '1024x1024';
 
-    // ── Provider 1: OpenAI DALL-E 3 (primary) ──────────────────────────
+    // ── Provider 1: OpenAI — GPT Image family + DALL-E fallback ────────
     const openaiKey = await getVaultApiKey('openai');
     if (openaiKey) {
-      const model = requestedModel && OPENAI_IMAGE_MODELS.has(requestedModel)
-        ? requestedModel
-        : 'dall-e-3';
+      // Resolve the model to use:
+      //   1. If the caller requested a specific image model, honour it.
+      //   2. Otherwise try each GPT Image model in capability order.
+      //   3. Fall back to DALL-E 3 → DALL-E 2 for legacy compatibility.
+      const modelCandidates: string[] = requestedModel && OPENAI_IMAGE_MODELS.has(requestedModel)
+        ? [requestedModel]
+        : [...GPT_IMAGE_MODELS_ORDERED, 'dall-e-3', 'dall-e-2'];
 
-      try {
-        const dalleSize = model === 'dall-e-2'
-          ? (DALLE2_SIZES.has(resolvedSize) ? resolvedSize : '1024x1024') as ImageSize
-          : resolvedSize;
+      // Validate: only allow models the usable registry knows as image-capable.
+      const enabledImageModelIds = new Set(
+        getUsableModels()
+          .filter((m) => m.provider === 'openai' && m.supports_image_generation)
+          .map((m) => m.model_id),
+      );
+      // Also keep DALL-E entries which may not appear in the usable pool when provider health is not yet synced.
+      const candidates = modelCandidates.filter(
+        (m) => enabledImageModelIds.has(m) || m === 'dall-e-3' || m === 'dall-e-2',
+      );
 
-        const requestBody: Record<string, unknown> = {
-          model,
-          prompt: prompt.trim(),
-          n: 1,
-          size: dalleSize,
-        };
-        if (model === 'dall-e-3') {
-          requestBody.quality = quality === 'hd' ? 'hd' : 'standard';
-        }
+      for (const model of candidates) {
+        try {
+          const effectiveSize = model === 'dall-e-2'
+            ? (DALLE2_SIZES.has(resolvedSize) ? resolvedSize : '1024x1024') as ImageSize
+            : resolvedSize;
 
-        const response = await fetch('https://api.openai.com/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${openaiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(60_000),
-        });
-
-        if (response.ok) {
-          const data = await response.json() as { data?: Array<{ url?: string; b64_json?: string }> };
-          const imageUrl = data.data?.[0]?.url ?? null;
-          const imageBase64 = data.data?.[0]?.b64_json
-            ? `data:image/png;base64,${data.data[0].b64_json}`
-            : null;
-          if (imageUrl || imageBase64) {
-            return NextResponse.json({
-              executed: true,
-              imageUrl,
-              imageBase64,
-              provider: 'openai',
-              model,
-              size: dalleSize,
-            });
+          const requestBody: Record<string, unknown> = {
+            model,
+            prompt: prompt.trim(),
+            n: 1,
+            size: effectiveSize,
+          };
+          // DALL-E 3 supports quality; GPT Image models do not use this field.
+          if (model === 'dall-e-3') {
+            requestBody.quality = quality === 'hd' ? 'hd' : 'standard';
           }
-        } else {
-          const errBody = await response.json().catch(() => ({})) as { error?: { message?: string } };
-          console.warn(`[brain/image] OpenAI ${model} failed: ${errBody?.error?.message ?? response.status}`);
+
+          const response = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${openaiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+            signal: AbortSignal.timeout(60_000),
+          });
+
+          if (response.ok) {
+            const data = await response.json() as { data?: Array<{ url?: string; b64_json?: string }> };
+            const imageUrl = data.data?.[0]?.url ?? null;
+            const imageBase64 = data.data?.[0]?.b64_json
+              ? `data:image/png;base64,${data.data[0].b64_json}`
+              : null;
+            if (imageUrl || imageBase64) {
+              return NextResponse.json({
+                executed: true,
+                imageUrl,
+                imageBase64,
+                provider: 'openai',
+                model,
+                size: effectiveSize,
+              });
+            }
+          } else {
+            const errBody = await response.json().catch(() => ({})) as { error?: { message?: string } };
+            const errMsg = errBody?.error?.message ?? String(response.status);
+            console.warn(`[brain/image] OpenAI ${model} failed: ${errMsg}`);
+            // If the model is not supported by this account (404 / model_not_found),
+            // try the next candidate. For other errors stop (rate-limit, auth, etc.).
+            if (response.status !== 404 && !errMsg.includes('model_not_found') && !errMsg.includes('does not exist')) {
+              break;
+            }
+          }
+        } catch (err) {
+          console.warn(`[brain/image] OpenAI ${model} error:`, err instanceof Error ? err.message : err);
+          break;
         }
-      } catch (err) {
-        console.warn('[brain/image] OpenAI call failed:', err instanceof Error ? err.message : err);
       }
     }
 
@@ -156,15 +192,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── No provider available ──────────────────────────────────────────
+    // ── No provider available — structured failure, never falls back to text ──
+    const candidateModels = [...GPT_IMAGE_MODELS_ORDERED, 'dall-e-3', 'dall-e-2'];
+    const rejectionReasons: string[] = [];
+    if (!openaiKey) rejectionReasons.push('openai: no API key configured');
+    if (!togetherKey) rejectionReasons.push('together: no API key configured');
+
     return NextResponse.json(
       {
         executed: false,
+        capability: 'image_generation',
+        code: 'no_eligible_image_model',
         error:
           'No image generation provider is configured. ' +
-          'Add an API key via Admin → AI Providers. Supported: OpenAI (DALL-E 3), Together AI (FLUX).',
+          'Add an OpenAI API key (Admin → AI Providers) to enable GPT Image models. ' +
+          'Supported: gpt-image-1.5, gpt-image-1, gpt-image-1-mini, dall-e-3, Together AI FLUX.',
+        candidate_models: candidateModels,
+        rejection_reasons: rejectionReasons,
         providers_checked: ['openai', 'together'],
-        capability: 'image_generation',
       },
       { status: 503 },
     );

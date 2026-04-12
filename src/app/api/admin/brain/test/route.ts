@@ -24,7 +24,8 @@ const testSchema = z.object({
 
 const SPECIALIST_CAPABILITIES = new Set([
   'tts', 'voice', 'stt', 'voice_input', 'voice_output',
-  'image', 'image_generation', 'suggestive', 'suggestive_image',
+  'image', 'image_generation', 'image_gen', 'generate_image', 'create_image',
+  'suggestive', 'suggestive_image',
   'research', 'research_search', 'deep_research',
   'video', 'video_generation', 'video_planning',
 ])
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (['image', 'image_generation'].includes(body.taskType)) {
+    if (['image', 'image_generation', 'image_gen', 'generate_image', 'create_image'].includes(body.taskType)) {
       const imageRes = await fetch(`${origin}/api/brain/image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -124,19 +125,24 @@ export async function POST(request: NextRequest) {
       })
       const latencyMs = Date.now() - start
       const imageData = await imageRes.json().catch(() => ({})) as {
-        imageUrl?: string; imageBase64?: string; error?: string; provider?: string; model?: string
+        imageUrl?: string; imageBase64?: string; error?: string; provider?: string; model?: string;
+        code?: string; candidate_models?: unknown; rejection_reasons?: string[];
       }
+      const imageSuccess = imageRes.ok && (!!imageData.imageUrl || !!imageData.imageBase64)
       return NextResponse.json(
         {
-          success: imageRes.ok && (!!imageData.imageUrl || !!imageData.imageBase64),
-          executed: imageRes.ok, traceId,
-          output: imageRes.ok ? '[Image generated]' : null,
+          success: imageSuccess,
+          executed: imageSuccess, traceId,
+          output: imageSuccess ? '[Image generated]' : null,
           imageUrl: imageData.imageUrl ?? imageData.imageBase64 ?? null,
           capability: capabilities, routedProvider: imageData.provider ?? null,
           routedModel: imageData.model ?? null, executionMode: 'specialist', fallback_used: false,
-          error: imageData.error ?? null, latencyMs, timestamp: new Date().toISOString(),
+          error: imageData.error ?? null,
+          code: imageData.code ?? null,
+          candidateModels: imageData.candidate_models ?? null,
+          latencyMs, timestamp: new Date().toISOString(),
         },
-        { status: imageRes.ok ? 200 : imageRes.status },
+        { status: imageSuccess ? 200 : (imageRes.ok ? 503 : imageRes.status) },
       )
     }
 
