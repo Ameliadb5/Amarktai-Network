@@ -819,3 +819,19 @@ model AppAgentLearningLog {
   @@index([cycleDate])
   @@map("app_agent_learning_logs")
 }
+
+/// Runtime integration configuration — stores API keys and URLs for external services.
+/// Keys are encrypted at rest using the same crypto-vault as AI provider keys.
+model IntegrationConfig {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique // e.g. firecrawl, mem0, graphiti, litellm, posthog, langgraph, qdrant
+  displayName String   @map("display_name")
+  apiKey      String   @default("") @map("api_key") // encrypted via crypto-vault
+  apiUrl      String   @default("") @map("api_url")
+  enabled     Boolean  @default(true)
+  notes       String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("integration_configs")
+}

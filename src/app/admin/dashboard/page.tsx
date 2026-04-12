@@ -658,6 +658,7 @@ export default function DashboardOverview() {
               { label: 'Alerts',             href: '/admin/dashboard/alerts',       icon: Bell,        gradient: 'from-red-500/20 to-orange-500/20' },
               { label: 'Voice & Persona',    href: '/admin/dashboard/voice',        icon: Mic,         gradient: 'from-emerald-500/20 to-teal-500/20' },
               { label: 'Video Generation',   href: '/admin/dashboard/video',        icon: Film,        gradient: 'from-pink-500/20 to-rose-500/20' },
+              { label: 'Integrations',       href: '/admin/dashboard/integrations', icon: Cable,       gradient: 'from-violet-500/20 to-indigo-500/20' },
             ].map(action => (
               <Link
                 key={action.label}

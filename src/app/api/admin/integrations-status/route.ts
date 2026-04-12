@@ -5,8 +5,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getIronSession } from 'iron-session'
-import { cookies } from 'next/headers'
+import { getSession } from '@/lib/session'
 import { getFirecrawlStatus } from '@/lib/firecrawl'
 import { getMem0Status } from '@/lib/mem0-client'
 import { getGraphitiStatus } from '@/lib/graphiti-client'
@@ -14,18 +13,9 @@ import { getLiteLLMStatus } from '@/lib/litellm-client'
 import { getPostHogStatus } from '@/lib/posthog-client'
 import { getLangGraphStatus } from '@/lib/langgraph-client'
 
-interface SessionData { admin?: boolean }
-
-async function requireAdmin(): Promise<boolean> {
-  const session = await getIronSession<SessionData>(await cookies(), {
-    cookieName: 'amarktai-admin-session',
-    password: process.env.SESSION_SECRET || 'dev-secret-replace-in-production-min-32-chars',
-  })
-  return !!session.admin
-}
-
 export async function GET() {
-  if (!(await requireAdmin())) {
+  const session = await getSession()
+  if (!session.isLoggedIn) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -8,23 +8,13 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getIronSession } from 'iron-session'
-import { cookies } from 'next/headers'
+import { getSession } from '@/lib/session'
 import { getQueue, isJobQueueHealthy } from '@/lib/job-queue'
 import { prisma } from '@/lib/prisma'
 
-interface SessionData { admin?: boolean }
-
-async function requireAdmin(): Promise<boolean> {
-  const session = await getIronSession<SessionData>(await cookies(), {
-    cookieName: 'amarktai-admin-session',
-    password: process.env.SESSION_SECRET || 'dev-secret-replace-in-production-min-32-chars',
-  })
-  return !!session.admin
-}
-
 export async function GET() {
-  if (!(await requireAdmin())) {
+  const session = await getSession()
+  if (!session.isLoggedIn) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

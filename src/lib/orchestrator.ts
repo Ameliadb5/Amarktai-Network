@@ -51,6 +51,25 @@ import { generateContent, type MultimodalResult } from '@/lib/multimodal-router'
 import { getAppProfileFromDb, runtimeProfileOverrides } from '@/lib/app-profiles'
 import { recordPerformance, loadSmartRouterState } from '@/lib/smart-router'
 import { lookupCache, storeInCache } from '@/lib/semantic-cache'
+import type { ModelEntry } from '@/lib/model-registry'
+
+/**
+ * Check whether a model supports the given modality.
+ * Returns true for text (no restriction) or when the model carries
+ * the corresponding capability flag. Returns false (fail-safe) for
+ * unknown models (null/undefined).
+ */
+function checkModalitySupport(model: ModelEntry | null | undefined, modality: string): boolean {
+  if (!model) return false // unknown model — fail safe
+  switch (modality) {
+    case 'image':      return model.supports_image_generation === true
+    case 'voice':      return model.supports_tts === true || model.supports_stt === true
+    case 'embeddings': return model.supports_embeddings === true
+    case 'moderation': return model.supports_moderation === true
+    case 'video':      return model.supports_video_generation === true || model.supports_video_planning === true
+    default:           return true
+  }
+}
 
 // Consensus synthesizer: prefer longer response if it exceeds primary by this ratio
 const CONSENSUS_LENGTH_RATIO_THRESHOLD = 1.2
@@ -599,7 +618,43 @@ export async function orchestrate(opts: {
     }
   }
 
-  // 5b. Apply provider/model override from app metadata (Phase 2).
+  // 5b. CRITICAL: Hard capability guard — when a non-text modality was required
+  //     but the routing engine found no eligible model, STOP immediately.
+  //     Never silently fall through to a text model for image/voice/video/embeddings/moderation.
+  if (detectedModality !== 'text' && !routingDecision.primaryModel) {
+    const capabilityLabel: Record<string, string> = {
+      image:      'image generation',
+      voice:      'voice/audio',
+      video:      'video generation',
+      embeddings: 'text embeddings',
+      moderation: 'content moderation',
+    }
+    const label = capabilityLabel[detectedModality] ?? detectedModality
+    const checkedProviders = filteredAvailable.map(p => p.providerKey)
+    return {
+      output: null,
+      executionMode: 'direct',
+      routedProvider: null,
+      routedModel: null,
+      confidenceScore: null,
+      validationUsed: false,
+      consensusUsed: false,
+      fallbackUsed: false,
+      memoryUsed: false,
+      warnings: [...decision.warnings, ...routingDecision.warnings],
+      errors: [
+        `No eligible model found for capability: ${label}. ` +
+        `Configure a provider that supports ${label} (e.g. OpenAI for images, Groq/OpenAI for voice). ` +
+        `Providers checked: [${checkedProviders.join(', ') || 'none'}]. ` +
+        `Cross-capability fallback to text models is strictly prohibited.`,
+      ],
+      latencyMs: Date.now() - start,
+      classification,
+      routingReason: routingDecision.reason,
+    }
+  }
+
+  // 5c. Apply provider/model override from app metadata (Phase 2).
   //     Validate the override is actually a configured, usable provider before applying.
   if (providerOverride) {
     const overrideUsable = isProviderUsable(providerOverride)
@@ -770,6 +825,40 @@ export async function orchestrate(opts: {
     // ── Direct / Specialist ─────────────────────────────────────────────
     case 'direct':
     case 'specialist': {
+      // ── Last-line-of-defense capability check ─────────────────────────
+      // Verify the selected model actually supports the required modality.
+      // This catches any edge case where the routing guard above was bypassed
+      // (e.g. by a provider override pointing to a text model for an image task).
+      if (detectedModality !== 'text') {
+        const selectedModel = getModelById(
+          decision.primaryProvider.providerKey,
+          decision.primaryProvider.model,
+        )
+        const capabilityOk = checkModalitySupport(selectedModel, detectedModality)
+        if (!capabilityOk) {
+          return {
+            output: null,
+            executionMode: 'direct',
+            routedProvider: decision.primaryProvider.providerKey,
+            routedModel: decision.primaryProvider.model,
+            confidenceScore: null,
+            validationUsed: false,
+            consensusUsed: false,
+            fallbackUsed: false,
+            memoryUsed: false,
+            warnings,
+            errors: [
+              `Capability mismatch: model "${decision.primaryProvider.model}" ` +
+              `(${decision.primaryProvider.providerKey}) does not support ${detectedModality}. ` +
+              `Cross-capability execution is strictly prohibited. ` +
+              `Configure a ${detectedModality}-capable provider to enable this feature.`,
+            ],
+            latencyMs: Date.now() - start,
+            classification,
+          }
+        }
+      }
+
       // ── Semantic cache lookup (text-only tasks) ──────────────────────
       // Skip cache for image/TTS/STT/video/embeddings tasks — those return binary/URL outputs
       // that can't be meaningfully cached by text similarity.

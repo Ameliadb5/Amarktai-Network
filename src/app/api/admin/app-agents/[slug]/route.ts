@@ -7,22 +7,12 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getIronSession } from 'iron-session'
-import { cookies } from 'next/headers'
+import { getSession } from '@/lib/session'
 import { getAppAgent, updateAppAgent, deleteAppAgent, syncAdminNotesToRules } from '@/lib/app-agent'
 
-interface SessionData { admin?: boolean }
-
-async function requireAdmin(): Promise<boolean> {
-  const session = await getIronSession<SessionData>(await cookies(), {
-    cookieName: 'amarktai-admin-session',
-    password: process.env.SESSION_SECRET || 'dev-secret-replace-in-production-min-32-chars',
-  })
-  return !!session.admin
-}
-
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
-  if (!(await requireAdmin())) {
+  const session = await getSession()
+  if (!session.isLoggedIn) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -36,7 +26,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ slug: string }> }) {
-  if (!(await requireAdmin())) {
+  const session = await getSession()
+  if (!session.isLoggedIn) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -62,7 +53,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
-  if (!(await requireAdmin())) {
+  const session = await getSession()
+  if (!session.isLoggedIn) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -176,14 +176,25 @@ const LATENCY_CEILING: Record<string, number> = {
 // ── Helpers (internal) ──────────────────────────────────────────────────
 
 /**
- * Filter the global usable-model list down to models that the app
- * profile allows (by provider *and* by model id).
+ * Build the eligible model pool for a routing request.
  *
- * Uses `getUsableModels()` which excludes models whose provider is
- * unconfigured, errored, or disabled when health data is available.
+ * For text tasks: apply the full profile filter (provider allowlist + model allowlist).
+ * The model allowlist expresses TEXT model preferences and must not block
+ * capability-specific models like dall-e-3 or bark.
+ *
+ * For non-text capability requests (image/voice/video/embeddings/moderation):
+ * apply only the provider allowlist — the model allowlist is a TEXT model preference
+ * list and is intentionally bypassed so that capability-eligible models are reachable.
+ * Modality filtering happens immediately after in routeRequest().
  */
-function getEligibleModels(profile: AppProfile): ModelEntry[] {
-  return getUsableModels().filter(
+function getEligibleModels(profile: AppProfile, requiredModality?: string): ModelEntry[] {
+  const usable = getUsableModels()
+  if (requiredModality && requiredModality !== 'text') {
+    // Non-text capability: apply provider gate only, not model allowlist
+    return usable.filter((m) => isProviderAllowed(profile, m.provider))
+  }
+  // Text capability: apply full profile gate (provider + model allowlist)
+  return usable.filter(
     (m) => isProviderAllowed(profile, m.provider) && isModelAllowed(profile, m.model_id),
   )
 }
@@ -433,7 +444,8 @@ export function estimateLatency(model: ModelEntry): LatencyEstimate {
 export async function routeRequest(context: RoutingContext): Promise<RoutingDecision> {
   const warnings: string[] = []
   const profile = getAppProfile(context.appSlug)
-  let eligible = getEligibleModels(profile)
+  // Pass requiredModality so non-text capability routing bypasses the text model allowlist
+  let eligible = getEligibleModels(profile, context.requiredModality)
 
   if (eligible.length === 0) {
     return {
