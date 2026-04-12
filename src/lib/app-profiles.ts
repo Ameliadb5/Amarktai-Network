@@ -172,8 +172,12 @@ export const DEFAULT_PROFILE: AppProfile = {
   memory_namespace: 'default',
   retrieval_namespace: 'default',
 
-  // 'medium' allows cost tiers up to 'medium' (gpt-4o-mini, gpt-image-1-mini, etc.).
-  // 'high' would cap at 'low' and filter out most OpenAI models except gpt-4o-mini.
+  // budget_sensitivity maps to a cost ceiling in routing-engine.ts:
+  //   'high'   → highly budget-conscious → cost ceiling = 'low'   (only free/very_low/low models)
+  //   'medium' → balanced               → cost ceiling = 'medium' (up to medium cost, e.g. gpt-4o-mini, gpt-image-1-mini)
+  //   'low'    → cost-insensitive       → cost ceiling = 'premium' (all tiers allowed)
+  // 'medium' is the right default so that common OpenAI models (gpt-4o-mini at 'low', gpt-image-1-mini at 'medium')
+  // are not filtered out when routing unknown-app requests.
   budget_sensitivity: 'medium',
   latency_sensitivity: 'medium',
   logging_privacy_rules: BASIC_PRIVACY_RULES,
