@@ -265,10 +265,11 @@ export default function LabPage() {
 
   /** Download a generated image by its URL (data: or https:). */
   const handleImageDownload = async (url: string) => {
+    const filename = `generated-image-${Date.now()}.png`
     if (url.startsWith('data:')) {
       const a = document.createElement('a')
       a.href = url
-      a.download = 'generated-image.png'
+      a.download = filename
       a.click()
     } else {
       try {
@@ -277,8 +278,9 @@ export default function LabPage() {
         const blobUrl = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = blobUrl
-        a.download = 'generated-image.png'
+        a.download = filename
         a.click()
+        // Revoke after a short delay to allow the browser to initiate the download
         setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000)
       } catch {
         window.open(url, '_blank', 'noopener,noreferrer')
