@@ -66,7 +66,11 @@ export async function POST(request: NextRequest) {
   const isSpecialist = SPECIALIST_CAPABILITIES.has(body.taskType) ||
     capabilities.some(c => SPECIALIST_CAPABILITIES.has(c))
 
-  if (isSpecialist && !body.providerKey) {
+  // Specialist tasks (image, TTS, STT, research, video, …) ALWAYS use the
+  // correct specialist executor — even when the caller forces a providerKey.
+  // Passing providerKey to callProvider for image tasks would silently route
+  // to the default chat model (e.g. gpt-4o-mini) instead of the image API.
+  if (isSpecialist) {
     // Use a safe, hardcoded internal origin to prevent SSRF via Host header manipulation
     const origin = process.env.NEXTAUTH_URL?.replace(/\/$/, '')
       || process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
@@ -307,7 +311,9 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (body.providerKey) {
+  // Direct provider call — only for non-specialist (text) tasks.
+  // Image, TTS, STT, research, and video tasks are already handled above.
+  if (body.providerKey && !isSpecialist) {
     const result = await callProvider(body.providerKey, body.modelId ?? '', body.message)
     const latencyMs = Date.now() - start
     await logBrainEvent({

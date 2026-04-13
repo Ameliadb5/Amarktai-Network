@@ -104,6 +104,12 @@ export async function POST(request: NextRequest) {
           if (model === 'dall-e-3') {
             requestBody.quality = quality === 'hd' ? 'hd' : 'standard';
           }
+          // DALL-E 3 and DALL-E 2 support b64_json response format so we get
+          // a stable base64 payload instead of a temporary CDN URL.
+          // GPT Image models (gpt-image-1.x) do NOT accept response_format.
+          if (model === 'dall-e-3' || model === 'dall-e-2') {
+            requestBody.response_format = 'b64_json';
+          }
 
           const response = await fetch('https://api.openai.com/v1/images/generations', {
             method: 'POST',

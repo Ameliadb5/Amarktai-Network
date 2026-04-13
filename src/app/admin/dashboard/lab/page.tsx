@@ -195,11 +195,23 @@ export default function LabPage() {
       if (!res.ok && data.routedProvider == null && !(Array.isArray(data.capability) && data.capability.length > 0)) {
         throw new Error(data.error || `HTTP ${res.status}`)
       }
+      // Image-class guard: if the capability is image-related but the backend
+      // returned text output without an imageUrl, treat it as an execution failure
+      // rather than a success. This prevents a chat-model text response from
+      // appearing as a successful image generation.
+      const IMAGE_CLASS_CAPABILITIES = new Set([
+        'image_generation', 'image_editing', 'adult_18plus_image', 'suggestive_image_generation',
+      ])
+      const resolvedCapabilities: string[] = Array.isArray(data.capability) ? data.capability : []
+      const resolvedImageUrl: string | null = data.imageUrl ?? data.image_url ?? null
+      const isImageClassResponse = resolvedCapabilities.some((c: string) => IMAGE_CLASS_CAPABILITIES.has(c))
+      const imageClassWithoutImage = isImageClassResponse && !resolvedImageUrl && !!data.output && typeof data.output === 'string'
+
       setResult({
-        success: data.success ?? res.ok,
-        executed: data.executed ?? (data.success ?? false),
-        output: data.output ?? null,
-        capability: Array.isArray(data.capability) ? data.capability : [],
+        success: imageClassWithoutImage ? false : (data.success ?? res.ok),
+        executed: imageClassWithoutImage ? false : (data.executed ?? (data.success ?? false)),
+        output: imageClassWithoutImage ? null : (data.output ?? null),
+        capability: resolvedCapabilities,
         capabilityRoutes: data.capabilityRoutes,
         routedProvider: data.routedProvider ?? null,
         routedModel: data.routedModel ?? null,
@@ -211,9 +223,11 @@ export default function LabPage() {
         fallback_used: data.fallback_used ?? false,
         routingReason: data.routingReason,
         warnings: Array.isArray(data.warnings) ? data.warnings : [],
-        error: data.error ?? null,
+        error: imageClassWithoutImage
+          ? `Image generation executed through a chat model (${data.routedModel ?? 'unknown'}) — text output is not a valid image. Check provider/model dispatch.`
+          : (data.error ?? null),
         latencyMs: data.latencyMs ?? 0,
-        imageUrl: data.imageUrl ?? data.image_url ?? null,
+        imageUrl: resolvedImageUrl,
         audioUrl: data.audioUrl ?? data.audio_url ?? null,
         videoStatus: data.videoStatus ?? data.video_status ?? null,
         sources: Array.isArray(data.sources)
@@ -261,6 +275,34 @@ export default function LabPage() {
     navigator.clipboard.writeText(result.output)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  /** Download a generated image by its URL (data: or https:). */
+  const handleImageDownload = async (url: string) => {
+    const filename = `generated-image-${Date.now()}.png`
+    if (url.startsWith('data:')) {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } else {
+      try {
+        const res = await fetch(url)
+        const blob = await res.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 500)
+      } catch {
+        window.open(url, '_blank', 'noopener,noreferrer')
+      }
+    }
   }
 
   /** Stream a chat/code/reasoning request via SSE from /api/brain/stream */
@@ -738,6 +780,12 @@ export default function LabPage() {
                 alt="Generated image"
                 className="w-full rounded-lg border border-white/[0.08]"
               />
+              <button
+                onClick={() => handleImageDownload(result.imageUrl!)}
+                className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+              >
+                ↓ Download image
+              </button>
             </div>
           )}
 
@@ -851,6 +899,12 @@ export default function LabPage() {
                       alt="Generated"
                       className="max-w-full rounded-lg border border-white/[0.06]"
                     />
+                    <button
+                      onClick={() => handleImageDownload(result.imageUrl!)}
+                      className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+                    >
+                      ↓ Download image
+                    </button>
                   </div>
                 )}
 
