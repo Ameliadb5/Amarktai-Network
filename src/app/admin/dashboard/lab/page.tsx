@@ -270,7 +270,9 @@ export default function LabPage() {
       const a = document.createElement('a')
       a.href = url
       a.download = filename
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
     } else {
       try {
         const res = await fetch(url)
@@ -279,9 +281,10 @@ export default function LabPage() {
         const a = document.createElement('a')
         a.href = blobUrl
         a.download = filename
+        document.body.appendChild(a)
         a.click()
-        // Revoke after a short delay to allow the browser to initiate the download
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000)
+        document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 500)
       } catch {
         window.open(url, '_blank', 'noopener,noreferrer')
       }
