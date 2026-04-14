@@ -226,6 +226,20 @@ const CAPABILITY_META: Record<
   code_review: { displayName: 'Code Review', category: 'code', routeExists: true },
   moderation: { displayName: 'Content Moderation', category: 'safety', routeExists: true },
   adult_18plus_image: { displayName: 'Adult 18+ Image Gen', category: 'adult', routeExists: true },
+  // ── Workflow / Automation ───────────────────────────────────────────────────
+  workflow_automation: { displayName: 'Workflow Automation', category: 'workflow', routeExists: true },
+  skill_templates: { displayName: 'Skill Templates Library', category: 'workflow', routeExists: true },
+  // ── Multi-Agent / Team ──────────────────────────────────────────────────────
+  multi_agent_orchestration: { displayName: 'Multi-Agent Orchestration', category: 'agent', routeExists: true },
+  team_assistant: { displayName: 'Team Assistant', category: 'agent', routeExists: true },
+  agent_handoff: { displayName: 'Agent Handoff Chains', category: 'agent', routeExists: true },
+  // ── Integration Hub ─────────────────────────────────────────────────────────
+  integration_hub: { displayName: 'Integration Hub', category: 'integration', routeExists: true },
+  email_triage: { displayName: 'Email Triage', category: 'integration', routeExists: true },
+  calendar_management: { displayName: 'Calendar Management', category: 'integration', routeExists: true },
+  // ── Smart Home / Device ─────────────────────────────────────────────────────
+  smart_home_control: { displayName: 'Smart Home Control', category: 'smart_home', routeExists: true },
+  device_automation: { displayName: 'Device Automation', category: 'smart_home', routeExists: true },
 };
 
 /** Capabilities gated behind safety settings (suggestive_*). */
@@ -277,7 +291,30 @@ const CAP_TO_MODEL_FLAG: Record<string, string> = {
   // adult_18plus_image uses HuggingFace image models; checking supports_image_generation
   // is a reasonable proxy since the HF inference API handles the actual generation.
   adult_18plus_image: 'supports_image_generation',
+  // Workflow / Automation — platform-level features backed by general chat models
+  workflow_automation: 'supports_chat',
+  skill_templates: 'supports_chat',
+  // Multi-Agent / Team — backed by agent_planning models
+  multi_agent_orchestration: 'supports_agent_planning',
+  team_assistant: 'supports_agent_planning',
+  agent_handoff: 'supports_agent_planning',
+  // Integration Hub — platform-level feature (no AI model required, route always exists)
+  integration_hub: 'supports_chat', // proxy flag — actual availability is platform-level
+  email_triage: 'supports_chat',
+  calendar_management: 'supports_chat',
+  // Smart Home / Device — platform-level feature (framework is always available)
+  smart_home_control: 'supports_chat', // proxy flag — actual availability is platform-level
+  device_automation: 'supports_chat',
 };
+
+/** Capabilities that are platform-level features (route + framework always available,
+ *  no specific AI model flag required beyond having any active chat provider). */
+const PLATFORM_LEVEL_CAPABILITIES = new Set([
+  'integration_hub',
+  'smart_home_control',
+  'workflow_automation',
+  'skill_templates',
+]);
 
 /**
  * Get truth for all capabilities given the current provider/model state.
@@ -332,6 +369,18 @@ export async function getCapabilityTruth(
         'Realtime voice service not configured: set REALTIME_SERVICE_URL to the running ' +
         'WebSocket service (see services/realtime/). The session endpoint ' +
         '(/api/realtime/session) exists but streaming requires the separate service.';
+    } else if (PLATFORM_LEVEL_CAPABILITIES.has(cap)) {
+      // Platform-level capability: no AI model flag required.
+      // These are always AVAILABLE_NOW as long as the route exists (which it does).
+      state = 'AVAILABLE_NOW';
+      implementationState = 'ACTIVE_NOW';
+      if (cap === 'integration_hub') {
+        reason = 'Integration Hub route (/api/admin/integration-hub) is operational. Individual connectors require their own credentials.';
+      } else if (cap === 'smart_home_control') {
+        reason = 'Smart Home framework (/api/admin/smart-home) is operational in simulation mode. Configure HOME_ASSISTANT_URL or HOMEY_API_URL for real device control.';
+      } else {
+        reason = 'Platform-level feature — route exists and is operational.';
+      }
     } else if (hasCapableModel && hasActiveProvider) {
       state = 'AVAILABLE_NOW';
       implementationState = 'ACTIVE_NOW';
