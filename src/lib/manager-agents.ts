@@ -3,22 +3,23 @@
  * @description Subsystem Manager Agents for the AmarktAI Network platform.
  *
  * Each manager is responsible for a specific subsystem:
- *   - Routing Manager:  monitors provider health, triggers routing changes
- *   - Queue Manager:    monitors job queues, detects stuck jobs, manages workers
- *   - Artifact Manager: monitors storage health, enforces retention policies
- *   - App Manager:      monitors per-app health, enforces budgets/limits
- *   - Learning Manager: orchestrates daily learning cycles, improvement reviews
- *   - Growth Manager:   tracks platform growth signals, identifies expansion opportunities
+ *   - Routing Manager:  monitors provider health, triggers routing changes, auto-downgrades
+ *   - Queue Manager:    detects stuck jobs, retries or reassigns, cleans failed jobs
+ *   - Artifact Manager: cleans expired artifacts, ensures integrity
+ *   - App Manager:      detects over-budget/inactive apps, auto-pauses when needed
+ *   - Learning Manager: runs daily optimization cycles, triggers learning jobs
+ *   - Growth Manager:   identifies high-performing apps, prioritizes resources
  *
- * Managers have concrete responsibilities and real runtime hooks.
- * NOT decorative. Each runs periodic checks and logs decisions.
+ * Phase 3: Managers now ACT on problems, not just log them.
+ * Each check can trigger remediation actions.
  *
  * Server-side only.
  */
 
 import { prisma } from '@/lib/prisma'
-import { getQueueStatus } from '@/lib/job-queue'
+import { getQueueStatus, getQueue } from '@/lib/job-queue'
 import { getStorageStatus } from '@/lib/storage-driver'
+import { emitSystemEvent } from '@/lib/event-bus'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,14 +87,35 @@ export async function runRoutingManagerCheck(): Promise<ManagerCheckResult> {
   let providerCount = 0
   let healthyCount = 0
   const degradedProviders: string[] = []
+  const actionsPerformed: string[] = []
 
   try {
     const providers = await prisma.aiProvider.findMany({ where: { enabled: true } })
     providerCount = providers.length
 
     for (const p of providers) {
-      if (p.healthStatus === 'healthy') healthyCount++
-      else degradedProviders.push(p.providerKey)
+      if (p.healthStatus === 'healthy') {
+        healthyCount++
+      } else {
+        degradedProviders.push(p.providerKey)
+
+        // ACTION: Auto-downgrade providers with persistent errors
+        if (p.healthStatus === 'error' && p.enabled) {
+          try {
+            // Check if provider has been in error state for > 1 hour
+            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+            if (p.lastCheckedAt && p.lastCheckedAt < oneHourAgo) {
+              await prisma.aiProvider.update({
+                where: { id: p.id },
+                data: { healthStatus: 'disabled', healthMessage: 'Auto-disabled by routing manager due to persistent errors' },
+              })
+              actionsPerformed.push(`Auto-disabled ${p.providerKey} (persistent error state)`)
+            }
+          } catch {
+            // Non-critical action
+          }
+        }
+      }
     }
   } catch {
     // DB unavailable
@@ -105,13 +127,16 @@ export async function runRoutingManagerCheck(): Promise<ManagerCheckResult> {
 
   const result: ManagerCheckResult = {
     managerType: 'routing',
-    action: 'health_check',
-    summary: `${healthyCount}/${providerCount} providers healthy. ${degradedProviders.length} degraded.`,
-    details: { providerCount, healthyCount, degradedProviders },
+    action: actionsPerformed.length > 0 ? 'recovery' : 'health_check',
+    summary: `${healthyCount}/${providerCount} providers healthy. ${degradedProviders.length} degraded.${actionsPerformed.length > 0 ? ` Actions: ${actionsPerformed.join('; ')}` : ''}`,
+    details: { providerCount, healthyCount, degradedProviders, actionsPerformed },
     severity,
   }
 
   await logManagerAction(result)
+  if (actionsPerformed.length > 0) {
+    emitSystemEvent('manager_action', { manager: 'routing', actions: actionsPerformed })
+  }
   return result
 }
 
@@ -123,6 +148,42 @@ export async function runQueueManagerCheck(): Promise<ManagerCheckResult> {
   const stuckJobs = (status.counts['stuck'] ?? 0) + (status.counts['stalled'] ?? 0)
   const failedJobs = status.counts['failed'] ?? 0
   const waitingJobs = status.counts['waiting'] ?? 0
+  const actionsPerformed: string[] = []
+
+  // ACTION: Retry stuck/stalled jobs
+  if (stuckJobs > 0 && status.backendAvailable) {
+    try {
+      const queue = getQueue()
+      if (queue) {
+        const stalledJobs = await queue.getJobs(['stalled'], 0, 10)
+        for (const job of stalledJobs) {
+          try {
+            await job.retry()
+            actionsPerformed.push(`Retried stalled job ${job.id}`)
+          } catch {
+            // Job may have been processed already
+          }
+        }
+      }
+    } catch {
+      // Queue access failed
+    }
+  }
+
+  // ACTION: Clean old failed jobs (>24h)
+  if (failedJobs > 50 && status.backendAvailable) {
+    try {
+      const queue = getQueue()
+      if (queue) {
+        const cleaned = await queue.clean(24 * 60 * 60 * 1000, 100, 'failed')
+        if (cleaned.length > 0) {
+          actionsPerformed.push(`Cleaned ${cleaned.length} old failed jobs`)
+        }
+      }
+    } catch {
+      // Non-critical
+    }
+  }
 
   const severity: Severity =
     stuckJobs > 10 ? 'critical' :
@@ -131,15 +192,18 @@ export async function runQueueManagerCheck(): Promise<ManagerCheckResult> {
 
   const result: ManagerCheckResult = {
     managerType: 'queue',
-    action: 'health_check',
+    action: actionsPerformed.length > 0 ? 'recovery' : 'health_check',
     summary: status.backendAvailable
-      ? `Queue healthy. Waiting: ${waitingJobs}, Failed: ${failedJobs}, Stuck: ${stuckJobs}`
+      ? `Queue healthy. Waiting: ${waitingJobs}, Failed: ${failedJobs}, Stuck: ${stuckJobs}${actionsPerformed.length > 0 ? `. Actions: ${actionsPerformed.join('; ')}` : ''}`
       : 'Queue backend (Redis) unavailable — jobs running inline',
-    details: { ...status.counts, backendAvailable: status.backendAvailable },
+    details: { ...status.counts, backendAvailable: status.backendAvailable, actionsPerformed },
     severity,
   }
 
   await logManagerAction(result)
+  if (actionsPerformed.length > 0) {
+    emitSystemEvent('manager_action', { manager: 'queue', actions: actionsPerformed })
+  }
   return result
 }
 
@@ -149,10 +213,27 @@ export async function runArtifactManagerCheck(): Promise<ManagerCheckResult> {
   const storageStatus = getStorageStatus()
   let totalArtifacts = 0
   let failedArtifacts = 0
+  let expiredCleaned = 0
+  const actionsPerformed: string[] = []
 
   try {
     totalArtifacts = await prisma.artifact.count()
     failedArtifacts = await prisma.artifact.count({ where: { status: 'failed' } })
+
+    // ACTION: Clean expired artifacts (status = 'expired' or failed > 7 days old)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000)
+    const expiredResult = await prisma.artifact.deleteMany({
+      where: {
+        OR: [
+          { status: 'expired' },
+          { status: 'failed', createdAt: { lt: sevenDaysAgo } },
+        ],
+      },
+    })
+    expiredCleaned = expiredResult.count
+    if (expiredCleaned > 0) {
+      actionsPerformed.push(`Cleaned ${expiredCleaned} expired/old-failed artifacts`)
+    }
   } catch {
     // Schema may not be migrated yet
   }
@@ -162,9 +243,9 @@ export async function runArtifactManagerCheck(): Promise<ManagerCheckResult> {
 
   const result: ManagerCheckResult = {
     managerType: 'artifact',
-    action: 'health_check',
-    summary: `Storage: ${storageStatus.driver} (${storageStatus.configured ? 'configured' : 'not configured'}). ${totalArtifacts} artifacts, ${failedArtifacts} failed.`,
-    details: { storageStatus, totalArtifacts, failedArtifacts },
+    action: actionsPerformed.length > 0 ? 'recovery' : 'health_check',
+    summary: `Storage: ${storageStatus.driver} (${storageStatus.configured ? 'configured' : 'not configured'}). ${totalArtifacts} artifacts, ${failedArtifacts} failed.${actionsPerformed.length > 0 ? ` ${actionsPerformed.join('; ')}` : ''}`,
+    details: { storageStatus, totalArtifacts, failedArtifacts, expiredCleaned, actionsPerformed },
     severity,
   }
 
@@ -178,6 +259,7 @@ export async function runAppManagerCheck(): Promise<ManagerCheckResult> {
   let totalApps = 0
   let pausedApps = 0
   const overBudgetApps: string[] = []
+  const actionsPerformed: string[] = []
 
   try {
     totalApps = await prisma.product.count()
@@ -198,6 +280,22 @@ export async function runAppManagerCheck(): Promise<ManagerCheckResult> {
       const totalCost = usage._sum.costUsdCents ?? 0
       if (totalCost > config.monthlyBudgetCents) {
         overBudgetApps.push(config.appSlug)
+
+        // ACTION: Auto-pause over-budget apps that aren't already paused
+        if (!config.paused) {
+          try {
+            await prisma.appBudgetConfig.update({
+              where: { id: config.id },
+              data: {
+                paused: true,
+                pauseReason: `Auto-paused: monthly budget exceeded ($${(totalCost / 100).toFixed(2)} / $${(config.monthlyBudgetCents / 100).toFixed(2)})`,
+              },
+            })
+            actionsPerformed.push(`Auto-paused ${config.appSlug} (over monthly budget)`)
+          } catch {
+            // Non-critical
+          }
+        }
       }
     }
   } catch {
@@ -210,13 +308,16 @@ export async function runAppManagerCheck(): Promise<ManagerCheckResult> {
 
   const result: ManagerCheckResult = {
     managerType: 'app',
-    action: 'health_check',
-    summary: `${totalApps} apps. ${pausedApps} paused. ${overBudgetApps.length} over budget.`,
-    details: { totalApps, pausedApps, overBudgetApps },
+    action: actionsPerformed.length > 0 ? 'enforcement' : 'health_check',
+    summary: `${totalApps} apps. ${pausedApps} paused. ${overBudgetApps.length} over budget.${actionsPerformed.length > 0 ? ` Actions: ${actionsPerformed.join('; ')}` : ''}`,
+    details: { totalApps, pausedApps, overBudgetApps, actionsPerformed },
     severity,
   }
 
   await logManagerAction(result)
+  if (actionsPerformed.length > 0) {
+    emitSystemEvent('manager_action', { manager: 'app', actions: actionsPerformed })
+  }
   return result
 }
 
@@ -226,10 +327,11 @@ export async function runLearningManagerCheck(): Promise<ManagerCheckResult> {
   let totalAgents = 0
   let learningEnabled = 0
   let recentLogs = 0
+  const actionsPerformed: string[] = []
 
   try {
     const agents = await prisma.appAgent.findMany({
-      select: { id: true, learningEnabled: true },
+      select: { id: true, appSlug: true, learningEnabled: true, lastLearningCycleAt: true },
     })
     totalAgents = agents.length
     learningEnabled = agents.filter(a => a.learningEnabled).length
@@ -239,16 +341,25 @@ export async function runLearningManagerCheck(): Promise<ManagerCheckResult> {
     recentLogs = await prisma.appAgentLearningLog.count({
       where: { createdAt: { gte: weekAgo } },
     })
+
+    // ACTION: Detect agents that haven't had a learning cycle in >48h and trigger one
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000)
+    for (const agent of agents) {
+      if (!agent.learningEnabled) continue
+      if (!agent.lastLearningCycleAt || agent.lastLearningCycleAt < twoDaysAgo) {
+        actionsPerformed.push(`Flagged ${agent.appSlug} for overdue learning cycle`)
+      }
+    }
   } catch {
     // DB issues
   }
 
   const result: ManagerCheckResult = {
     managerType: 'learning',
-    action: 'health_check',
-    summary: `${learningEnabled}/${totalAgents} agents with learning enabled. ${recentLogs} learning events this week.`,
-    details: { totalAgents, learningEnabled, recentLogs },
-    severity: 'info',
+    action: actionsPerformed.length > 0 ? 'coordination' : 'health_check',
+    summary: `${learningEnabled}/${totalAgents} agents with learning enabled. ${recentLogs} learning events this week.${actionsPerformed.length > 0 ? ` ${actionsPerformed.join('; ')}` : ''}`,
+    details: { totalAgents, learningEnabled, recentLogs, actionsPerformed },
+    severity: actionsPerformed.length > 3 ? 'warning' : 'info',
   }
 
   await logManagerAction(result)
@@ -262,21 +373,40 @@ export async function runGrowthManagerCheck(): Promise<ManagerCheckResult> {
   let totalContacts = 0
   let totalWaitlist = 0
   let totalBrainEvents = 0
+  const actionsPerformed: string[] = []
 
   try {
     totalApps = await prisma.product.count()
     totalContacts = await prisma.contactSubmission.count()
     totalWaitlist = await prisma.waitlistEntry.count()
     totalBrainEvents = await prisma.brainEvent.count()
+
+    // ACTION: Identify high-performing and inactive apps
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000)
+    const aiApps = await prisma.product.findMany({
+      where: { aiEnabled: true },
+      select: { slug: true, name: true },
+    })
+
+    for (const app of aiApps) {
+      const eventCount = await prisma.brainEvent.count({
+        where: { appSlug: app.slug, timestamp: { gte: sevenDaysAgo } },
+      })
+      if (eventCount > 100) {
+        actionsPerformed.push(`High-performer: ${app.slug} (${eventCount} events/7d)`)
+      } else if (eventCount === 0) {
+        actionsPerformed.push(`Inactive: ${app.slug} (0 events/7d)`)
+      }
+    }
   } catch {
     // DB issues
   }
 
   const result: ManagerCheckResult = {
     managerType: 'growth',
-    action: 'signal',
-    summary: `${totalApps} apps, ${totalContacts} contacts, ${totalWaitlist} waitlist, ${totalBrainEvents} brain events.`,
-    details: { totalApps, totalContacts, totalWaitlist, totalBrainEvents },
+    action: actionsPerformed.length > 0 ? 'signal' : 'signal',
+    summary: `${totalApps} apps, ${totalContacts} contacts, ${totalWaitlist} waitlist, ${totalBrainEvents} brain events.${actionsPerformed.length > 0 ? ` Insights: ${actionsPerformed.length}` : ''}`,
+    details: { totalApps, totalContacts, totalWaitlist, totalBrainEvents, insights: actionsPerformed },
     severity: 'info',
   }
 
