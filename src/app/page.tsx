@@ -86,10 +86,10 @@ const HOW_IT_WORKS_STEPS = [
 ]
 
 const APP_TYPES = [
-  { label: 'AI Companions',            desc: 'Conversational companions with persistent memory and persona-driven voice.' },
-  { label: 'Business & Productivity',  desc: 'Research, drafting, analysis, and workflow automation for serious business tools.' },
-  { label: 'Creative & Media',         desc: 'Image, voice, video, and music generation for content studios and creative tools.' },
-  { label: 'Education & Community',    desc: 'Learning platforms with retrieval-augmented answers and adaptive responses.' },
+  { label: 'AI Companions', desc: 'Conversational companions with persistent memory and persona-driven voice.' },
+  { label: 'Business & Productivity', desc: 'Research, drafting, analysis, and workflow automation for serious business tools.' },
+  { label: 'Creative & Media', desc: 'Image, voice, video, and music generation for content studios and creative tools.' },
+  { label: 'Education & Community', desc: 'Learning platforms with retrieval-augmented answers and adaptive responses.' },
 ]
 
 const DIFFERENTIATORS = [
@@ -261,7 +261,7 @@ export default function HomePage() {
             ))}
           </div>
           <p className="mt-6 text-center text-xs text-slate-600">
-            Plus: religious &amp; faith, equestrian, pets &amp; animals, security, smart home, and more — any app that needs context-aware AI.
+            Plus: religious &amp; faith, equestrian, pets &amp; animals, security, smart home, and more.
           </p>
         </div>
       </Section>
