@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  FlaskConical, Code2, Palette, Workflow, GitBranch,
+  FlaskConical, Code2, Workflow, GitBranch,
   Layers, ImageIcon, Mic, Film, Music,
 } from 'lucide-react'
 
@@ -35,7 +35,7 @@ type TabKey = (typeof TABS)[number]['key']
 
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' as const } },
 }
 
 export default function BuildStudioPage() {

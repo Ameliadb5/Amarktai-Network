@@ -88,8 +88,8 @@ export default function MediaPage() {
     <motion.div initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.06 } } }} className="space-y-8">
       {/* Header */}
       <motion.div variants={fadeUp}>
-        <h1 className="text-2xl font-bold text-white font-heading">Media</h1>
-        <p className="text-sm text-slate-400 mt-1">Image, video, voice, and multimodal capability status</p>
+        <h1 className="text-2xl font-bold text-white tracking-tight font-heading">Media</h1>
+        <p className="text-sm text-slate-500 mt-1">Image, video, voice, and multimodal capability status</p>
       </motion.div>
 
       {/* Stats strip */}
@@ -100,7 +100,7 @@ export default function MediaPage() {
           { label: 'Providers', value: data?.stats?.supportedProviders ?? 0 },
           { label: 'Requests', value: data?.stats?.requestVolume ?? 0 },
         ].map((s) => (
-          <div key={s.label} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
+          <div key={s.label} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4">
             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">{s.label}</p>
             <p className="text-xl font-bold text-white font-heading mt-1">{s.value}</p>
           </div>
@@ -117,10 +117,10 @@ export default function MediaPage() {
           const StatusIcon = status.icon
 
           return (
-            <div key={mod} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
+            <div key={mod} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg bg-white/[0.04] flex items-center justify-center ${meta.color}`}>
+                  <div className={`w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center ${meta.color}`}>
                     <Icon className="w-5 h-5" />
                   </div>
                   <div>
@@ -165,7 +165,7 @@ export default function MediaPage() {
       </motion.div>
 
       {/* Adult 18+ Capability */}
-      <motion.div variants={fadeUp} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6">
+      <motion.div variants={fadeUp} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
         <h2 className="text-sm font-semibold text-white mb-4">Adult 18+ Content Mode</h2>
         {data?.adultMode ? (
           <div className="space-y-3">
@@ -189,7 +189,7 @@ export default function MediaPage() {
       </motion.div>
 
       {/* Multimodal Status */}
-      <motion.div variants={fadeUp} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6">
+      <motion.div variants={fadeUp} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
         <h2 className="text-sm font-semibold text-white mb-4">Multimodal Status</h2>
         {caps.length === 0 ? (
           <p className="text-sm text-slate-500">No multimodal capabilities detected.</p>

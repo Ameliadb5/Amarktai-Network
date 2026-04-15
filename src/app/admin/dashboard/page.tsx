@@ -100,7 +100,7 @@ const H = {
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
 }
 
 /* ── Helpers ───────────────────────────────────────────────────── */
@@ -175,7 +175,7 @@ export default function DashboardOverview() {
 
   /* ── Derived ─────────────────────────────────────────────────── */
   const healthyProviders  = providers.filter(p => p.healthStatus === 'healthy')
-  const enabledProviders  = providers.filter(p => p.enabled)
+  const _enabledProviders  = providers.filter(p => p.enabled)
   const unconfiguredProvs = providers.filter(p => p.healthStatus === 'unconfigured')
   const totalApps  = data?.productStats?.length ?? 0
   const totalReqs  = data?.brainStats?.totalRequests ?? 0

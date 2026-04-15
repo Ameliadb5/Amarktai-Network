@@ -111,12 +111,12 @@ export default function ModelsPage() {
       {/* Header */}
       <motion.div variants={fadeUp} className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white font-heading">Model Registry</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <h1 className="text-2xl font-bold text-white tracking-tight font-heading">Model Registry</h1>
+          <p className="text-sm text-slate-500 mt-1">
             {models.length} models across {providers.length - 1} providers — availability, latency, and cost tiers
           </p>
         </div>
-        <button onClick={load} disabled={loading} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors mt-1">
+        <button onClick={load} disabled={loading} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors mt-1">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </motion.div>
@@ -132,9 +132,9 @@ export default function ModelsPage() {
             <button
               key={tab.key}
               onClick={() => setFilterCategory(tab.key)}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors border ${
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl transition-colors border ${
                 filterCategory === tab.key
-                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                  ? 'bg-white/[0.06] text-white border-white/[0.10]'
                   : 'bg-white/[0.04] text-slate-400 border-transparent hover:bg-white/[0.06]'
               }`}
             >
@@ -155,20 +155,20 @@ export default function ModelsPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search models…"
-            className="pl-8 pr-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors w-48"
+            className="pl-8 pr-3 py-2 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors w-48"
           />
         </div>
         <select
           value={filterProvider}
           onChange={e => setFilterProvider(e.target.value)}
-          className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
+          className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
         >
           {providers.map(p => <option key={p} value={p} className="bg-[#0a0f1a] text-white">{p === 'all' ? 'All providers' : p}</option>)}
         </select>
         <select
           value={filterCapability}
           onChange={e => setFilterCapability(e.target.value)}
-          className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
+          className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
         >
           {capabilities.map(c => <option key={c} value={c} className="bg-[#0a0f1a] text-white">{c === 'all' ? 'All capabilities' : c}</option>)}
         </select>
@@ -187,7 +187,7 @@ export default function ModelsPage() {
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <AlertCircle className="w-8 h-8 text-red-400" />
           <p className="text-sm text-slate-400">{error}</p>
-          <button onClick={load} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors">Retry</button>
+          <button onClick={load} className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-sm rounded-xl transition-colors">Retry</button>
         </div>
       ) : Object.keys(grouped).length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
@@ -208,7 +208,7 @@ export default function ModelsPage() {
                   const costCls = COST_COLORS[m.costTier ?? ''] ?? 'text-slate-400 bg-slate-500/10 border-slate-500/20'
                   const latCls = LATENCY_COLORS[m.latencyTier ?? ''] ?? 'text-slate-400'
                   return (
-                    <div key={m.id} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 space-y-3 hover:bg-white/[0.05] transition-colors">
+                    <div key={m.id} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 space-y-3 hover:bg-white/[0.05] transition-colors">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h3 className="text-sm font-semibold text-white truncate">{m.displayName ?? m.id}</h3>
