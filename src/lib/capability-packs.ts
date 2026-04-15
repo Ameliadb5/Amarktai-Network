@@ -309,6 +309,96 @@ const CAPABILITY_PACKS: Map<string, CapabilityPack> = new Map([
       tags: ['pet', 'horse', 'equestrian', 'animal', 'veterinary'],
     },
   ],
+  [
+    'religious_pack',
+    {
+      id: 'religious_pack',
+      name: 'Religious & Spiritual Pack',
+      description:
+        'Faith-based applications — Bible study, sermon prep, prayer tools, devotional content, and doctrinal research.',
+      capabilities: ['chat', 'reasoning', 'retrieval', 'structured_output'],
+      allowedProviders: ['openai', 'groq', 'deepseek'],
+      recommendedModels: ['gpt-4o', 'llama-3.1-70b'],
+      safetyLevel: 'strict',
+      defaultBudget: { daily: 5_000, monthly: 80_000 },
+      recommendedAgents: ['router', 'memory', 'validator'],
+      memoryStrategy: 'full',
+      realtimeRequired: false,
+      tags: ['religious', 'faith', 'bible', 'church', 'spiritual', 'devotional', 'prayer'],
+    },
+  ],
+  [
+    'education_pack',
+    {
+      id: 'education_pack',
+      name: 'Education & Learning Pack',
+      description:
+        'Educational platforms — tutoring, quiz generation, course content, study aids, and adaptive learning.',
+      capabilities: ['chat', 'reasoning', 'retrieval', 'embeddings', 'structured_output'],
+      allowedProviders: ['openai', 'groq', 'deepseek'],
+      recommendedModels: ['gpt-4o', 'llama-3.1-70b'],
+      safetyLevel: 'strict',
+      defaultBudget: { daily: 8_000, monthly: 150_000 },
+      recommendedAgents: ['router', 'memory', 'learning'],
+      memoryStrategy: 'full',
+      realtimeRequired: false,
+      tags: ['education', 'learning', 'tutoring', 'study', 'school', 'course', 'quiz'],
+    },
+  ],
+  [
+    'smart_home_pack',
+    {
+      id: 'smart_home_pack',
+      name: 'Smart Home Pack',
+      description:
+        'Home automation and IoT control — device management, routines, energy monitoring, and voice commands.',
+      capabilities: ['chat', 'voice', 'structured_output', 'agents'],
+      allowedProviders: ['openai', 'groq'],
+      recommendedModels: ['gpt-4o-mini', 'llama-3.1-8b'],
+      safetyLevel: 'standard',
+      defaultBudget: { daily: 3_000, monthly: 60_000 },
+      recommendedAgents: ['router', 'executor'],
+      memoryStrategy: 'session',
+      realtimeRequired: true,
+      tags: ['smart_home', 'iot', 'automation', 'home', 'device', 'energy'],
+    },
+  ],
+  [
+    'health_pack',
+    {
+      id: 'health_pack',
+      name: 'Health & Tracking Pack',
+      description:
+        'Health and wellness applications — fitness tracking, nutrition, mental health, symptom logging, and wellness coaching.',
+      capabilities: ['chat', 'reasoning', 'retrieval', 'structured_output'],
+      allowedProviders: ['openai', 'groq'],
+      recommendedModels: ['gpt-4o', 'llama-3.1-70b'],
+      safetyLevel: 'strict',
+      defaultBudget: { daily: 5_000, monthly: 100_000 },
+      recommendedAgents: ['router', 'memory', 'learning'],
+      memoryStrategy: 'full',
+      realtimeRequired: false,
+      tags: ['health', 'wellness', 'fitness', 'nutrition', 'mental_health', 'tracking'],
+    },
+  ],
+  [
+    'family_pack',
+    {
+      id: 'family_pack',
+      name: 'Family & Personal Assistant Pack',
+      description:
+        'Family management and personal assistant apps — scheduling, reminders, meal planning, and family coordination.',
+      capabilities: ['chat', 'voice', 'structured_output', 'agents'],
+      allowedProviders: ['openai', 'groq'],
+      recommendedModels: ['gpt-4o-mini', 'llama-3.1-8b'],
+      safetyLevel: 'strict',
+      defaultBudget: { daily: 4_000, monthly: 80_000 },
+      recommendedAgents: ['router', 'memory', 'scheduler'],
+      memoryStrategy: 'full',
+      realtimeRequired: false,
+      tags: ['family', 'personal', 'assistant', 'scheduling', 'planning', 'reminder'],
+    },
+  ],
 ])
 
 // ── Category → keyword mapping ───────────────────────────
@@ -328,6 +418,11 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   security_pack: ['security', 'monitoring', 'compliance', 'threat', 'audit'],
   operations_pack: ['operations', 'automation', 'workflow', 'scheduling'],
   pet_horse_pack: ['pet', 'horse', 'equestrian', 'animal', 'veterinary'],
+  religious_pack: ['religious', 'faith', 'bible', 'church', 'spiritual', 'devotional', 'prayer', 'gospel'],
+  education_pack: ['education', 'learning', 'tutoring', 'study', 'school', 'course', 'quiz', 'teaching'],
+  smart_home_pack: ['smart_home', 'iot', 'automation', 'home', 'device', 'energy', 'smart'],
+  health_pack: ['health', 'wellness', 'fitness', 'nutrition', 'mental_health', 'tracking', 'medical'],
+  family_pack: ['family', 'personal', 'assistant', 'scheduling', 'planning', 'reminder', 'household'],
 }
 
 // ── Public API ───────────────────────────────────────────

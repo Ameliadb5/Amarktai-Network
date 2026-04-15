@@ -125,15 +125,20 @@ describe('Worker', () => {
 // ── Enhanced Capability Packs Tests ──────────────────────────────────────────
 
 describe('Enhanced Capability Packs', () => {
-  it('has 13 packs including Phase 2 additions', async () => {
+  it('has 18 packs including Phase 2 and Phase 3 additions', async () => {
     const { getAllCapabilityPacks } = await import('../capability-packs')
     const packs = getAllCapabilityPacks()
-    expect(packs.length).toBe(13)
+    expect(packs.length).toBe(18)
     const ids = packs.map(p => p.id)
     expect(ids).toContain('research_pack')
     expect(ids).toContain('security_pack')
     expect(ids).toContain('operations_pack')
     expect(ids).toContain('pet_horse_pack')
+    expect(ids).toContain('religious_pack')
+    expect(ids).toContain('education_pack')
+    expect(ids).toContain('smart_home_pack')
+    expect(ids).toContain('health_pack')
+    expect(ids).toContain('family_pack')
   })
 
   it('research pack has correct capabilities', async () => {

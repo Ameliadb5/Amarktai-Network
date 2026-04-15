@@ -122,10 +122,16 @@ export default function CreateAppTab() {
             <option value="education_pack">Education</option>
             <option value="smart_home_pack">Smart Home</option>
             <option value="equestrian_pack">Equestrian</option>
-            <option value="pet_pack">Pet / Dog</option>
-            <option value="religious_pack">Religious</option>
+            <option value="pet_horse_pack">Pet & Equestrian</option>
+            <option value="religious_pack">Religious / Spiritual</option>
             <option value="security_pack">Security</option>
             <option value="health_pack">Health / Tracking</option>
+            <option value="family_pack">Family / Personal Assistant</option>
+            <option value="knowledge_pack">Knowledge / Reference</option>
+            <option value="media_pack">Media / Production</option>
+            <option value="voice_pack">Voice Assistant</option>
+            <option value="dev_pack">Developer / Engineering</option>
+            <option value="operations_pack">Operations / Automation</option>
           </select>
           <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
             <input type="checkbox" checked={includeDocker} onChange={e => setIncludeDocker(e.target.checked)} className="rounded border-slate-600 bg-transparent" />
