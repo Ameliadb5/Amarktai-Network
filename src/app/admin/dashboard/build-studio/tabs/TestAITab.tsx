@@ -301,8 +301,8 @@ export default function TestAITab() {
 
       {/* Result */}
       {result && (
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-white/[0.01]">
             <div className="flex items-center gap-2">
               {result.success ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
               <span className="text-sm font-medium text-white">{result.success ? 'Success' : 'Failed'}</span>
@@ -315,13 +315,37 @@ export default function TestAITab() {
             </div>
           </div>
 
-          {/* Image output */}
+          {/* Image output — premium inline display */}
           {result.imageUrl && (
-            <div className="space-y-2">
-              <img src={result.imageUrl} alt="Generated" className="max-w-full rounded-lg border border-white/[0.06]" />
-              <a href={result.imageUrl} download className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300">
-                Download image
-              </a>
+            <div className="image-result-container relative rounded-2xl overflow-hidden bg-[#0d1424] border border-white/[0.06]">
+              <img
+                src={result.imageUrl}
+                alt="Generated image"
+                className="w-full max-h-[600px] object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                  const parent = target.parentElement
+                  if (parent) {
+                    const fallback = document.createElement('div')
+                    fallback.className = 'p-6 text-center'
+                    fallback.innerHTML = `<p class="text-sm text-slate-400 mb-2">Image generated but could not display inline.</p><a href="${result.imageUrl}" target="_blank" rel="noopener noreferrer" class="text-sm text-blue-400 hover:text-blue-300 underline">Open image in new tab →</a>`
+                    parent.appendChild(fallback)
+                  }
+                }}
+              />
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] text-slate-300">
+                    {result.routedProvider && <span className="px-2 py-0.5 rounded-lg bg-white/10 backdrop-blur-sm">{result.routedProvider}</span>}
+                    {result.routedModel && <span className="px-2 py-0.5 rounded-lg bg-white/10 backdrop-blur-sm">{result.routedModel}</span>}
+                  </div>
+                  <a href={result.imageUrl} download
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/80 backdrop-blur-sm text-xs text-white font-medium hover:bg-blue-500 transition-colors">
+                    <Download className="w-3 h-3" /> Download
+                  </a>
+                </div>
+              </div>
             </div>
           )}
 

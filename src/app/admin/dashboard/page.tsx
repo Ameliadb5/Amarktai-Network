@@ -4,14 +4,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   CheckCircle, AlertCircle, AlertTriangle, WifiOff, Clock,
-  RefreshCw, Zap, Activity, Brain, Database, Server,
+  RefreshCw, Zap, Brain, Database, Server,
   ArrowRight, Cpu, Gauge, DollarSign, Bell,
-  ShieldAlert, Puzzle, Layers, Sparkles,
-  FlaskConical,
+  ShieldAlert, Sparkles,
+  FlaskConical, Activity, Layers,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import MetricCard from '@/components/ui/MetricCard'
 
 /* ── Types ─────────────────────────────────────────────────────── */
 interface DashboardData {
@@ -97,23 +96,12 @@ const H = {
   disabled:     { label: 'Disabled', color: 'text-slate-500',   dot: 'bg-slate-600',   icon: WifiOff },
 } as const
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const SEV = {
-  critical: { color: 'text-red-400',   bg: 'bg-red-400/10',   dot: 'bg-red-400' },
-  error:    { color: 'text-red-400',   bg: 'bg-red-400/10',   dot: 'bg-red-400' },
-  warning:  { color: 'text-amber-400', bg: 'bg-amber-400/10', dot: 'bg-amber-400' },
-  info:     { color: 'text-blue-400',  bg: 'bg-blue-400/10',  dot: 'bg-blue-400' },
-} as const
-
 /* ── Animation ─────────────────────────────────────────────────── */
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
 }
-
-const CARD = 'bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl'
-const INNER = 'bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]'
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 function appStatusCfg(status: string, health: string | undefined) {
@@ -122,6 +110,8 @@ function appStatusCfg(status: string, health: string | undefined) {
     return { label: 'Live', dot: 'bg-emerald-400', color: 'text-emerald-400' }
   return { label: 'Idle', dot: 'bg-amber-400', color: 'text-amber-400' }
 }
+
+const CARD = 'bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] rounded-2xl overflow-hidden'
 
 /* ── Main ──────────────────────────────────────────────────────── */
 export default function DashboardOverview() {
@@ -157,14 +147,12 @@ export default function DashboardOverview() {
         if (body.error) setDbError(body.error)
       }
       if (memRes.ok) setMemory(await memRes.json())
-      // Fetch budget data for cost burn
       try {
         const budgetRes = await fetch('/api/admin/budgets')
         if (budgetRes.ok) setBudgetData(await budgetRes.json())
       } catch (err) {
         console.warn('[dashboard] Budget fetch failed:', err instanceof Error ? err.message : err)
       }
-      // Fetch truth summary for unified dashboard state
       try {
         const truthRes = await fetch('/api/admin/truth?section=summary')
         if (truthRes.ok) {
@@ -176,7 +164,7 @@ export default function DashboardOverview() {
       }
       setLastRefreshed(new Date())
     } catch {
-      // silently fail — data stays as-is
+      // silently fail
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -194,21 +182,21 @@ export default function DashboardOverview() {
   const successReqs = data?.brainStats?.successCount ?? 0
   const errorReqs  = data?.brainStats?.errorCount ?? 0
   const successRate = totalReqs > 0 ? Math.round((successReqs / totalReqs) * 100) : 0
-
-  // Compute local health score from real data only — no hardcoded fallback values.
-  // When the truth API provides a systemHealth score, that takes priority (see rendering below).
   const systemHealth = totalReqs > 0
     ? Math.round(((successReqs / totalReqs) * 0.7 + (healthyProviders.length > 0 ? 0.3 : 0)) * 100)
     : 0
   const alertEvents = (data?.recentEvents ?? []).filter(e => e.severity === 'critical' || e.severity === 'error')
-  const errorEvents = alertEvents.slice(0, 6)
+  const errorEvents = alertEvents.slice(0, 5)
+  const healthScore = truth?.systemHealth ?? systemHealth
 
   /* ── Loading state ───────────────────────────────────────────── */
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4">
-        <RefreshCw className="w-6 h-6 text-blue-400 animate-spin" />
-        <p className="text-sm text-slate-500 font-mono">Loading control center…</p>
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 border border-white/[0.06] flex items-center justify-center">
+          <RefreshCw className="w-5 h-5 text-blue-400 animate-spin" />
+        </div>
+        <p className="text-sm text-slate-500">Loading command center…</p>
       </div>
     )
   }
@@ -217,12 +205,14 @@ export default function DashboardOverview() {
   if (!data && dbError) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4 text-center">
-        <AlertCircle className="w-8 h-8 text-red-400" />
+        <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+          <AlertCircle className="w-5 h-5 text-red-400" />
+        </div>
         <p className="text-sm text-red-400 font-semibold">Failed to load dashboard</p>
         <p className="text-xs text-slate-500 max-w-md">{dbError}</p>
         <button
           onClick={() => { setLoading(true); load() }}
-          className="mt-2 px-4 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs text-white hover:bg-white/[0.1] transition-colors"
+          className="mt-2 px-5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs text-white hover:bg-white/[0.08] transition-colors"
         >
           Retry
         </button>
@@ -234,10 +224,10 @@ export default function DashboardOverview() {
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-8">
 
       {/* ─── Header ─────────────────────────────────────────────── */}
-      <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Control Center</h1>
-          <p className="text-xs text-slate-500 mt-0.5">System overview &amp; network health</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Command Center</h1>
+          <p className="text-sm text-slate-500 mt-1">System overview &amp; network health</p>
         </div>
         <div className="flex items-center gap-3">
           {lastRefreshed && (
@@ -248,7 +238,7 @@ export default function DashboardOverview() {
           <button
             onClick={() => load(true)}
             disabled={refreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -258,33 +248,43 @@ export default function DashboardOverview() {
 
       {/* ─── DB Error Banner ────────────────────────────────────── */}
       {dbError && (
-        <motion.div variants={fadeUp} className="bg-red-500/[0.06] border border-red-500/20 rounded-xl px-5 py-4 flex items-start gap-3">
+        <motion.div variants={fadeUp} className="bg-red-500/[0.06] border border-red-500/20 rounded-2xl px-5 py-4 flex items-start gap-3">
           <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-semibold text-red-400">Database Connection Error</p>
             <p className="text-xs text-red-400/70 mt-0.5">{dbError}</p>
             <p className="text-xs text-slate-500 mt-1.5">
               Set a valid <code className="text-slate-400 font-mono text-[11px]">DATABASE_URL</code> and check the{' '}
-              <Link href="/admin/dashboard/access" className="text-blue-400 hover:text-blue-300 underline transition-colors">Readiness</Link> page.
+              <Link href="/admin/dashboard/access" className="text-blue-400 hover:text-blue-300 underline transition-colors">Settings</Link> page.
             </p>
           </div>
         </motion.div>
       )}
 
-      {/* ─── Top Strip: 5 Metric Cards ──────────────────────────── */}
+      {/* ─── Metric Strip ───────────────────────────────────────── */}
       <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <MetricCard label="System Health"  value={`${truth?.systemHealth ?? systemHealth}%`}               icon={<Gauge className="w-4 h-4" />} />
-        <MetricCard label="Active Apps"    value={totalApps}                         icon={<Server className="w-4 h-4" />} />
-        <MetricCard label="AI Activity"    value={totalReqs.toLocaleString()}        icon={<Brain className="w-4 h-4" />} suffix="reqs" />
-        <MetricCard label="Cost Burn"      value={budgetData?.totalEstimatedSpendUsd != null ? `$${budgetData.totalEstimatedSpendUsd.toFixed(2)}` : '—'} icon={<DollarSign className="w-4 h-4" />} />
-        <MetricCard label="Alerts"         value={alertEvents.length}               icon={<Bell className="w-4 h-4" />} />
+        {[
+          { label: 'System Health', value: `${healthScore}%`, icon: Gauge,      color: healthScore >= 80 ? 'text-emerald-400' : healthScore >= 50 ? 'text-amber-400' : 'text-red-400', gradient: 'from-emerald-500/10 to-emerald-500/5' },
+          { label: 'Active Apps',   value: totalApps,         icon: Server,     color: 'text-blue-400',    gradient: 'from-blue-500/10 to-blue-500/5' },
+          { label: 'AI Requests',   value: totalReqs.toLocaleString(), icon: Brain, color: 'text-violet-400', gradient: 'from-violet-500/10 to-violet-500/5' },
+          { label: 'Cost Burn',     value: budgetData?.totalEstimatedSpendUsd != null ? `$${budgetData.totalEstimatedSpendUsd.toFixed(2)}` : '—', icon: DollarSign, color: 'text-amber-400', gradient: 'from-amber-500/10 to-amber-500/5' },
+          { label: 'Alerts',        value: alertEvents.length, icon: Bell,       color: alertEvents.length > 0 ? 'text-red-400' : 'text-slate-400', gradient: alertEvents.length > 0 ? 'from-red-500/10 to-red-500/5' : 'from-slate-500/10 to-slate-500/5' },
+        ].map(m => (
+          <div key={m.label} className={`bg-gradient-to-br ${m.gradient} border border-white/[0.06] rounded-2xl p-5`}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">{m.label}</span>
+              <m.icon className={`w-4 h-4 ${m.color}`} />
+            </div>
+            <p className={`text-2xl font-bold font-mono ${m.color}`}>{m.value}</p>
+          </div>
+        ))}
       </motion.div>
 
-      {/* ─── Main 3-Column Grid ─────────────────────────────────── */}
+      {/* ─── Main Grid ──────────────────────────────────────────── */}
       <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT — App Network */}
         <div className={CARD}>
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
               <Server className="w-4 h-4 text-cyan-400" /> App Network
             </h2>
@@ -292,10 +292,10 @@ export default function DashboardOverview() {
               All <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="p-4 space-y-1.5 max-h-[380px] overflow-y-auto">
+          <div className="p-4 space-y-1 max-h-[340px] overflow-y-auto">
             {totalApps === 0 ? (
               <div className="py-10 text-center">
-                <Server className="w-6 h-6 text-slate-700 mx-auto mb-2" />
+                <Server className="w-6 h-6 text-slate-700 mx-auto mb-3" />
                 <p className="text-sm text-slate-500">No apps registered</p>
                 <Link href="/admin/dashboard/apps" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300 transition-colors">
                   Register your first app →
@@ -305,7 +305,7 @@ export default function DashboardOverview() {
               data?.productStats?.map(app => {
                 const cfg = appStatusCfg(app.status, app.integration?.healthStatus)
                 return (
-                  <div key={app.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.03] transition-colors">
+                  <div key={app.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.03] transition-colors">
                     <span className="relative flex h-2 w-2 shrink-0">
                       {cfg.label === 'Live' && <span className={`animate-ping absolute inset-0 rounded-full ${cfg.dot} opacity-75`} />}
                       <span className={`relative inline-flex rounded-full h-2 w-2 ${cfg.dot}`} />
@@ -330,35 +330,26 @@ export default function DashboardOverview() {
 
         {/* CENTER — Intelligence Activity */}
         <div className={CARD}>
-          <div className="px-5 py-3.5 border-b border-white/[0.06]">
+          <div className="px-5 py-4 border-b border-white/[0.06]">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Brain className="w-4 h-4 text-violet-400" /> Intelligence Activity
+              <Brain className="w-4 h-4 text-violet-400" /> Intelligence
             </h2>
           </div>
           <div className="p-4 space-y-4">
-            {/* Brain performance */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className={INNER}>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Success</p>
-                <p className={`text-lg font-bold font-mono mt-1 ${successRate >= 90 ? 'text-emerald-400' : successRate >= 70 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {totalReqs > 0 ? `${successRate}%` : '—'}
-                </p>
-              </div>
-              <div className={INNER}>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Latency</p>
-                <p className="text-lg font-bold font-mono mt-1 text-white">
-                  {data?.brainStats?.avgLatencyMs ? `${data.brainStats.avgLatencyMs}ms` : '—'}
-                </p>
-              </div>
-              <div className={INNER}>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Errors</p>
-                <p className={`text-lg font-bold font-mono mt-1 ${errorReqs > 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                  {errorReqs.toLocaleString()}
-                </p>
-              </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Success', value: totalReqs > 0 ? `${successRate}%` : '—', color: successRate >= 90 ? 'text-emerald-400' : successRate >= 70 ? 'text-amber-400' : 'text-red-400' },
+                { label: 'Latency', value: data?.brainStats?.avgLatencyMs ? `${data.brainStats.avgLatencyMs}ms` : '—', color: 'text-white' },
+                { label: 'Errors',  value: errorReqs.toLocaleString(), color: errorReqs > 0 ? 'text-red-400' : 'text-slate-400' },
+              ].map(m => (
+                <div key={m.label} className="bg-white/[0.02] rounded-xl p-3 border border-white/[0.04]">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">{m.label}</p>
+                  <p className={`text-lg font-bold font-mono mt-1 ${m.color}`}>{m.value}</p>
+                </div>
+              ))}
             </div>
 
-            {/* Provider usage */}
+            {/* Providers */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-slate-500 uppercase tracking-wider">Providers</p>
@@ -367,12 +358,12 @@ export default function DashboardOverview() {
               {providers.length === 0 ? (
                 <p className="text-xs text-slate-600 py-3 text-center">No providers configured</p>
               ) : (
-                <div className="space-y-1 max-h-[120px] overflow-y-auto">
-                  {providers.map(p => {
+                <div className="space-y-1 max-h-[100px] overflow-y-auto">
+                  {providers.slice(0, 6).map(p => {
                     const cfg = H[p.healthStatus as keyof typeof H] ?? H.unconfigured
                     const isActive = p.healthStatus === 'healthy'
                     return (
-                      <div key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/[0.03] transition-colors">
+                      <div key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] transition-colors">
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
                         <span className={`text-xs truncate flex-1 ${isActive ? 'text-white' : 'text-slate-500'}`}>{p.displayName}</span>
                         <span className={`text-[10px] font-mono ${cfg.color}`}>{isActive ? 'Active' : cfg.label}</span>
@@ -383,8 +374,8 @@ export default function DashboardOverview() {
               )}
             </div>
 
-            {/* Memory status */}
-            <div className={INNER}>
+            {/* Memory */}
+            <div className="bg-white/[0.02] rounded-xl p-3 border border-white/[0.04]">
               <div className="flex items-center gap-2 mb-2">
                 <Database className="w-3.5 h-3.5 text-cyan-400" />
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider">Memory</p>
@@ -400,57 +391,55 @@ export default function DashboardOverview() {
               </div>
               <div className="flex items-center gap-4 text-xs font-mono">
                 <span className="text-white">{(memory?.totalEntries ?? 0).toLocaleString()} <span className="text-slate-500">entries</span></span>
-                <span className="text-white">{memory?.appSlugs?.length ?? 0} <span className="text-slate-500">ns</span></span>
+                <span className="text-white">{memory?.appSlugs?.length ?? 0} <span className="text-slate-500">namespaces</span></span>
               </div>
-              {memory?.error && (
-                <p className="text-[10px] text-red-400/70 font-mono mt-2 truncate">{memory.error}</p>
-              )}
             </div>
           </div>
         </div>
 
-        {/* RIGHT — Alerts & Issues */}
+        {/* RIGHT — Alerts */}
         <div className={CARD}>
-          <div className="px-5 py-3.5 border-b border-white/[0.06]">
+          <div className="px-5 py-4 border-b border-white/[0.06]">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-red-400" /> Alerts &amp; Issues
+              <ShieldAlert className="w-4 h-4 text-red-400" /> Alerts
             </h2>
           </div>
-          <div className="p-4 space-y-4 max-h-[380px] overflow-y-auto">
+          <div className="p-4 space-y-4 max-h-[340px] overflow-y-auto">
             {/* Missing API keys */}
             {unconfiguredProvs.length > 0 && (
               <div>
-                <p className="text-[10px] text-amber-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                  <Zap className="w-3 h-3" /> Missing API Keys
+                <p className="text-[10px] text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Zap className="w-3 h-3" /> Missing Keys
                 </p>
                 <div className="space-y-1">
-                  {unconfiguredProvs.map(p => (
-                    <div key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-400/[0.04] border border-amber-400/10">
+                  {unconfiguredProvs.slice(0, 3).map(p => (
+                    <div key={p.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-400/[0.04] border border-amber-400/10">
                       <WifiOff className="w-3 h-3 text-amber-400 shrink-0" />
                       <span className="text-xs text-white truncate flex-1">{p.displayName}</span>
                       <Link href="/admin/dashboard/operations" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors shrink-0">
-                        Configure
+                        Fix
                       </Link>
                     </div>
                   ))}
+                  {unconfiguredProvs.length > 3 && <p className="text-[10px] text-slate-600 pl-2">+{unconfiguredProvs.length - 3} more</p>}
                 </div>
               </div>
             )}
 
-            {/* Recent errors */}
+            {/* Errors */}
             <div>
-              <p className="text-[10px] text-red-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <p className="text-[10px] text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <AlertCircle className="w-3 h-3" /> Recent Errors
               </p>
               {errorEvents.length === 0 ? (
-                <div className="py-4 text-center">
-                  <CheckCircle className="w-5 h-5 text-emerald-400/40 mx-auto mb-1" />
-                  <p className="text-xs text-slate-600">No errors — all clear</p>
+                <div className="py-6 text-center">
+                  <CheckCircle className="w-5 h-5 text-emerald-400/30 mx-auto mb-2" />
+                  <p className="text-xs text-slate-600">All clear</p>
                 </div>
               ) : (
                 <div className="space-y-1">
                   {errorEvents.map(ev => (
-                    <div key={ev.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/[0.03] transition-colors">
+                    <div key={ev.id} className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/[0.03] transition-colors">
                       <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
                       <span className="text-xs text-white truncate flex-1">{ev.title}</span>
                       <span className="text-[10px] text-slate-600 font-mono shrink-0">
@@ -461,67 +450,15 @@ export default function DashboardOverview() {
                 </div>
               )}
             </div>
-
-            {/* Capability gaps summary */}
-            <div>
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <Puzzle className="w-3 h-3" /> Provider Status
-              </p>
-              {(() => {
-                const unconfigured = providers.filter(p => p.healthStatus === 'unconfigured' || !p.healthStatus)
-                const healthy = providers.filter(p => p.healthStatus === 'healthy')
-                const withErrors = providers.filter(p => p.healthStatus === 'error')
-                // Split errors into blocking (required) and informational (optional)
-                const blockingErrors = withErrors.filter(p => p.launchRequired)
-                const optionalErrors = withErrors.filter(p => !p.launchRequired)
-                if (providers.length === 0) {
-                  return (
-                    <div className="py-3 text-center rounded-lg bg-amber-500/5 border border-amber-500/10">
-                      <p className="text-[11px] text-amber-400/70">No providers loaded</p>
-                    </div>
-                  )
-                }
-                return (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 py-1 px-2 rounded-lg bg-white/[0.02]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      <span className="text-[11px] text-emerald-400/80">{healthy.length} healthy</span>
-                      <span className="text-[11px] text-slate-600 ml-auto">{unconfigured.length} unconfigured</span>
-                    </div>
-                    {blockingErrors.length > 0 && (
-                      <div className="flex items-center gap-2 py-1 px-2 rounded-lg bg-red-500/5 border border-red-500/10">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                        <span className="text-[11px] text-red-400/80">{blockingErrors.length} required provider{blockingErrors.length !== 1 ? 's' : ''} with errors</span>
-                      </div>
-                    )}
-                    {optionalErrors.length > 0 && (
-                      <div className="flex items-center gap-2 py-1 px-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                        <span className="text-[11px] text-amber-400/80">{optionalErrors.length} optional provider{optionalErrors.length !== 1 ? 's' : ''} degraded</span>
-                      </div>
-                    )}
-                    {unconfigured.slice(0, 3).map(p => (
-                      <div key={p.providerKey} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                        <span className="text-[11px] text-amber-400/80">{p.displayName}: API key not set</span>
-                      </div>
-                    ))}
-                    {unconfigured.length > 3 && (
-                      <p className="text-[10px] text-slate-600 pl-2">+{unconfigured.length - 3} more</p>
-                    )}
-                  </div>
-                )
-              })()}
-            </div>
           </div>
         </div>
       </motion.div>
 
-      {/* ─── Bottom Section ─────────────────────────────────────── */}
+      {/* ─── Activity Feed ──────────────────────────────────────── */}
       <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activity (spans 2 cols) — shows BrainEvents as primary feed */}
+        {/* Recent AI Activity — spans 2 cols */}
         <div className={`${CARD} lg:col-span-2`}>
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
               <Brain className="w-4 h-4 text-violet-400" /> Recent AI Activity
             </h2>
@@ -531,22 +468,22 @@ export default function DashboardOverview() {
           </div>
           <div className="p-4">
             {(data?.recentBrainEvents?.length ?? 0) === 0 ? (
-              <div className="py-8 text-center">
-                <Brain className="w-6 h-6 text-slate-700 mx-auto mb-2" />
+              <div className="py-10 text-center">
+                <Brain className="w-6 h-6 text-slate-700 mx-auto mb-3" />
                 <p className="text-sm text-slate-500">No AI requests logged yet</p>
-                <p className="text-xs text-slate-600 mt-1">Brain events appear here once apps start making requests</p>
+                <p className="text-xs text-slate-600 mt-1">Activity appears here once apps start making requests</p>
               </div>
             ) : (
               <div className="space-y-1">
                 {(data?.recentBrainEvents ?? []).slice(0, 8).map(ev => (
-                  <div key={ev.id} className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.03] transition-colors">
+                  <div key={ev.id} className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-white/[0.03] transition-colors">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ev.success ? 'bg-emerald-500' : 'bg-red-500'}`} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white truncate font-mono">{ev.taskType}</p>
                       <p className="text-[11px] text-slate-600 truncate">{ev.appSlug} · {ev.routedProvider ?? 'no provider'}</p>
                     </div>
                     <div className="text-right shrink-0 flex items-center gap-2">
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md ${ev.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${ev.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
                         {ev.success ? 'ok' : 'err'}
                       </span>
                       {ev.latencyMs != null && (
@@ -560,69 +497,29 @@ export default function DashboardOverview() {
                 ))}
               </div>
             )}
-            {/* Secondary: app events if any critical ones */}
-            {(data?.recentEvents ?? []).some(e => e.severity === 'critical' || e.severity === 'error') && (
-              <div className="mt-4 pt-4 border-t border-white/[0.06]">
-                <p className="text-[10px] uppercase tracking-wider text-red-400 font-mono mb-2">⚠ App Alerts</p>
-                {(data?.recentEvents ?? []).filter(e => e.severity === 'critical' || e.severity === 'error').slice(0, 3).map(ev => (
-                  <div key={ev.id} className="flex items-center gap-3 py-1.5 px-3 rounded-lg bg-red-500/5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                    <p className="text-xs text-red-300 truncate flex-1">{ev.title}</p>
-                    <span className="text-[10px] text-slate-600">{ev.product?.name ?? '—'}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
-        {/* System Summary */}
+        {/* Quick Actions */}
         <div className={CARD}>
-          <div className="px-5 py-3.5 border-b border-white/[0.06]">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-emerald-400" /> System Summary
-            </h2>
-          </div>
-          <div className="p-4 space-y-3">
-            {[
-              { label: 'Total Apps',       value: String(data?.metrics?.totalProducts ?? 0) },
-              { label: 'Active Providers',  value: `${truth?.activeProviders ?? enabledProviders.length} / ${truth?.totalProviders ?? providers.length}` },
-              { label: 'Healthy Providers', value: String(truth?.activeProviders ?? healthyProviders.length) },
-              { label: 'Total Requests',    value: totalReqs.toLocaleString() },
-              { label: 'Error Rate',        value: totalReqs > 0 ? `${100 - successRate}%` : '0%' },
-              { label: 'Memory Entries',    value: (memory?.totalEntries ?? 0).toLocaleString() },
-              { label: 'Capabilities',      value: truth ? `${truth.availableCapabilities} / ${truth.totalCapabilities}` : '—' },
-              { label: 'Contacts',          value: String(data?.metrics?.totalContacts ?? 0) },
-              { label: 'Waitlist',          value: String(data?.metrics?.totalWaitlist ?? 0) },
-            ].map(row => (
-              <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-white/[0.04] last:border-0">
-                <span className="text-xs text-slate-500">{row.label}</span>
-                <span className="text-xs font-mono text-white">{row.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </motion.div>
-      {/* ─── Quick Actions ────────────────────────────────────────── */}
-      <motion.div variants={fadeUp}>
-        <div className={CARD}>
-          <div className="px-5 py-3.5 border-b border-white/[0.06]">
+          <div className="px-5 py-4 border-b border-white/[0.06]">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-400" /> Quick Actions
             </h2>
           </div>
-          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="p-4 grid grid-cols-2 gap-3">
             {[
-              { label: 'Studio',              href: '/admin/dashboard/build-studio',  icon: FlaskConical,gradient: 'from-blue-500/20 to-violet-500/20' },
-              { label: 'Manage Apps',        href: '/admin/dashboard/apps',          icon: Server,      gradient: 'from-cyan-500/20 to-blue-500/20' },
-              { label: 'Models',             href: '/admin/dashboard/models',        icon: Brain,       gradient: 'from-violet-500/20 to-purple-500/20' },
-              { label: 'Operations',         href: '/admin/dashboard/operations',    icon: Activity,    gradient: 'from-rose-500/20 to-pink-500/20' },
-              { label: 'Artifacts',          href: '/admin/dashboard/artifacts',     icon: Layers,      gradient: 'from-amber-500/20 to-yellow-500/20' },
+              { label: 'Studio',     href: '/admin/dashboard/build-studio',  icon: FlaskConical, gradient: 'from-blue-500/15 to-violet-500/15' },
+              { label: 'Apps',       href: '/admin/dashboard/apps',          icon: Server,       gradient: 'from-cyan-500/15 to-blue-500/15' },
+              { label: 'Models',     href: '/admin/dashboard/models',        icon: Brain,        gradient: 'from-violet-500/15 to-purple-500/15' },
+              { label: 'Providers',  href: '/admin/dashboard/operations',    icon: Activity,     gradient: 'from-rose-500/15 to-pink-500/15' },
+              { label: 'Artifacts',  href: '/admin/dashboard/artifacts',     icon: Layers,       gradient: 'from-amber-500/15 to-yellow-500/15' },
+              { label: 'Events',     href: '/admin/dashboard/events',        icon: Cpu,          gradient: 'from-emerald-500/15 to-green-500/15' },
             ].map(action => (
               <Link
                 key={action.label}
                 href={action.href}
-                className={`flex flex-col items-center gap-2 px-4 py-4 rounded-xl bg-gradient-to-br ${action.gradient} border border-white/[0.06] hover:border-white/[0.12] hover:scale-[1.02] transition-all text-center`}
+                className={`flex flex-col items-center gap-2.5 px-4 py-5 rounded-2xl bg-gradient-to-br ${action.gradient} border border-white/[0.06] hover:border-white/[0.12] hover:scale-[1.02] transition-all text-center`}
               >
                 <action.icon className="w-5 h-5 text-white" />
                 <span className="text-[11px] text-white font-medium">{action.label}</span>

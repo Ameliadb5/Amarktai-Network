@@ -2,12 +2,13 @@
 
 /**
  * CreatorStudioTab — Image / Audio / Music / Video / Campaign creation inside Build Studio.
+ * Accepts optional initialMode to support direct tab navigation from Studio tabs.
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   ImageIcon, Music, Mic, Film, Megaphone, Loader2, Download,
-  AlertCircle, CheckCircle, Sparkles,
+  AlertCircle, CheckCircle, Sparkles, ExternalLink,
 } from 'lucide-react'
 
 type CreatorMode = 'image' | 'music' | 'voice' | 'video' | 'campaign'
@@ -33,8 +34,12 @@ interface CreationResult {
   artifacts?: Array<{ type: string; content: string }>
 }
 
-export default function CreatorStudioTab() {
-  const [mode, setMode] = useState<CreatorMode>('image')
+interface CreatorStudioTabProps {
+  initialMode?: CreatorMode
+}
+
+export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps) {
+  const [mode, setMode] = useState<CreatorMode>(initialMode ?? 'image')
   const [prompt, setPrompt] = useState('')
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<CreationResult | null>(null)
@@ -45,6 +50,11 @@ export default function CreatorStudioTab() {
   const [instrumental, setInstrumental] = useState(false)
   // Campaign-specific
   const [campaignNiche, setCampaignNiche] = useState('')
+
+  // Sync mode when initialMode changes
+  useEffect(() => {
+    if (initialMode) setMode(initialMode)
+  }, [initialMode])
 
   const create = useCallback(async () => {
     if (!prompt.trim()) return
@@ -97,21 +107,26 @@ export default function CreatorStudioTab() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Creation failed') } finally { setRunning(false) }
   }, [mode, prompt, genre, mood, instrumental, campaignNiche])
 
+  // Show mode selector only when opened without a specific initialMode
+  const showModeSelector = !initialMode
+
   return (
     <div className="space-y-6">
-      {/* Mode selector */}
-      <div className="flex items-center gap-2">
-        {MODES.map(m => (
-          <button key={m.key} onClick={() => { setMode(m.key); setResult(null) }}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg border transition-all
-              ${mode === m.key ? 'bg-blue-500/10 border-blue-500/30 text-white' : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-white hover:bg-white/[0.04]'}`}>
-            <m.icon className={`w-4 h-4 ${mode === m.key ? 'text-blue-400' : ''}`} /> {m.label}
-          </button>
-        ))}
-      </div>
+      {/* Mode selector — only when accessed via generic Create Media tab */}
+      {showModeSelector && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {MODES.map(m => (
+            <button key={m.key} onClick={() => { setMode(m.key); setResult(null) }}
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium rounded-xl border transition-all
+                ${mode === m.key ? 'bg-white/[0.06] border-white/[0.10] text-white' : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-white hover:bg-white/[0.04]'}`}>
+              <m.icon className={`w-4 h-4 ${mode === m.key ? 'text-blue-400' : ''}`} /> {m.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Input form */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={3}
           placeholder={
             mode === 'image' ? 'Describe the image to generate…' :
@@ -120,18 +135,18 @@ export default function CreatorStudioTab() {
             mode === 'video' ? 'Describe the video concept…' :
             'Describe the campaign theme…'
           }
-          className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/40 resize-none" />
+          className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10 resize-none transition-all" />
 
         {mode === 'music' && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <select value={genre} onChange={e => setGenre(e.target.value)}
-              className="bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white">
+              className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2.5 text-xs text-white">
               {['Pop','Rock','Gospel','Amapiano','EDM','Hip-Hop','R&B','Jazz','Classical','Cinematic','Lo-Fi','Afrobeats','Country','Reggae'].map(g =>
                 <option key={g} value={g}>{g}</option>
               )}
             </select>
             <select value={mood} onChange={e => setMood(e.target.value)}
-              className="bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white">
+              className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2.5 text-xs text-white">
               {['Uplifting','Melancholic','Energetic','Chill','Romantic','Dark','Inspirational','Nostalgic','Aggressive','Peaceful'].map(m =>
                 <option key={m} value={m}>{m}</option>
               )}
@@ -146,13 +161,13 @@ export default function CreatorStudioTab() {
         {mode === 'campaign' && (
           <div>
             <input value={campaignNiche} onChange={e => setCampaignNiche(e.target.value)} placeholder="Niche (e.g. fitness, saas, church)…"
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/40" />
-            <p className="text-[10px] text-slate-600 mt-1">Uses AI chat to generate social copy, email, blog outline, and landing page concepts.</p>
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/40 transition-all" />
+            <p className="text-[10px] text-slate-600 mt-1.5">Uses AI chat to generate social copy, email, blog outline, and landing page concepts.</p>
           </div>
         )}
 
         <button onClick={create} disabled={running || !prompt.trim()}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:shadow-lg hover:shadow-blue-500/20 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all">
           {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
           {running ? 'Creating…' : 'Create'}
         </button>
@@ -160,49 +175,105 @@ export default function CreatorStudioTab() {
 
       {/* Error */}
       {error && (
-        <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-red-500/5 border border-red-500/20 text-red-300 text-sm">
+        <div className="flex items-start gap-3 px-5 py-4 rounded-xl bg-red-500/[0.06] border border-red-500/20 text-red-300 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {error}
         </div>
       )}
 
       {/* Result */}
       {result && (
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            {result.success ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-red-400" />}
-            <span className="text-sm font-medium text-white">{result.success ? 'Created Successfully' : 'Creation Failed'}</span>
-            {result.provider && <span className="text-[10px] text-slate-500 ml-2">via {result.provider}{result.model ? ` / ${result.model}` : ''}</span>}
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
+          {/* Status bar */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-white/[0.01]">
+            <div className="flex items-center gap-2">
+              {result.success ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-red-400" />}
+              <span className="text-sm font-medium text-white">{result.success ? 'Created Successfully' : 'Creation Failed'}</span>
+            </div>
+            <div className="flex items-center gap-3 text-[10px] text-slate-500">
+              {result.provider && <span>via {result.provider}</span>}
+              {result.model && <span>{result.model}</span>}
+              {result.latencyMs && result.latencyMs > 0 && <span>{result.latencyMs}ms</span>}
+            </div>
           </div>
 
+          {/* Image output — PREMIUM INLINE DISPLAY */}
           {result.imageUrl && (
-            <div className="space-y-2">
-              <img src={result.imageUrl} alt="Generated" className="max-w-full max-h-[500px] rounded-lg border border-white/[0.06]" />
-              <a href={result.imageUrl} download className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"><Download className="w-3 h-3" /> Download</a>
+            <div className="p-5">
+              <div className="image-result-container relative rounded-2xl overflow-hidden bg-[#0d1424] border border-white/[0.06]">
+                <img
+                  src={result.imageUrl}
+                  alt="Generated image"
+                  className="w-full max-h-[600px] object-contain"
+                  onError={(e) => {
+                    // Fallback: show as link if image fails to load
+                    const target = e.target as HTMLImageElement
+                    target.style.display = 'none'
+                    const parent = target.parentElement
+                    if (parent) {
+                      const fallback = document.createElement('div')
+                      fallback.className = 'p-6 text-center'
+                      fallback.innerHTML = `<p class="text-sm text-slate-400 mb-2">Image generated but could not display inline.</p><a href="${result.imageUrl}" target="_blank" rel="noopener noreferrer" class="text-sm text-blue-400 hover:text-blue-300 underline">Open image in new tab →</a>`
+                      parent.appendChild(fallback)
+                    }
+                  }}
+                />
+                {/* Overlay with download */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[11px] text-slate-300">
+                      {result.provider && <span className="px-2 py-0.5 rounded-lg bg-white/10 backdrop-blur-sm">{result.provider}</span>}
+                      {result.model && <span className="px-2 py-0.5 rounded-lg bg-white/10 backdrop-blur-sm">{result.model}</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <a href={result.imageUrl} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 backdrop-blur-sm text-xs text-white hover:bg-white/20 transition-colors">
+                        <ExternalLink className="w-3 h-3" /> Open
+                      </a>
+                      <a href={result.imageUrl} download
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/80 backdrop-blur-sm text-xs text-white font-medium hover:bg-blue-500 transition-colors">
+                        <Download className="w-3 h-3" /> Download
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
+          {/* Audio output */}
           {result.audioUrl && (
-            <div className="space-y-2">
-              <audio controls src={result.audioUrl} className="w-full" />
-              <a href={result.audioUrl} download className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"><Download className="w-3 h-3" /> Download</a>
+            <div className="p-5 space-y-3">
+              <audio controls src={result.audioUrl} className="w-full rounded-xl" />
+              <a href={result.audioUrl} download
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] transition-colors">
+                <Download className="w-3 h-3" /> Download Audio
+              </a>
             </div>
           )}
 
+          {/* Video output */}
           {result.videoUrl && (
-            <div className="space-y-2">
-              <video controls src={result.videoUrl} className="max-w-full rounded-lg" />
-              <a href={result.videoUrl} download className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"><Download className="w-3 h-3" /> Download</a>
+            <div className="p-5 space-y-3">
+              <video controls src={result.videoUrl} className="w-full rounded-xl border border-white/[0.06]" />
+              <a href={result.videoUrl} download
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] transition-colors">
+                <Download className="w-3 h-3" /> Download Video
+              </a>
             </div>
           )}
 
+          {/* Text output */}
           {result.output && !result.imageUrl && !result.audioUrl && (
-            <div className="bg-white/[0.02] rounded-lg p-4 text-sm text-slate-300 whitespace-pre-wrap max-h-[500px] overflow-y-auto">
-              {result.output}
+            <div className="p-5">
+              <div className="bg-white/[0.02] rounded-xl p-5 text-sm text-slate-300 whitespace-pre-wrap max-h-[500px] overflow-y-auto leading-relaxed border border-white/[0.04]">
+                {result.output}
+              </div>
             </div>
           )}
 
+          {/* Error detail */}
           {result.error && (
-            <div className="text-xs text-red-300 bg-red-500/5 rounded-lg p-3">{result.error}</div>
+            <div className="mx-5 mb-5 text-xs text-red-300 bg-red-500/[0.06] rounded-xl p-4 border border-red-500/20">{result.error}</div>
           )}
         </div>
       )}
