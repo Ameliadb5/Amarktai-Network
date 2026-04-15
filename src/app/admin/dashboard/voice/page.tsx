@@ -3,10 +3,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Mic, RefreshCw, AlertCircle, Loader2, ArrowLeft, Save, Volume2,
+  Mic, RefreshCw, AlertCircle, Loader2, Save, Volume2,
   User, Sparkles, Gauge,
 } from 'lucide-react'
-import Link from 'next/link'
 
 /* ── Types ───────────────────────────────────────────────── */
 interface VoicePersona {
@@ -77,21 +76,20 @@ export default function VoiceDashboardPage() {
   const inputCls = 'w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white focus:outline-none focus:border-violet-500/50 appearance-none cursor-pointer'
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0a0a0f] to-[#0f0f1a] text-white p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="space-y-6"
+    >
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/admin/dashboard" className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors">
-              <ArrowLeft className="w-4 h-4 text-slate-400" />
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
+          <div>
+              <h1 className="text-xl font-bold tracking-tight flex items-center gap-2 text-white">
                 <Mic className="w-5 h-5 text-emerald-400" />
                 Voice &amp; Persona
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">Configure voice persona per app agent — STT → Brain → TTS pipeline</p>
-            </div>
           </div>
           <button
             onClick={() => { setLoading(true); fetchData() }}
@@ -229,8 +227,7 @@ export default function VoiceDashboardPage() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </motion.div>
   )
 }
 

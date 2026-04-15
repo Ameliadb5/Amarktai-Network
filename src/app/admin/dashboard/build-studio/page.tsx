@@ -21,13 +21,13 @@ const CompareTab = dynamic(() => import('./tabs/CompareTab'), { ssr: false })
 /* ── Tab config ─────────────────────────────────────────────── */
 
 const TABS = [
-  { key: 'test-ai',        label: 'Test AI',        icon: FlaskConical },
-  { key: 'compare',        label: 'Compare Models', icon: Layers },
-  { key: 'create-app',     label: 'Create App',     icon: Code2 },
-  { key: 'creator-studio', label: 'Images / Media', icon: Palette },
-  { key: 'workflows',      label: 'Workflows',      icon: Workflow },
-  { key: 'skills',         label: 'Skill Library',  icon: BookOpen },
-  { key: 'github',         label: 'GitHub Export',  icon: GitBranch },
+  { key: 'test-ai',        label: 'Test AI',          icon: FlaskConical,  desc: 'Test any AI capability' },
+  { key: 'compare',        label: 'Compare Models',   icon: Layers,        desc: 'Side-by-side model comparison' },
+  { key: 'create-app',     label: 'Create App',       icon: Code2,         desc: 'AI-powered app scaffolding' },
+  { key: 'creator-studio', label: 'Create Media',     icon: Palette,       desc: 'Images, voice, video, music' },
+  { key: 'workflows',      label: 'Workflows',        icon: Workflow,      desc: 'Multi-step AI sequences' },
+  { key: 'skills',         label: 'Skills',           icon: BookOpen,      desc: 'Pre-built skill templates' },
+  { key: 'github',         label: 'Export',           icon: GitBranch,     desc: 'GitHub export & deploy' },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
@@ -44,20 +44,21 @@ export default function BuildStudioPage() {
     <motion.div initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.06 } } }} className="space-y-6">
       {/* Header */}
       <motion.div variants={fadeUp}>
-        <h1 className="text-2xl font-bold text-white">Studio</h1>
+        <h1 className="text-2xl font-bold text-white font-heading">Studio</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Test AI, create apps, generate media, compare models, and export to GitHub.
+          Test AI capabilities, create apps, generate media, compare models, and export.
         </p>
       </motion.div>
 
       {/* Tab bar */}
-      <motion.div variants={fadeUp} className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-white/[0.06]">
+      <motion.div variants={fadeUp} className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-white/[0.06] scrollbar-thin">
         {TABS.map((tab) => {
           const active = activeTab === tab.key
           return (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
+              title={tab.desc}
               className={`flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium whitespace-nowrap rounded-t-lg transition-all duration-200
                 ${active
                   ? 'text-white bg-blue-500/10 border-b-2 border-blue-500'

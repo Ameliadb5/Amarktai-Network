@@ -43,11 +43,17 @@ const navGroups: NavGroup[] = [
   {
     label: 'Studio',
     items: [
-      { href: '/admin/dashboard/build-studio', label: 'Studio', icon: FlaskConical },
-      { href: '/admin/dashboard/artifacts',    label: 'Artifacts',      icon: Package },
-      { href: '/admin/dashboard/music-studio', label: 'Music Studio',   icon: Music },
-      { href: '/admin/dashboard/voice',        label: 'Voice',          icon: Mic },
-      { href: '/admin/dashboard/video',        label: 'Video',          icon: Film },
+      { href: '/admin/dashboard/build-studio', label: 'Studio',    icon: FlaskConical },
+      { href: '/admin/dashboard/music-studio', label: 'Music',     icon: Music },
+      { href: '/admin/dashboard/video',        label: 'Video',     icon: Film },
+      { href: '/admin/dashboard/voice',        label: 'Voice',     icon: Mic },
+    ],
+  },
+  {
+    label: 'Media',
+    items: [
+      { href: '/admin/dashboard/artifacts',    label: 'Artifacts',    icon: Package },
+      { href: '/admin/dashboard/media',        label: 'Capabilities', icon: Layers },
     ],
   },
   {
