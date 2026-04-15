@@ -7,10 +7,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ArrowRight } from 'lucide-react'
 
 const navLinks = [
-  { href: '/', label: 'Product' },
+  { href: '/', label: 'Home' },
   { href: '/apps', label: 'Ecosystem' },
-  { href: '/about', label: 'Intelligence' },
-  { href: '/contact', label: 'Access' },
+  { href: '/about', label: 'About' },
+  { href: '/docs', label: 'Docs' },
+  { href: '/contact', label: 'Contact' },
 ]
 
 export default function Header() {
@@ -85,12 +86,18 @@ export default function Header() {
           </nav>
 
           {/* CTA */}
-          <div className="hidden md:block">
+          <div className="hidden md:flex items-center gap-3">
             <Link
               href="/admin/login"
+              className="text-sm font-medium text-slate-400 hover:text-white transition-colors"
+            >
+              Login
+            </Link>
+            <Link
+              href="/contact"
               className="group inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/20 hover:-translate-y-0.5"
             >
-              Enter Platform
+              Request Access
               <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
           </div>
@@ -168,14 +175,21 @@ export default function Header() {
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: navLinks.length * 0.05, duration: 0.2 }}
-                className="pt-3 mt-2 border-t border-white/5"
+                className="pt-3 mt-2 border-t border-white/5 space-y-2"
               >
                 <Link
                   href="/admin/login"
                   onClick={() => setMenuOpen(false)}
+                  className="block text-center px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-white rounded-lg transition-colors"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/contact"
+                  onClick={() => setMenuOpen(false)}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg"
                 >
-                  Enter Platform
+                  Request Access
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </motion.div>

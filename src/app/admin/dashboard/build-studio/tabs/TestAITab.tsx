@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Play, Loader2, Copy, Check, Gauge, CheckCircle, XCircle,
-  Zap, Route, AlertCircle, ShieldAlert, Radio, BookOpen,
+  Zap, Route, AlertCircle, ShieldAlert, Radio, BookOpen, Download,
 } from 'lucide-react'
 
 const CAPABILITIES = [
@@ -54,9 +54,9 @@ export default function TestAITab() {
   const [appProfile] = useState<string>('__admin_test__')
   const [providers, setProviders] = useState<ProviderOption[]>([])
   const [models, setModels] = useState<ModelOption[]>([])
-  const [_loadingProviders, setLoadingProviders] = useState(true)
+  const [loadingProviders, setLoadingProviders] = useState(true)
   const [capabilityStatus, setCapabilityStatus] = useState<CapabilityEntry[]>([])
-  const [_loadingCaps, setLoadingCaps] = useState(true)
+  const [loadingCaps, setLoadingCaps] = useState(true)
   const [result, setResult] = useState<TestResult | null>(null)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +70,7 @@ export default function TestAITab() {
   const [streaming, setStreaming] = useState(false)
   const sttFileRef = useRef<HTMLInputElement>(null)
   const [sttFile, setSttFile] = useState<File | null>(null)
-  const [_videoJobId, setVideoJobId] = useState<string | null>(null)
+  const [videoJobId, setVideoJobId] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const videoPollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -200,6 +200,14 @@ export default function TestAITab() {
 
   return (
     <div className="space-y-6">
+      {/* Loading indicator */}
+      {(loadingProviders || loadingCaps) && (
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Loading capabilities…
+        </div>
+      )}
+
       {/* Capability selector */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
         {CAPABILITIES.map(cap => {
@@ -328,11 +336,17 @@ export default function TestAITab() {
           )}
 
           {/* Video output */}
+          {videoJobId && !videoUrl && (
+            <div className="flex items-center gap-2 text-xs text-blue-400">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Video generating… (Job: {videoJobId.slice(0, 8)}…)
+            </div>
+          )}
           {videoUrl && (
             <div className="space-y-2">
-              <video controls src={videoUrl} className="max-w-full rounded-lg" />
+              <video controls src={videoUrl} className="max-w-full rounded-lg border border-white/[0.06]" />
               <a href={videoUrl} download className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300">
-                Download video
+                <Download className="w-3 h-3" /> Download video
               </a>
             </div>
           )}

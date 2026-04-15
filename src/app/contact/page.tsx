@@ -85,14 +85,13 @@ export default function ContactPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.21, 0.47, 0.32, 0.98] }}
         >
-          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Get in Touch</p>
+          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Request Access</p>
           <h1 className="font-heading text-5xl sm:text-6xl font-extrabold tracking-tight mb-5">
-            Serious <span className="gradient-text">Conversations</span>
-            <br />Welcome Here
+            Get in <span className="gradient-text">Touch</span>
           </h1>
           <p className="text-slate-400 text-lg max-w-xl mx-auto leading-relaxed">
-            Whether you are building, investing, partnering, or looking to join — we want to hear from you.
-            We respond to every substantive enquiry.
+            AmarktAI Network is currently available by request.
+            Whether you&apos;re building, investing, partnering, or looking to join — we want to hear from you.
           </p>
         </motion.div>
 

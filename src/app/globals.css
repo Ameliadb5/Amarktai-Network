@@ -102,6 +102,84 @@ code, pre, .font-mono {
 /* ─── Focus ──────────────────────────────────────── */
 input:focus, textarea:focus, select:focus { outline: none; }
 
+/* ─── Form Controls (Dark Theme) ─────────────────── */
+select,
+select option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+select option:checked {
+  background-color: var(--bg-surface);
+}
+select option:hover {
+  background-color: var(--bg-card);
+}
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+/* Ensure all selects have dark scheme so native dropdowns render dark */
+select {
+  color-scheme: dark;
+}
+input,
+textarea {
+  color: var(--text-primary);
+  background-color: transparent;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+input:focus,
+textarea:focus {
+  outline: none;
+}
+/* Ensure number and date inputs are readable in dark theme */
+input[type="date"],
+input[type="datetime-local"],
+input[type="number"],
+input[type="time"] {
+  color-scheme: dark;
+}
+/* File inputs */
+input[type="file"] {
+  color-scheme: dark;
+}
+/* Checkbox styling */
+input[type="checkbox"] {
+  accent-color: var(--accent-blue);
+}
+/* Radio styling */
+input[type="radio"] {
+  accent-color: var(--accent-blue);
+}
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.25);
+}
+
 /* ─── Glass Surfaces ─────────────────────────────── */
 .glass {
   background: rgba(10, 15, 26, 0.7);

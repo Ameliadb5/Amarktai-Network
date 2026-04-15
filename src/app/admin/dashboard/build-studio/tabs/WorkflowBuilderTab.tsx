@@ -58,7 +58,7 @@ export default function WorkflowBuilderTab() {
 
   return (
     <div className="space-y-6">
-      <div className="text-sm text-slate-400">Build and run chained AI workflows. Pick a template or create custom sequences.</div>
+      <div className="text-sm text-slate-400">Run pre-built AI workflow templates. Custom workflow creation is coming soon.</div>
 
       {error && <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-red-500/5 border border-red-500/20 text-red-300 text-sm"><AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {error}</div>}
 

@@ -4,15 +4,15 @@ const FOOTER_COLS = [
   {
     heading: 'Product',
     links: [
-      { href: '/', label: 'Overview' },
+      { href: '/', label: 'Home' },
       { href: '/apps', label: 'Ecosystem' },
-      { href: '/about', label: 'Intelligence Layer' },
+      { href: '/docs', label: 'API Docs' },
     ],
   },
   {
     heading: 'Company',
     links: [
-      { href: '/about-amarktai-network', label: 'About AmarktAI' },
+      { href: '/about', label: 'About' },
       { href: '/contact', label: 'Contact' },
     ],
   },

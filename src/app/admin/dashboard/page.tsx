@@ -6,9 +6,8 @@ import {
   CheckCircle, AlertCircle, AlertTriangle, WifiOff, Clock,
   RefreshCw, Zap, Activity, Brain, Database, Server,
   ArrowRight, Cpu, Gauge, DollarSign, Bell,
-  ShieldAlert, Puzzle, Layers, Shield, Workflow, Bot,
-  Code2, Webhook, FileSearch, Sparkles, Cable, FlaskConical,
-  Film, Mic,
+  ShieldAlert, Puzzle, Layers, Sparkles,
+  FlaskConical,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
@@ -604,50 +603,6 @@ export default function DashboardOverview() {
           </div>
         </div>
       </motion.div>
-      {/* ─── Platform Systems ────────────────────────────────────── */}
-      <motion.div variants={fadeUp}>
-        <div className={CARD}>
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-violet-400" /> Platform Systems
-            </h2>
-            <span className="text-[10px] text-emerald-400 font-mono bg-emerald-400/10 px-2 py-0.5 rounded-full">IMPLEMENTED</span>
-          </div>
-          <div className="p-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
-              {[
-                { name: 'Streaming SSE',     icon: Zap,         color: 'text-yellow-400', desc: '13 providers' },
-                { name: 'Tool Runtime',       icon: Bot,         color: 'text-blue-400',   desc: '5 built-in tools' },
-                { name: 'RAG Pipeline',       icon: FileSearch,  color: 'text-cyan-400',   desc: 'Ingest & query' },
-                { name: 'Rate Limiter',       icon: Shield,      color: 'text-red-400',    desc: '5 scopes' },
-                { name: 'Webhooks',           icon: Webhook,     color: 'text-orange-400', desc: '10 event types' },
-                { name: 'Guardrails',         icon: ShieldAlert, color: 'text-rose-400',   desc: 'PII & safety' },
-                { name: 'Smart Router',       icon: Cable,       color: 'text-emerald-400',desc: 'ML scoring' },
-                { name: 'Prompt Studio',      icon: Sparkles,    color: 'text-purple-400', desc: 'A/B testing' },
-                { name: 'Workflow Engine',    icon: Workflow,     color: 'text-indigo-400', desc: '9 step types' },
-                { name: 'Semantic Cache',     icon: Database,    color: 'text-teal-400',   desc: 'Vector dedup' },
-                { name: 'Batch Processing',   icon: Layers,      color: 'text-amber-400',  desc: 'BullMQ jobs' },
-                { name: 'Coding Agent',       icon: Code2,       color: 'text-sky-400',    desc: '5 project types' },
-                { name: 'Observability',      icon: Activity,    color: 'text-green-400',  desc: 'Traces & spans' },
-                { name: 'Audit Trail',        icon: Puzzle,      color: 'text-pink-400',   desc: '31 actions' },
-                { name: 'Plugin System',      icon: FlaskConical,color: 'text-lime-400',   desc: '7 types, 9 hooks' },
-                { name: 'Fine-Tuning',        icon: Brain,       color: 'text-violet-400', desc: '3 providers' },
-                { name: 'Model Compare',      icon: Gauge,       color: 'text-blue-400',   desc: 'Side-by-side' },
-                { name: 'Federated Memory',   icon: Server,      color: 'text-fuchsia-400',desc: '7 memory types' },
-              ].map(sys => (
-                <div key={sys.name} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-colors">
-                  <sys.icon className={`w-4 h-4 shrink-0 ${sys.color}`} />
-                  <div className="min-w-0">
-                    <p className="text-[11px] text-white font-medium truncate">{sys.name}</p>
-                    <p className="text-[9px] text-slate-500 font-mono truncate">{sys.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
       {/* ─── Quick Actions ────────────────────────────────────────── */}
       <motion.div variants={fadeUp}>
         <div className={CARD}>
@@ -658,17 +613,11 @@ export default function DashboardOverview() {
           </div>
           <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {[
-              { label: 'Build Studio',       href: '/admin/dashboard/build-studio',  icon: Code2,       gradient: 'from-blue-500/20 to-violet-500/20' },
-              { label: 'Test AI',            href: '/admin/dashboard/build-studio',  icon: FlaskConical,gradient: 'from-emerald-500/20 to-cyan-500/20' },
-              { label: 'Manage Models',      href: '/admin/dashboard/models',        icon: Brain,       gradient: 'from-violet-500/20 to-purple-500/20' },
-              { label: 'Configure Apps',     href: '/admin/dashboard/apps',          icon: Server,      gradient: 'from-cyan-500/20 to-blue-500/20' },
-              { label: 'View Intelligence',  href: '/admin/dashboard/intelligence',  icon: Gauge,       gradient: 'from-amber-500/20 to-orange-500/20' },
+              { label: 'Studio',              href: '/admin/dashboard/build-studio',  icon: FlaskConical,gradient: 'from-blue-500/20 to-violet-500/20' },
+              { label: 'Manage Apps',        href: '/admin/dashboard/apps',          icon: Server,      gradient: 'from-cyan-500/20 to-blue-500/20' },
+              { label: 'Models',             href: '/admin/dashboard/models',        icon: Brain,       gradient: 'from-violet-500/20 to-purple-500/20' },
               { label: 'Operations',         href: '/admin/dashboard/operations',    icon: Activity,    gradient: 'from-rose-500/20 to-pink-500/20' },
               { label: 'Artifacts',          href: '/admin/dashboard/artifacts',     icon: Layers,      gradient: 'from-amber-500/20 to-yellow-500/20' },
-              { label: 'Alerts',             href: '/admin/dashboard/alerts',        icon: Bell,        gradient: 'from-red-500/20 to-orange-500/20' },
-              { label: 'Music Studio',       href: '/admin/dashboard/music-studio',  icon: Mic,         gradient: 'from-emerald-500/20 to-teal-500/20' },
-              { label: 'Video Generation',   href: '/admin/dashboard/video',         icon: Film,        gradient: 'from-pink-500/20 to-rose-500/20' },
-              { label: 'Integrations',       href: '/admin/dashboard/integrations',  icon: Cable,       gradient: 'from-violet-500/20 to-indigo-500/20' },
             ].map(action => (
               <Link
                 key={action.label}
