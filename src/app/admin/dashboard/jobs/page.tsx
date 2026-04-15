@@ -49,7 +49,7 @@ export default function JobsDashboardPage() {
     return () => clearInterval(iv)
   }, [fetchData])
 
-  const glass = 'bg-white/[0.03] backdrop-blur-sm border border-white/[0.06] rounded-2xl'
+  const glass = 'bg-white/[0.02] backdrop-blur-sm border border-white/[0.06] rounded-2xl'
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0a0a0f] to-[#0f0f1a] text-white p-6">
@@ -61,16 +61,16 @@ export default function JobsDashboardPage() {
               <ArrowLeft className="w-4 h-4 text-slate-400" />
             </Link>
             <div>
-              <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                 <Layers className="w-5 h-5 text-amber-400" />
                 Jobs &amp; Queue Status
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5">Background processing overview</p>
+              <p className="text-sm text-slate-500 mt-0.5">Background processing overview</p>
             </div>
           </div>
           <button
             onClick={() => { setLoading(true); fetchData() }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-xs text-slate-400 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs text-slate-400 transition-colors"
           >
             <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
             Refresh

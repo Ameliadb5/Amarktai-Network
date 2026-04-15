@@ -61,7 +61,7 @@ function capitalize(s: string) {
 /* ── Card wrapper ──────────────────────────────────────────────── */
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 ${className}`}>
+    <div className={`bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 ${className}`}>
       {children}
     </div>
   )
@@ -148,12 +148,12 @@ export default function EmotionsDashboardPage() {
       {/* Header */}
       <motion.div variants={fadeIn} className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             <Heart className="w-5 h-5 text-pink-400" /> Emotional Intelligence
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">Real-time emotion detection, personality adaptation &amp; learning</p>
+          <p className="text-sm text-slate-500 mt-0.5">Real-time emotion detection, personality adaptation &amp; learning</p>
         </div>
-        <button onClick={load} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-slate-400 hover:text-white transition-colors">
+        <button onClick={load} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs text-slate-400 hover:text-white transition-colors">
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </button>
       </motion.div>
@@ -267,7 +267,7 @@ function DriftCard({ label, count, total, icon: Icon, color, bgColor }: {
 
 function InfoBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white/[0.02] rounded-lg p-3 border border-white/[0.04]">
+    <div className="bg-white/[0.02] rounded-xl p-3 border border-white/[0.06]">
       <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">{label}</p>
       <p className="text-white font-mono">{value}</p>
     </div>

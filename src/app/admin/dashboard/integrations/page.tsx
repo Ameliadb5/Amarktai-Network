@@ -109,7 +109,7 @@ export default function IntegrationsPage() {
     }
   }
 
-  const glass = 'bg-white/[0.03] backdrop-blur-sm border border-white/[0.06] rounded-2xl'
+  const glass = 'bg-white/[0.02] backdrop-blur-sm border border-white/[0.06] rounded-2xl'
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0a0a0f] to-[#0f0f1a] text-white p-6">
@@ -122,18 +122,18 @@ export default function IntegrationsPage() {
               <ArrowLeft className="w-4 h-4 text-slate-400" />
             </Link>
             <div>
-              <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                 <Cable className="w-5 h-5 text-violet-400" />
                 Integration Keys
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-sm text-slate-500 mt-0.5">
                 Manage API keys for Firecrawl, Mem0, Qdrant, and other external services
               </p>
             </div>
           </div>
           <button
             onClick={fetchData}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-xs text-slate-400 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs text-slate-400 transition-colors"
           >
             <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -226,7 +226,7 @@ export default function IntegrationsPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => startEdit(intg)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-500/10 text-violet-300 border border-violet-500/20 hover:bg-violet-500/20 transition-colors"
+                        className="px-3 py-1.5 rounded-xl text-xs font-medium bg-violet-500/10 text-violet-300 border border-violet-500/20 hover:bg-violet-500/20 transition-colors"
                       >
                         {intg.configured ? 'Update' : 'Configure'}
                       </button>
@@ -234,7 +234,7 @@ export default function IntegrationsPage() {
                         <button
                           onClick={() => handleDelete(intg.key)}
                           disabled={deleting === intg.key}
-                          className="p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          className="p-1.5 rounded-xl text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                           title="Remove saved key (will fall back to env var)"
                         >
                           {deleting === intg.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
@@ -262,7 +262,7 @@ export default function IntegrationsPage() {
                           value={formKey}
                           onChange={e => setFormKey(e.target.value)}
                           placeholder={intg.configured ? 'Leave blank to keep existing key' : 'Enter API key…'}
-                          className="w-full px-3 py-2 pr-10 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50 font-mono"
+                          className="w-full px-3 py-2 pr-10 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50 font-mono"
                         />
                         <button
                           type="button"
@@ -284,7 +284,7 @@ export default function IntegrationsPage() {
                           value={formUrl}
                           onChange={e => setFormUrl(e.target.value)}
                           placeholder={intg.apiUrl ? intg.apiUrl : 'https://...'}
-                          className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50"
+                          className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50"
                         />
                       </div>
                     )}
@@ -296,7 +296,7 @@ export default function IntegrationsPage() {
                         value={formNotes}
                         onChange={e => setFormNotes(e.target.value)}
                         placeholder="Any notes about this integration…"
-                        className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50"
+                        className="w-full px-3 py-2 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50"
                       />
                     </div>
 
@@ -310,14 +310,14 @@ export default function IntegrationsPage() {
                       <button
                         onClick={() => handleSave(intg.key)}
                         disabled={saving}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 transition-colors disabled:opacity-50"
                       >
                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         Save
                       </button>
                       <button
                         onClick={cancelEdit}
-                        className="px-4 py-2 rounded-lg text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                        className="px-4 py-2 rounded-xl text-sm text-slate-500 hover:text-slate-300 transition-colors"
                       >
                         Cancel
                       </button>
