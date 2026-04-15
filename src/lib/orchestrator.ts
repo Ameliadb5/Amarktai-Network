@@ -99,6 +99,33 @@ const BUDGET_TO_COST_TIER: Record<string, string> = {
 /** Task types that require video routing. */
 const VIDEO_TASK_TYPES_SET = new Set(['video', 'video_generation', 'video_gen', 'video_planning'])
 
+/**
+ * Message-content-based image detection.
+ *
+ * When the explicit taskType is a generic type (e.g. "chat"), but the message
+ * clearly requests image generation, this function returns true so the
+ * orchestrator sets the correct modality and never routes to a text model.
+ *
+ * This prevents the critical bug where "create an image of a sunset" sent
+ * with taskType="chat" would be routed to gpt-4o-mini for a text response.
+ */
+const IMAGE_MESSAGE_PATTERNS = [
+  /\b(?:create|generate|make|draw|paint|design|produce|render)\b.*\b(?:image|picture|photo|illustration|artwork|visual|graphic)\b/i,
+  /\b(?:image|picture|photo|illustration|artwork|visual|graphic)\b.*\b(?:of|showing|depicting|with|featuring)\b/i,
+  /\bdall-?e\b/i,
+  /\bimage.?generat/i,
+  /\bgenerate.?(?:an?\s+)?image\b/i,
+]
+
+function detectImageFromMessage(normalizedTask: string, message: string): boolean {
+  // Only activate for generic task types — don't override explicit non-image tasks
+  if (normalizedTask && !['chat', 'help', 'ping', 'support', 'general', ''].includes(normalizedTask)) {
+    return false
+  }
+  const msg = (message ?? '').toLowerCase()
+  return IMAGE_MESSAGE_PATTERNS.some(p => p.test(msg))
+}
+
 // ── Classification ────────────────────────────────────────────────────────────
 
 export type TaskComplexity = 'simple' | 'moderate' | 'complex'
@@ -605,7 +632,7 @@ export async function orchestrate(opts: {
   const isMultimodal = detectMultimodal(appCategory, taskType)
   const isRetrieval = detectRetrieval(taskType, message)
   const normalizedTask = (taskType ?? '').toLowerCase()
-  const isImageTask = IMAGE_TASK_TYPES_SET.has(normalizedTask)
+  const isImageTask = IMAGE_TASK_TYPES_SET.has(normalizedTask) || detectImageFromMessage(normalizedTask, message)
   const isVoiceTask = VOICE_TASK_TYPES_SET.has(normalizedTask)
   const isEmbeddingsTask = EMBEDDINGS_TASK_TYPES_SET.has(normalizedTask)
   const isModerationTask = MODERATION_TASK_TYPES_SET.has(normalizedTask)

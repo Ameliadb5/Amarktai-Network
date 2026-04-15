@@ -171,8 +171,8 @@ export default function TestAITab() {
     // General brain test
     try {
       const body: Record<string, unknown> = { appId: appProfile, appSecret: 'admin-test-secret', taskType: capability, message: prompt }
-      if (forceProvider !== 'auto') body.forceProvider = forceProvider
-      if (forceModel !== 'auto') body.forceModel = forceModel
+      if (forceProvider !== 'auto') body.providerKey = forceProvider
+      if (forceModel !== 'auto') body.modelId = forceModel
       const res = await fetch('/api/admin/brain/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json()
       setResult(data)

@@ -23,14 +23,57 @@ const testSchema = z.object({
   ttsProvider: z.string().optional(),
 })
 
-const SPECIALIST_CAPABILITIES = new Set([
-  'tts', 'voice', 'stt', 'voice_input', 'voice_output',
-  'image', 'image_generation', 'image_gen', 'generate_image', 'create_image', 'image_editing',
-  'suggestive', 'suggestive_image',
-  'adult_image', 'adult_18plus_image',
-  'research', 'research_search', 'deep_research',
-  'video', 'video_generation', 'video_planning',
+/** Capability classes that indicate an image-generation request. */
+const IMAGE_CAPABILITY_CLASSES = new Set([
+  'image', 'image_generation', 'image_gen', 'generate_image', 'create_image',
 ])
+
+/** Capability classes that indicate a voice/TTS request. */
+const TTS_CAPABILITY_CLASSES = new Set(['tts', 'voice', 'voice_output'])
+
+/** Capability classes that indicate a STT request. */
+const STT_CAPABILITY_CLASSES = new Set(['stt', 'voice_input'])
+
+/** Capability classes that indicate a research request. */
+const RESEARCH_CAPABILITY_CLASSES = new Set(['research', 'research_search', 'deep_research'])
+
+/** Capability classes that indicate a video request. */
+const VIDEO_CAPABILITY_CLASSES = new Set(['video', 'video_generation', 'video_planning'])
+
+/**
+ * Resolve the effective specialist type from both the explicit taskType AND
+ * the detected capabilities array. This ensures that when a user sends
+ * taskType="chat" but the message contains "create an image of a sunset",
+ * the detected `image_generation` capability routes to the image handler
+ * instead of falling through to the text orchestrator.
+ */
+function resolveSpecialistType(
+  taskType: string,
+  capabilities: string[],
+): 'image' | 'image_editing' | 'suggestive' | 'adult_image' | 'tts' | 'stt' | 'research' | 'video' | null {
+  // Explicit taskType always wins
+  if (IMAGE_CAPABILITY_CLASSES.has(taskType)) return 'image'
+  if (taskType === 'image_editing') return 'image_editing'
+  if (['suggestive', 'suggestive_image'].includes(taskType)) return 'suggestive'
+  if (['adult_image', 'adult_18plus_image'].includes(taskType)) return 'adult_image'
+  if (TTS_CAPABILITY_CLASSES.has(taskType)) return 'tts'
+  if (STT_CAPABILITY_CLASSES.has(taskType)) return 'stt'
+  if (RESEARCH_CAPABILITY_CLASSES.has(taskType)) return 'research'
+  if (VIDEO_CAPABILITY_CLASSES.has(taskType)) return 'video'
+
+  // Fallback: infer from detected capabilities (message-based detection)
+  for (const cap of capabilities) {
+    if (IMAGE_CAPABILITY_CLASSES.has(cap) || cap === 'image_generation') return 'image'
+    if (cap === 'image_editing') return 'image_editing'
+    if (['suggestive_image_generation', 'suggestive_image'].includes(cap)) return 'suggestive'
+    if (TTS_CAPABILITY_CLASSES.has(cap)) return 'tts'
+    if (STT_CAPABILITY_CLASSES.has(cap)) return 'stt'
+    if (RESEARCH_CAPABILITY_CLASSES.has(cap)) return 'research'
+    if (VIDEO_CAPABILITY_CLASSES.has(cap)) return 'video'
+  }
+
+  return null
+}
 
 export async function POST(request: NextRequest) {
   const session = await getSession()
@@ -63,8 +106,12 @@ export async function POST(request: NextRequest) {
     safeMode: safetyConfig?.safeMode,
   })
 
-  const isSpecialist = SPECIALIST_CAPABILITIES.has(body.taskType) ||
-    capabilities.some(c => SPECIALIST_CAPABILITIES.has(c))
+  // Resolve specialist type from BOTH taskType AND detected capabilities.
+  // This prevents the critical bug where taskType="chat" + message="create an image"
+  // detects image_generation capability but no specialist handler matches, causing
+  // fallthrough to orchestrate() which routes to gpt-4o-mini for a text response.
+  const specialistType = resolveSpecialistType(body.taskType, capabilities)
+  const isSpecialist = specialistType !== null
 
   // Specialist tasks (image, TTS, STT, research, video, …) ALWAYS use the
   // correct specialist executor — even when the caller forces a providerKey.
@@ -76,7 +123,7 @@ export async function POST(request: NextRequest) {
       || process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
       || 'http://localhost:3000'
 
-    if (['tts', 'voice', 'voice_output'].includes(body.taskType)) {
+    if (specialistType === 'tts') {
       const ttsRes = await fetch(`${origin}/api/brain/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,7 +163,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (['stt', 'voice_input'].includes(body.taskType)) {
+    if (specialistType === 'stt') {
       return NextResponse.json(
         {
           success: false, executed: false, traceId, output: null,
@@ -129,7 +176,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (['image', 'image_generation', 'image_gen', 'generate_image', 'create_image'].includes(body.taskType)) {
+    if (specialistType === 'image') {
       const imageRes = await fetch(`${origin}/api/brain/image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,7 +205,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (body.taskType === 'image_editing') {
+    if (specialistType === 'image_editing') {
       // Image editing requires an actual image to be provided. From the lab (text-only),
       // return a structured response explaining the required inputs rather than failing silently.
       const editRes = await fetch(`${origin}/api/brain/image-edit`, {
@@ -193,7 +240,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (['suggestive', 'suggestive_image'].includes(body.taskType)) {
+    if (specialistType === 'suggestive') {
       const imageRes = await fetch(`${origin}/api/brain/suggestive-image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -217,7 +264,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (['adult_image', 'adult_18plus_image'].includes(body.taskType)) {
+    if (specialistType === 'adult_image') {
       if (!body.appSlug) {
         return NextResponse.json(
           {
@@ -257,7 +304,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (['research', 'research_search', 'deep_research'].includes(body.taskType)) {
+    if (specialistType === 'research') {
       const depth = body.taskType === 'deep_research' ? 'deep' : 'shallow'
       const researchRes = await fetch(`${origin}/api/brain/research`, {
         method: 'POST',
@@ -282,7 +329,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (['video', 'video_generation', 'video_planning'].includes(body.taskType)) {
+    if (specialistType === 'video') {
       return NextResponse.json({
         success: false, executed: false, traceId, output: null, videoStatus: 'unavailable',
         capability: capabilities, routedProvider: null, routedModel: null,
