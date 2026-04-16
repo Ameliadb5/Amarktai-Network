@@ -92,7 +92,27 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
       } else {
         throw new Error(`Unknown mode: ${mode}`)
       }
-      const data = await res.json()
+      const data = await (async () => {
+        // /api/brain/tts returns audio/mpeg on success, JSON on error
+        if (mode === 'voice') {
+          if (!res.ok) {
+            return await res.json().catch(() => ({ success: false, error: `Voice generation failed: HTTP ${res.status}` }))
+          }
+          const contentType = res.headers.get('Content-Type') ?? ''
+          if (contentType.includes('audio')) {
+            const buffer = await res.arrayBuffer()
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+            return { success: true, audioUrl: `data:audio/mpeg;base64,${base64}`, output: '[TTS audio generated]' }
+          }
+          return await res.json().catch(() => ({ success: false, error: 'Unexpected TTS response format' }))
+        }
+        // All other modes return JSON
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({ error: `Request failed: HTTP ${res.status}` }))
+          return { success: false, error: errBody.error ?? `Request failed: HTTP ${res.status}` }
+        }
+        return await res.json().catch(() => ({ success: false, error: 'Invalid JSON response from server' }))
+      })()
       setResult({
         success: data.success ?? (!!data.output || !!data.audioUrl),
         output: data.output ?? data.text ?? null,

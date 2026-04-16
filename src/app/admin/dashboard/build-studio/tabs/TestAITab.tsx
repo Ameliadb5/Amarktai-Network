@@ -122,6 +122,12 @@ export default function TestAITab() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ appId: appProfile, appSecret: 'admin-test-secret', taskType: capability, message: prompt }),
         })
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: `Stream failed: HTTP ${res.status}` }))
+          setError(errData.error ?? `Stream request failed: HTTP ${res.status}`)
+          setStreaming(false); setRunning(false)
+          return
+        }
         const reader = res.body?.getReader()
         const decoder = new TextDecoder()
         let full = ''
@@ -149,21 +155,39 @@ export default function TestAITab() {
         form.append('appId', appProfile)
         form.append('appSecret', 'admin-test-secret')
         const res = await fetch('/api/brain/stt', { method: 'POST', body: form })
-        const data = await res.json()
-        setResult({ success: data.success ?? true, executed: true, output: data.text ?? data.output ?? JSON.stringify(data), capability: ['stt'], routedProvider: data.provider ?? null, routedModel: data.model ?? null, executionMode: 'direct', confidenceScore: null, validationUsed: false, consensusUsed: false, fallbackUsed: false, fallback_used: false, warnings: [], error: data.error ?? null, latencyMs: data.latencyMs ?? 0 })
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: `STT failed: HTTP ${res.status}` }))
+          setResult({ success: false, executed: false, output: null, capability: ['stt'], routedProvider: null, routedModel: null, executionMode: 'direct', confidenceScore: null, validationUsed: false, consensusUsed: false, fallbackUsed: false, fallback_used: false, warnings: [], error: errData.error ?? `STT failed: HTTP ${res.status}`, latencyMs: 0 })
+        } else {
+          const data = await res.json()
+          setResult({ success: data.success ?? true, executed: true, output: data.text ?? data.output ?? JSON.stringify(data), capability: ['stt'], routedProvider: data.provider ?? null, routedModel: data.model ?? null, executionMode: 'direct', confidenceScore: null, validationUsed: false, consensusUsed: false, fallbackUsed: false, fallback_used: false, warnings: [], error: data.error ?? null, latencyMs: data.latencyMs ?? 0 })
+        }
       } catch (e) { setError(e instanceof Error ? e.message : 'STT error') } finally { setRunning(false) }
       return
     }
 
-    // TTS
+    // TTS — /api/brain/tts returns audio/mpeg on success, JSON on error
     if (capability === 'tts') {
       try {
         const res = await fetch('/api/brain/tts', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ appId: appProfile, appSecret: 'admin-test-secret', text: prompt, gender: ttsGender || undefined, voiceId: ttsVoiceId || undefined, accent: ttsAccent || undefined, provider: ttsProvider !== 'auto' ? ttsProvider : undefined }),
         })
-        const data = await res.json()
-        setResult({ success: data.success ?? false, executed: true, output: data.text ?? null, capability: ['tts'], routedProvider: data.provider ?? null, routedModel: data.model ?? null, executionMode: 'direct', confidenceScore: null, validationUsed: false, consensusUsed: false, fallbackUsed: false, fallback_used: false, warnings: [], error: data.error ?? null, latencyMs: data.latencyMs ?? 0, audioUrl: data.audioUrl ?? null })
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: `TTS failed: HTTP ${res.status}` }))
+          setResult({ success: false, executed: false, output: null, capability: ['tts'], routedProvider: null, routedModel: null, executionMode: 'direct', confidenceScore: null, validationUsed: false, consensusUsed: false, fallbackUsed: false, fallback_used: false, warnings: [], error: errData.error ?? `TTS failed: HTTP ${res.status}`, latencyMs: 0 })
+        } else {
+          const contentType = res.headers.get('Content-Type') ?? ''
+          if (contentType.includes('audio')) {
+            const buffer = await res.arrayBuffer()
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+            const audioUrl = `data:audio/mpeg;base64,${base64}`
+            setResult({ success: true, executed: true, output: '[TTS audio generated]', capability: ['tts'], routedProvider: res.headers.get('X-Provider') ?? null, routedModel: res.headers.get('X-Model') ?? null, executionMode: 'direct', confidenceScore: null, validationUsed: false, consensusUsed: false, fallbackUsed: false, fallback_used: false, warnings: [], error: null, latencyMs: 0, audioUrl })
+          } else {
+            const data = await res.json().catch(() => ({ error: 'Unexpected TTS response format' }))
+            setResult({ success: data.success ?? false, executed: true, output: data.text ?? null, capability: ['tts'], routedProvider: data.provider ?? null, routedModel: data.model ?? null, executionMode: 'direct', confidenceScore: null, validationUsed: false, consensusUsed: false, fallbackUsed: false, fallback_used: false, warnings: [], error: data.error ?? null, latencyMs: data.latencyMs ?? 0, audioUrl: data.audioUrl ?? null })
+          }
+        }
       } catch (e) { setError(e instanceof Error ? e.message : 'TTS error') } finally { setRunning(false) }
       return
     }
@@ -174,7 +198,11 @@ export default function TestAITab() {
       if (forceProvider !== 'auto') body.providerKey = forceProvider
       if (forceModel !== 'auto') body.modelId = forceModel
       const res = await fetch('/api/admin/brain/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({ success: false, error: `Unexpected response from server (HTTP ${res.status})`, executed: false, output: null, capability: [capability], routedProvider: null, routedModel: null, executionMode: null, confidenceScore: null, validationUsed: false, consensusUsed: false, fallbackUsed: false, fallback_used: false, warnings: [], latencyMs: 0 }))
+      if (!res.ok && !data.error) {
+        data.error = `Request failed: HTTP ${res.status}`
+        data.success = false
+      }
       setResult(data)
       if (data.imageUrl) { /* image result */ }
       if (capability === 'video' || capability === 'video_planning') {
@@ -183,7 +211,9 @@ export default function TestAITab() {
           const poll = setInterval(async () => {
             try {
               const pr = await fetch(`/api/brain/video-generate/${data.videoJobId}`)
-              const pj = await pr.json()
+              if (!pr.ok) return // retry on next tick
+              const pj = await pr.json().catch(() => null)
+              if (!pj) return // retry on next tick
               if (pj.status === 'completed' && pj.videoUrl) { setVideoUrl(pj.videoUrl); clearInterval(poll) }
               else if (pj.status === 'failed') { clearInterval(poll) }
             } catch { /* retry next tick */ }

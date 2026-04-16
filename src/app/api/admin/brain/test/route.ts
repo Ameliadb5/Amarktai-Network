@@ -7,6 +7,7 @@ import { orchestrate } from '@/lib/orchestrator'
 import {
   classifyCapabilities,
   resolveCapabilityRoutes,
+  type CapabilityClass,
 } from '@/lib/capability-engine'
 import { getAppSafetyConfig } from '@/lib/content-filter'
 import { syncProviderHealthFromDB } from '@/lib/sync-provider-health'
@@ -73,6 +74,51 @@ function resolveSpecialistType(
   }
 
   return null
+}
+
+/**
+ * GET /api/admin/brain/test — Returns capability availability status.
+ * Used by the TestAI tab on initial load to show which capabilities are
+ * available / unavailable before any execution request is made.
+ */
+export async function GET() {
+  const session = await getSession()
+  if (!session.isLoggedIn) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    await syncProviderHealthFromDB()
+    const allCapabilities = [
+      'chat', 'code', 'reasoning', 'image', 'image_editing', 'video', 'video_planning',
+      'tts', 'stt', 'vision', 'embeddings', 'reranking', 'research', 'suggestive',
+      'adult_image', 'app_builder',
+    ]
+    const capabilityMap: Record<string, string> = {
+      chat: 'general_chat', code: 'coding', reasoning: 'deep_reasoning',
+      image: 'image_generation', image_editing: 'image_editing',
+      video: 'video_generation', video_planning: 'video_planning',
+      tts: 'voice_output', stt: 'voice_input', vision: 'multimodal_understanding',
+      embeddings: 'embeddings', reranking: 'reranking', research: 'research_search',
+      suggestive: 'suggestive_image_generation', adult_image: 'adult_18plus_image',
+      app_builder: 'app_analysis',
+    }
+    const capabilities = allCapabilities.map(cap => {
+      const internalCap = capabilityMap[cap] ?? cap
+      const routes = resolveCapabilityRoutes({ capabilities: [internalCap as CapabilityClass] })
+      const route = routes.routes[0]
+      return {
+        capability: cap,
+        available: route?.available ?? false,
+        reason: route?.missingMessage ?? null,
+        routeExists: route?.available ?? false,
+      }
+    })
+    return NextResponse.json({ capabilities })
+  } catch (err) {
+    return NextResponse.json(
+      { success: false, error: err instanceof Error ? err.message : 'Failed to load capabilities', code: 'CAPABILITY_LOAD_ERROR' },
+      { status: 500 },
+    )
+  }
 }
 
 export async function POST(request: NextRequest) {
