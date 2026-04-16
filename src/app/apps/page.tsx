@@ -210,7 +210,7 @@ export default function EcosystemPage() {
               <FadeUp key={category.label} delay={catIndex * 0.08}>
                 <div className="mb-8">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-1 h-6 rounded-full bg-gradient-to-b ${category.apps[0]?.gradient ?? 'from-blue-500 to-blue-600'}`} />
+                    <div className={`w-1 h-6 rounded-full bg-gradient-to-b ${category.apps[0] ? category.apps[0].gradient : 'from-blue-500 to-blue-600'}`} />
                     <h2 className={`text-lg font-bold tracking-tight ${accentText}`}>{category.label}</h2>
                   </div>
                   <p className="text-sm text-slate-500 ml-[19px]">{category.description}</p>

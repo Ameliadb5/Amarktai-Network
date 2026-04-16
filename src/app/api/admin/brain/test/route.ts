@@ -166,12 +166,20 @@ export async function POST(request: NextRequest) {
   // Passing providerKey to callProvider for image tasks would silently route
   // to the default chat model (e.g. gpt-4o-mini) instead of the image API.
   if (isSpecialist) {
-    // Derive the internal origin from the incoming request URL, with env var overrides.
-    // This ensures server-to-server fetches work regardless of deployment configuration.
-    const requestUrl = new URL(request.url)
-    const origin = process.env.NEXTAUTH_URL?.replace(/\/$/, '')
+    // Derive the internal origin for server-to-server specialist calls.
+    // Prefer explicit env vars; fall back to request origin only when env vars
+    // are missing (e.g. local dev). The request origin is safe here because
+    // this is an authenticated admin-only route behind session auth, and the
+    // internal fetch targets hardcoded API paths (not user-controlled paths).
+    const envOrigin = process.env.NEXTAUTH_URL?.replace(/\/$/, '')
       || process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
-      || `${requestUrl.protocol}//${requestUrl.host}`
+    let origin: string
+    if (envOrigin) {
+      origin = envOrigin
+    } else {
+      const requestUrl = new URL(request.url)
+      origin = `${requestUrl.protocol}//${requestUrl.host}`
+    }
 
     if (specialistType === 'tts') {
       try {
