@@ -93,7 +93,7 @@ function AppCard({ app }: { app: AppRecord }) {
     <motion.div variants={fadeUp}>
       <Link
         href={`/admin/dashboard/apps/${app.slug}`}
-        className="block bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 hover:bg-white/[0.05] hover:border-white/[0.12] transition-all duration-200"
+        className="block bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 hover:bg-white/[0.05] hover:border-white/[0.12] transition-all duration-200"
       >
         {/* Name + Status */}
         <div className="flex items-start justify-between gap-3 mb-3">
@@ -139,7 +139,7 @@ function AppCard({ app }: { app: AppRecord }) {
 
         {/* Error state indicator */}
         {isErrorState && (
-          <div className={`mt-4 flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg ${
+          <div className={`mt-4 flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl ${
             healthStatus === 'error'
               ? 'bg-red-500/10 text-red-400 border border-red-500/20'
               : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
@@ -188,12 +188,12 @@ export default function AppsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Apps</h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Apps</h1>
           <p className="text-sm text-slate-500 mt-1">Manage and monitor your connected applications.</p>
         </div>
         <Link
           href="/admin/dashboard/apps/new"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm text-white font-medium transition-colors flex-shrink-0"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-sm text-white font-medium transition-colors flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
           Add App
@@ -207,7 +207,7 @@ export default function AppsPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search by name or slug…"
-          className="w-full pl-10 pr-4 py-2.5 bg-white/[0.03] border border-white/[0.06] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-colors"
+          className="w-full pl-10 pr-4 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-colors"
         />
       </div>
 
@@ -220,7 +220,7 @@ export default function AppsPage() {
 
       {/* Error */}
       {!loading && error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-center">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 text-center">
           <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
           <p className="text-sm text-red-400 mb-3">{error}</p>
           <button
@@ -234,7 +234,7 @@ export default function AppsPage() {
 
       {/* Empty */}
       {!loading && !error && apps.length === 0 && (
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-16 text-center">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-16 text-center">
           <Layers className="w-10 h-10 text-slate-700 mx-auto mb-4" />
           <p className="text-sm text-slate-500 mb-4">No apps registered yet.</p>
           <Link
@@ -248,7 +248,7 @@ export default function AppsPage() {
 
       {/* No search results */}
       {!loading && !error && apps.length > 0 && filtered.length === 0 && (
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-16 text-center">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-16 text-center">
           <Search className="w-10 h-10 text-slate-700 mx-auto mb-4" />
           <p className="text-sm text-slate-500">No apps match &ldquo;{search}&rdquo;</p>
         </div>

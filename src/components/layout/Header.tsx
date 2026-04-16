@@ -10,7 +10,6 @@ const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/apps', label: 'Ecosystem' },
   { href: '/about', label: 'About' },
-  { href: '/docs', label: 'Docs' },
   { href: '/contact', label: 'Contact' },
 ]
 
@@ -37,27 +36,24 @@ export default function Header() {
     <motion.header
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
-          ? 'glass-strong shadow-lg shadow-black/20'
+          ? 'glass-strong shadow-lg shadow-black/30'
           : 'bg-transparent'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-16 lg:h-18">
           {/* Logo */}
           <Link href="/" className="flex items-center group">
             <span className="text-lg font-bold tracking-tight font-heading">
               <span className="text-white">Amarkt</span>
               <span className="text-blue-500">AI</span>
             </span>
-            <span className="text-lg font-bold tracking-tight font-heading text-white ml-1.5">
-              Network
-            </span>
           </Link>
 
-          {/* Center Nav */}
+          {/* Center Nav — minimal, no docs */}
           <nav className="hidden md:flex items-center gap-1" aria-label="Main navigation">
             {navLinks.map((link) => {
               const active = pathname === link.href
@@ -75,7 +71,7 @@ export default function Header() {
                   {active && (
                     <motion.div
                       layoutId="nav-indicator"
-                      className="absolute inset-0 rounded-lg bg-white/[0.06] border border-white/10"
+                      className="absolute inset-0 rounded-lg bg-white/[0.06] border border-white/[0.08]"
                       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                     />
                   )}
@@ -86,7 +82,7 @@ export default function Header() {
           </nav>
 
           {/* CTA */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-4">
             <Link
               href="/admin/login"
               className="text-sm font-medium text-slate-400 hover:text-white transition-colors"
@@ -95,7 +91,7 @@ export default function Header() {
             </Link>
             <Link
               href="/contact"
-              className="group inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/20 hover:-translate-y-0.5"
+              className="group inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 hover:-translate-y-0.5"
             >
               Request Access
               <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
@@ -144,7 +140,7 @@ export default function Header() {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="md:hidden overflow-hidden glass-strong border-t border-white/5"
+            className="md:hidden overflow-hidden glass-strong border-t border-white/[0.06]"
           >
             <nav className="px-4 py-4 flex flex-col gap-1" aria-label="Mobile navigation">
               {navLinks.map((link, i) => {
@@ -159,7 +155,7 @@ export default function Header() {
                     <Link
                       href={link.href}
                       onClick={() => setMenuOpen(false)}
-                      className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
                         active
                           ? 'text-white bg-white/[0.06]'
                           : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
@@ -175,19 +171,19 @@ export default function Header() {
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: navLinks.length * 0.05, duration: 0.2 }}
-                className="pt-3 mt-2 border-t border-white/5 space-y-2"
+                className="pt-3 mt-2 border-t border-white/[0.06] space-y-2"
               >
                 <Link
                   href="/admin/login"
                   onClick={() => setMenuOpen(false)}
-                  className="block text-center px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-white rounded-lg transition-colors"
+                  className="block text-center px-4 py-3 text-sm font-medium text-slate-400 hover:text-white rounded-xl transition-colors"
                 >
                   Login
                 </Link>
                 <Link
                   href="/contact"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg"
+                  className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl"
                 >
                   Request Access
                   <ArrowRight className="w-3.5 h-3.5" />

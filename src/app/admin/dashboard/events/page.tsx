@@ -31,7 +31,7 @@ const fadeUp = {
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' as const } },
 }
 
-const CARD = 'bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl'
+const CARD = 'bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] rounded-2xl'
 
 export default function EventsPage() {
   const [events, setEvents] = useState<BrainEvent[]>([])
@@ -79,18 +79,18 @@ export default function EventsPage() {
       {/* Header */}
       <motion.div variants={fadeUp} className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white font-heading flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-white tracking-tight font-heading flex items-center gap-2">
             <Activity className="w-6 h-6 text-blue-400" />
             AI Execution Events
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             {total.toLocaleString()} total brain execution traces
           </p>
         </div>
         <button
           onClick={load}
           disabled={loading}
-          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors mt-1"
+          className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors mt-1"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -105,7 +105,7 @@ export default function EventsPage() {
         <select
           value={filterApp}
           onChange={e => setFilterApp(e.target.value)}
-          className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
+          className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
         >
           {apps.map(a => (
             <option key={a} value={a} className="bg-[#0a0f1a] text-white">
@@ -116,7 +116,7 @@ export default function EventsPage() {
         <select
           value={filterMode}
           onChange={e => setFilterMode(e.target.value)}
-          className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
+          className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
         >
           {modes.map(m => (
             <option key={m} value={m} className="bg-[#0a0f1a] text-white">
@@ -126,7 +126,7 @@ export default function EventsPage() {
         </select>
         <button
           onClick={() => setShowUnified(!showUnified)}
-          className={`text-xs px-3 py-2 rounded-lg border transition-colors ${
+          className={`text-xs px-3 py-2 rounded-xl border transition-colors ${
             showUnified
               ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
               : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:text-white'
@@ -169,7 +169,7 @@ export default function EventsPage() {
           <p className="text-sm text-slate-400">{error}</p>
           <button
             onClick={load}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors"
+            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm rounded-xl transition-colors"
           >
             Retry
           </button>

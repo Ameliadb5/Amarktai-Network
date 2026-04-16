@@ -10,7 +10,7 @@ import {
 
 /* ── constants ─────────────────────────────────────────────── */
 
-const CARD = 'bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl'
+const CARD = 'bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] rounded-2xl'
 const INNER = 'bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]'
 
 const TABS = [
@@ -81,7 +81,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
     <div className={`${CARD} p-8 text-center`}>
       <AlertCircle className="mx-auto mb-3 h-8 w-8 text-red-400/70" />
       <p className="mb-4 text-sm text-red-300/80">{message}</p>
-      <button onClick={onRetry} className="rounded-lg bg-white/[0.06] px-4 py-1.5 text-xs text-white/60 hover:bg-white/[0.1] transition">
+      <button onClick={onRetry} className="rounded-xl bg-white/[0.06] px-4 py-1.5 text-xs text-white/60 hover:bg-white/[0.1] transition">
         Retry
       </button>
     </div>
@@ -540,8 +540,8 @@ export default function IntelligencePage() {
             <Activity className="h-5 w-5 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white/90">Intelligence</h1>
-            <p className="text-sm text-white/40">AI routing, memory, learning, and agent management</p>
+            <h1 className="text-2xl font-bold tracking-tight text-white">Intelligence</h1>
+            <p className="text-sm text-slate-500">AI routing, memory, learning, and agent management</p>
           </div>
         </div>
       </motion.div>
@@ -550,7 +550,7 @@ export default function IntelligencePage() {
       <div className="flex gap-1 overflow-x-auto rounded-xl bg-white/[0.03] border border-white/[0.06] p-1">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key)}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition whitespace-nowrap ${
+            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition whitespace-nowrap ${
               tab === key
                 ? 'bg-blue-500/15 text-blue-300 border border-blue-400/20'
                 : 'text-white/40 hover:text-white/60 hover:bg-white/[0.04] border border-transparent'
@@ -565,7 +565,7 @@ export default function IntelligencePage() {
       {(API_MAP[tab] || tab === 'capabilities') && (
         <div className="flex justify-end">
           <button onClick={current.reload}
-            className="flex items-center gap-1.5 rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs text-white/40 hover:bg-white/[0.08] hover:text-white/60 transition">
+            className="flex items-center gap-1.5 rounded-xl bg-white/[0.04] px-3 py-1.5 text-xs text-white/40 hover:bg-white/[0.08] hover:text-white/60 transition">
             <RefreshCw className={`h-3.5 w-3.5 ${current.loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>

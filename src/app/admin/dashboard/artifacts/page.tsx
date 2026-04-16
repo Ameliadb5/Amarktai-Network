@@ -115,11 +115,11 @@ export default function ArtifactsPage() {
       <motion.div variants={fadeUp} initial="hidden" animate="show">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
               <Package className="w-6 h-6 text-blue-400" />
               Artifact Library
             </h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-slate-500 mt-1">
               {totalCount} total artifacts across all apps
             </p>
           </div>
@@ -166,7 +166,7 @@ export default function ArtifactsPage() {
           placeholder="Filter by app slug…"
           value={appFilter}
           onChange={e => setAppFilter(e.target.value)}
-          className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50 w-48"
+          className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-1.5 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50 w-48"
         />
         {(typeFilter || appFilter) && (
           <button
@@ -179,14 +179,14 @@ export default function ArtifactsPage() {
       </motion.div>
 
       {error && (
-        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
           <AlertCircle className="w-4 h-4 inline mr-2" />{error}
         </div>
       )}
 
       {/* Artifact Grid */}
       {artifacts.length === 0 ? (
-        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-12 text-center">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-12 text-center">
           <Package className="w-10 h-10 text-slate-600 mx-auto mb-3" />
           <p className="text-slate-400">No artifacts found</p>
         </div>
@@ -212,13 +212,13 @@ function ArtifactCard({ artifact: a, onDelete }: { artifact: Artifact; onDelete:
   const Icon = meta.icon
 
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 hover:border-white/[0.12] transition-colors">
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 hover:border-white/[0.12] transition-colors">
       {/* Preview */}
       {a.previewable && a.storageUrl && (
         <div className="mb-3">
           {a.type === 'image' && (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={a.storageUrl} alt={a.title} className="w-full h-40 object-cover rounded-lg" />
+            <img src={a.storageUrl} alt={a.title} className="w-full h-40 object-cover rounded-xl" />
           )}
           {(a.type === 'audio' || a.type === 'music') && (
             <audio controls className="w-full h-8" preload="none">
@@ -226,7 +226,7 @@ function ArtifactCard({ artifact: a, onDelete }: { artifact: Artifact; onDelete:
             </audio>
           )}
           {a.type === 'video' && (
-            <video controls className="w-full h-40 rounded-lg" preload="none">
+            <video controls className="w-full h-40 rounded-xl" preload="none">
               <source src={a.storageUrl} type={a.mimeType || 'video/mp4'} />
             </video>
           )}

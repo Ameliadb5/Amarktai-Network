@@ -140,8 +140,8 @@ export default function OperationsPage() {
     <motion.div initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.06 } } }} className="space-y-8">
       {/* Header */}
       <motion.div variants={fadeUp}>
-        <h1 className="text-2xl font-bold text-white font-heading">Operations</h1>
-        <p className="text-sm text-slate-400 mt-1">Providers, models, alerts, events, and system readiness</p>
+        <h1 className="text-2xl font-bold text-white tracking-tight font-heading">Operations</h1>
+        <p className="text-sm text-slate-500 mt-1">Providers, models, alerts, events, and system readiness</p>
       </motion.div>
 
       {/* Tab bar */}
@@ -149,14 +149,14 @@ export default function OperationsPage() {
         {TABS.map((t) => {
           const Icon = TAB_ICONS[t]
           return (
-            <button key={t} onClick={() => setTab(t)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${tab === t ? 'text-white bg-blue-500/10 border border-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent'}`}>
+            <button key={t} onClick={() => setTab(t)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${tab === t ? 'text-white bg-white/[0.06] border border-white/[0.10]' : 'text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent'}`}>
               <Icon className="w-4 h-4" />
               {t}
             </button>
           )
         })}
         <div className="flex-1" />
-        <button onClick={load} disabled={loading} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors">
+        <button onClick={load} disabled={loading} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </motion.div>
@@ -319,7 +319,7 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
   return (
     <div className="space-y-6">
       {/* Add new provider */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 space-y-4">
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Key className="w-4 h-4 text-blue-400" />
@@ -327,7 +327,7 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
           </div>
           <button
             onClick={() => { setShowAddForm(f => !f); setAddError(null) }}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
           >
             <Plus className="w-3 h-3" />
             Add Provider
@@ -335,14 +335,14 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
         </div>
 
         {showAddForm && (
-          <div className="space-y-3 p-4 bg-white/[0.02] border border-white/[0.06] rounded-lg">
+          <div className="space-y-3 p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl">
             <p className="text-xs text-slate-400 font-medium">New Provider</p>
             {addError && <p className="text-xs text-red-400">{addError}</p>}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <select
                 value={selectedCatalogKey}
                 onChange={e => setSelectedCatalogKey(e.target.value)}
-                className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
+                className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/40 transition-colors"
               >
                 <option value="" className="bg-[#0a0f1a]">Select provider…</option>
                 {catalogProviders.map(c => (
@@ -354,7 +354,7 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
                 placeholder="API key (optional)"
                 value={newProviderApiKey}
                 onChange={e => setNewProviderApiKey(e.target.value)}
-                className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors"
+                className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors"
               />
             </div>
             {catalogProviders.length === 0 && (
@@ -364,12 +364,12 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
               <button
                 onClick={handleAddProvider}
                 disabled={addingProvider || !selectedCatalogKey}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-500 hover:to-blue-400 disabled:opacity-50 transition-colors"
               >
                 {addingProvider ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                 Create
               </button>
-              <button onClick={() => setShowAddForm(false)} className="text-xs px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors">
+              <button onClick={() => setShowAddForm(false)} className="text-xs px-3 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors">
                 Cancel
               </button>
             </div>
@@ -392,7 +392,7 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
             const cardError = cardErrors[p.id]
 
             return (
-              <div key={p.id} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 space-y-4">
+              <div key={p.id} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 space-y-4">
                 {/* Header row */}
                 <div className="flex items-center justify-between">
                   <div>
@@ -444,7 +444,7 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
                   )}
                   {/* Show masked preview when no edit in progress */}
                   {!keyDirty && (
-                    <div className="flex items-center gap-2 text-xs text-slate-400 font-mono bg-white/[0.02] border border-white/[0.06] rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 text-xs text-slate-400 font-mono bg-white/[0.02] border border-white/[0.06] rounded-xl px-3 py-2">
                       {p.maskedPreview ? (
                         <span className="flex-1 truncate">{p.maskedPreview}</span>
                       ) : (
@@ -460,7 +460,7 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
                         placeholder={p.maskedPreview ? 'Enter new key to replace…' : 'Enter API key…'}
                         value={keyInputs[p.id] ?? ''}
                         onChange={e => setKeyInputs(k => ({ ...k, [p.id]: e.target.value }))}
-                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 pr-9 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors font-mono"
+                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 pr-9 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors font-mono"
                       />
                       <button
                         type="button"
@@ -474,7 +474,7 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
                       <button
                         onClick={() => handleSaveKey(p)}
                         disabled={isSaving}
-                        className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+                        className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-500 hover:to-blue-400 disabled:opacity-50 transition-colors"
                       >
                         {isSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                         Save
@@ -488,7 +488,7 @@ function ProvidersView({ providers, onRefresh }: { providers: Provider[]; onRefr
                   onClick={() => handleTestConnection(p)}
                   disabled={isTesting}
                   title={p.maskedPreview ? 'Run a live health check' : 'Save an API key first to test'}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   {isTesting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
                   {isTesting ? 'Testing…' : 'Test Connection'}
@@ -512,7 +512,7 @@ function ModelsView({ models }: { models: ModelEntry[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {models.map((m) => (
-        <div key={m.id} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 space-y-2">
+        <div key={m.id} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white truncate">{m.displayName}</h3>
             <span className={`text-[10px] px-2 py-0.5 rounded-full ${m.enabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-600/10 text-slate-500'}`}>{m.enabled ? 'Enabled' : 'Disabled'}</span>
@@ -545,15 +545,15 @@ function BudgetView({ budgets }: { budgets: BudgetEntry[] }) {
     <div className="space-y-6">
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5">
           <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Total Monthly Spend</p>
           <p className="text-2xl font-bold text-white mt-1">${totalSpend.toFixed(2)}</p>
         </div>
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5">
           <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Total Budget</p>
           <p className="text-2xl font-bold text-white mt-1">{totalBudget > 0 ? `$${totalBudget.toFixed(2)}` : 'Unlimited'}</p>
         </div>
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5">
           <p className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Budget Utilization</p>
           <p className={`text-2xl font-bold mt-1 ${totalBudget > 0 && (totalSpend / totalBudget) > 0.9 ? 'text-red-400' : totalBudget > 0 && (totalSpend / totalBudget) > 0.75 ? 'text-amber-400' : 'text-emerald-400'}`}>
             {totalBudget > 0 ? `${((totalSpend / totalBudget) * 100).toFixed(1)}%` : '—'}
@@ -562,7 +562,7 @@ function BudgetView({ budgets }: { budgets: BudgetEntry[] }) {
       </div>
 
       {/* Per-provider budget table */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl overflow-hidden">
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
@@ -616,7 +616,7 @@ function AlertsView({ alerts }: { alerts: AlertEntry[] }) {
       {alerts.map((a) => {
         const sev = SEV[a.severity] ?? SEV.info
         return (
-          <div key={a.id} className={`${sev.bg} border border-white/[0.06] rounded-xl p-4 space-y-1`}>
+          <div key={a.id} className={`${sev.bg} border border-white/[0.06] rounded-2xl p-4 space-y-1`}>
             <div className="flex items-center justify-between">
               <span className={`text-sm font-medium ${sev.color}`}>{a.title}</span>
               {a.autoHealed && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">Auto-healed</span>}
@@ -633,7 +633,7 @@ function AlertsView({ alerts }: { alerts: AlertEntry[] }) {
 function EventsView({ events }: { events: EventEntry[] }) {
   if (events.length === 0) return <EmptyState message="No events recorded." />
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl overflow-hidden">
+    <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -672,7 +672,7 @@ function ReadinessView({ data }: { data: ReadinessData | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 flex items-center gap-6">
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 flex items-center gap-6">
         <div className={`text-4xl font-bold font-heading ${scoreColor}`}>{data.score}%</div>
         <div>
           <p className="text-sm text-white font-medium">Readiness Score</p>
@@ -681,7 +681,7 @@ function ReadinessView({ data }: { data: ReadinessData | null }) {
       </div>
       <div className="space-y-2">
         {data.checks.map((c, i) => (
-          <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-4 py-3 flex items-center gap-4">
+          <div key={i} className="bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3 flex items-center gap-4">
             <span className={`w-2 h-2 rounded-full ${c.status === 'pass' ? 'bg-emerald-400' : c.status === 'fail' ? 'bg-red-400' : 'bg-amber-400'}`} />
             <div className="flex-1 min-w-0">
               <p className="text-sm text-white">{c.label}</p>

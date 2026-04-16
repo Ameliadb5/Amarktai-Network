@@ -22,7 +22,7 @@ interface VideoData {
   stats: { total: number; pending: number; processing: number; completed: number; failed: number }
 }
 
-const glass = 'bg-white/[0.03] backdrop-blur-sm border border-white/[0.06] rounded-2xl'
+const glass = 'bg-white/[0.02] backdrop-blur-sm border border-white/[0.06] rounded-2xl'
 
 /* ── Page ────────────────────────────────────────────────── */
 export default function VideoDashboardPage() {
@@ -149,15 +149,15 @@ export default function VideoDashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2 text-white">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-white">
             <Film className="w-5 h-5 text-pink-400" />
             Video Generation
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">Create videos via multi-provider queue-backed execution</p>
+          <p className="text-sm text-slate-500 mt-0.5">Create videos via multi-provider queue-backed execution</p>
         </div>
         <button
           onClick={() => { setLoading(true); fetchData() }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-xs text-slate-400 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs text-slate-400 transition-colors"
         >
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -189,7 +189,7 @@ export default function VideoDashboardPage() {
           <button
             onClick={generateVideo}
             disabled={creating || !prompt.trim()}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-pink-500 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
             {creating ? 'Generating…' : 'Generate Video'}
@@ -206,14 +206,14 @@ export default function VideoDashboardPage() {
         </div>
 
         {createError && (
-          <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-red-500/5 border border-red-500/20 text-red-300 text-sm">
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-500/5 border border-red-500/20 text-red-300 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {createError}
           </div>
         )}
 
         {videoUrl && (
           <div className="space-y-3">
-            <video controls src={videoUrl} className="max-w-full rounded-lg border border-white/[0.06]" />
+            <video controls src={videoUrl} className="max-w-full rounded-xl border border-white/[0.06]" />
             <a href={videoUrl} download className="inline-flex items-center gap-1 text-xs text-pink-400 hover:text-pink-300">
               <Download className="w-3 h-3" /> Download video
             </a>

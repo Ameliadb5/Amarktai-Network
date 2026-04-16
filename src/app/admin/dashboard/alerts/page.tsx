@@ -87,7 +87,7 @@ export default function AlertsDashboardPage() {
     }
   }
 
-  const glass = 'bg-white/[0.03] backdrop-blur-sm border border-white/[0.06] rounded-2xl'
+  const glass = 'bg-white/[0.02] backdrop-blur-sm border border-white/[0.06] rounded-2xl'
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0a0a0f] to-[#0f0f1a] text-white p-6">
@@ -99,16 +99,16 @@ export default function AlertsDashboardPage() {
               <ArrowLeft className="w-4 h-4 text-slate-400" />
             </Link>
             <div>
-              <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                 <Bell className="w-5 h-5 text-red-400" />
                 System Alerts
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5">Provider failures, routing errors, cost spikes, and more</p>
+              <p className="text-sm text-slate-500 mt-0.5">Provider failures, routing errors, cost spikes, and more</p>
             </div>
           </div>
           <button
             onClick={() => { setLoading(true); fetchData() }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-xs text-slate-400 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs text-slate-400 transition-colors"
           >
             <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -139,7 +139,7 @@ export default function AlertsDashboardPage() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
                 filter === f ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30' : 'bg-white/[0.03] text-slate-500 hover:text-slate-300 border border-white/[0.06]'
               }`}
             >
@@ -199,7 +199,7 @@ export default function AlertsDashboardPage() {
                     <button
                       onClick={() => handleResolve(alert.id)}
                       disabled={resolving === alert.id}
-                      className="shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors disabled:opacity-50"
+                      className="shrink-0 px-2.5 py-1 rounded-xl text-[10px] font-medium bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors disabled:opacity-50"
                     >
                       {resolving === alert.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3 inline mr-1" />}
                       Resolve

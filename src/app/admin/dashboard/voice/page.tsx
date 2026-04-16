@@ -72,8 +72,8 @@ export default function VoiceDashboardPage() {
     }
   }
 
-  const glass = 'bg-white/[0.03] backdrop-blur-sm border border-white/[0.06] rounded-2xl'
-  const inputCls = 'w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white focus:outline-none focus:border-violet-500/50 appearance-none cursor-pointer'
+  const glass = 'bg-white/[0.02] backdrop-blur-sm border border-white/[0.06] rounded-2xl'
+  const inputCls = 'w-full px-3 py-2 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white focus:outline-none focus:border-violet-500/50 appearance-none cursor-pointer'
 
   return (
     <motion.div
@@ -85,15 +85,15 @@ export default function VoiceDashboardPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-              <h1 className="text-xl font-bold tracking-tight flex items-center gap-2 text-white">
+              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-white">
                 <Mic className="w-5 h-5 text-emerald-400" />
                 Voice &amp; Persona
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5">Configure voice persona per app agent — STT → Brain → TTS pipeline</p>
+              <p className="text-sm text-slate-500 mt-0.5">Configure voice persona per app agent — STT → Brain → TTS pipeline</p>
           </div>
           <button
             onClick={() => { setLoading(true); fetchData() }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-xs text-slate-400 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs text-slate-400 transition-colors"
           >
             <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -160,7 +160,7 @@ export default function VoiceDashboardPage() {
                     <button
                       onClick={handleSave}
                       disabled={saving}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/20 text-violet-300 text-xs font-medium border border-violet-500/30 hover:bg-violet-500/30 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/20 text-violet-300 text-xs font-medium border border-violet-500/30 hover:bg-violet-500/30 transition-colors disabled:opacity-50"
                     >
                       {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Sparkles className="w-3 h-3" /> : <Save className="w-3 h-3" />}
                       {saved ? 'Saved!' : 'Save'}

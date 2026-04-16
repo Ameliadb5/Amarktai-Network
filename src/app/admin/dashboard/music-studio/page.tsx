@@ -144,15 +144,15 @@ export default function MusicStudioPage() {
       <motion.div variants={fadeUp} initial="hidden" animate="show">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
               <Music className="w-6 h-6 text-violet-400" />
               Music Studio
             </h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-slate-500 mt-1">
               Create music, lyrics, instrumentals, and cover art with AI
             </p>
           </div>
-          <button onClick={load} className="btn-ghost text-sm flex items-center gap-2">
+          <button onClick={load} className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-sm text-slate-400 hover:text-white flex items-center gap-2 transition-colors">
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
         </div>
@@ -190,7 +190,7 @@ export default function MusicStudioPage() {
 
       {/* Creation Form */}
       <motion.div variants={fadeUp} initial="hidden" animate="show">
-        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-6">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
           <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-violet-400" />
             Create New Track
@@ -204,7 +204,7 @@ export default function MusicStudioPage() {
                 value={theme}
                 onChange={e => setTheme(e.target.value)}
                 placeholder="e.g. 'An uplifting gospel song about hope and redemption'"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-violet-500/50"
+                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-violet-500/50"
               />
             </div>
 
@@ -213,7 +213,7 @@ export default function MusicStudioPage() {
               <select
                 value={genre}
                 onChange={e => setGenre(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500/50"
+                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500/50"
               >
                 {GENRE_PRESETS.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
@@ -224,7 +224,7 @@ export default function MusicStudioPage() {
               <select
                 value={mood}
                 onChange={e => setMood(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500/50"
+                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500/50"
               >
                 {MOOD_PRESETS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
@@ -235,7 +235,7 @@ export default function MusicStudioPage() {
               <select
                 value={vocalStyle}
                 onChange={e => setVocalStyle(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500/50"
+                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500/50"
               >
                 {VOCAL_STYLES.map(v => (
                   <option key={v} value={v}>{v.replace(/_/g, ' ')}</option>
@@ -276,13 +276,13 @@ export default function MusicStudioPage() {
                 type="text"
                 value={appSlug}
                 onChange={e => setAppSlug(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500/50"
+                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500/50"
               />
             </div>
           </div>
 
           {error && (
-            <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+            <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
               {error}
             </div>
           )}
@@ -291,7 +291,7 @@ export default function MusicStudioPage() {
             <button
               onClick={handleCreate}
               disabled={creating || !theme.trim()}
-              className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-50 transition-opacity"
             >
               {creating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Music className="w-4 h-4" />}
               {creating ? 'Creating…' : 'Create Track'}
@@ -308,7 +308,7 @@ export default function MusicStudioPage() {
         </h2>
 
         {artifacts.length === 0 ? (
-          <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-12 text-center">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-12 text-center">
             <Music className="w-10 h-10 text-slate-600 mx-auto mb-3" />
             <p className="text-slate-400">No tracks yet. Create your first track above.</p>
           </div>
@@ -317,7 +317,7 @@ export default function MusicStudioPage() {
             {artifacts.map(a => (
               <div
                 key={a.id}
-                className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 hover:border-white/[0.12] transition-colors"
+                className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 hover:border-white/[0.12] transition-colors"
               >
                 <div className="flex items-start gap-3">
                   {a.coverArtUrl ? (
