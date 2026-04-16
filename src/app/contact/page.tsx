@@ -87,7 +87,7 @@ export default function ContactPage() {
                 <span className="text-slate-400">Welcome.</span>
               </h1>
               <p className="text-slate-400 leading-relaxed mb-10 max-w-md">
-                AmarktAI Network is available by request. Whether you&apos;re looking to invest, partner, deploy, or join — start here.
+                Amarktai Network is available by request. Whether you&apos;re looking to invest, partner, deploy, or join — start here.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 {CONTACT_PILLARS.map(item => (

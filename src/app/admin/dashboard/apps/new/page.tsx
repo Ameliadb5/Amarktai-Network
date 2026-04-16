@@ -237,7 +237,7 @@ export default function NewAppPage() {
         setResult('error')
       }
     } catch {
-      setErrorMsg('Network error \u2014 could not reach the AmarktAI brain.')
+      setErrorMsg('Network error \u2014 could not reach the Amarktai brain.')
       setResult('error')
     } finally {
       setSubmitting(false)
@@ -260,7 +260,7 @@ export default function NewAppPage() {
           </div>
           <h2 className="text-xl font-bold text-white">App Profile Deployed</h2>
           <p className="text-sm text-slate-400">
-            <span className="text-white font-semibold">{appName}</span> is now connected to the AmarktAI brain.
+            <span className="text-white font-semibold">{appName}</span> is now connected to the Amarktai brain.
           </p>
           {capPack && <p className="text-xs text-violet-400">Capability Pack: {capPack.name}</p>}
           <a href="/admin/dashboard/apps"
@@ -718,7 +718,7 @@ export default function NewAppPage() {
             <h1 className="text-lg font-bold flex items-center gap-2">
               <Sparkles className="w-4.5 h-4.5 text-violet-400" /> Smart App Onboarding
             </h1>
-            <p className="text-xs text-slate-500">Connect a new app to the AmarktAI brain</p>
+            <p className="text-xs text-slate-500">Connect a new app to the Amarktai brain</p>
           </div>
         </div>
         {/* Progress bar */}

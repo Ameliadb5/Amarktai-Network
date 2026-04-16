@@ -166,12 +166,23 @@ export async function POST(request: NextRequest) {
   // Passing providerKey to callProvider for image tasks would silently route
   // to the default chat model (e.g. gpt-4o-mini) instead of the image API.
   if (isSpecialist) {
-    // Use a safe, hardcoded internal origin to prevent SSRF via Host header manipulation
-    const origin = process.env.NEXTAUTH_URL?.replace(/\/$/, '')
+    // Derive the internal origin for server-to-server specialist calls.
+    // Prefer explicit env vars; fall back to request origin only when env vars
+    // are missing (e.g. local dev). The request origin is safe here because
+    // this is an authenticated admin-only route behind session auth, and the
+    // internal fetch targets hardcoded API paths (not user-controlled paths).
+    const envOrigin = process.env.NEXTAUTH_URL?.replace(/\/$/, '')
       || process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
-      || 'http://localhost:3000'
+    let origin: string
+    if (envOrigin) {
+      origin = envOrigin
+    } else {
+      const requestUrl = new URL(request.url)
+      origin = `${requestUrl.protocol}//${requestUrl.host}`
+    }
 
     if (specialistType === 'tts') {
+      try {
       const ttsRes = await fetch(`${origin}/api/brain/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -209,6 +220,19 @@ export async function POST(request: NextRequest) {
         },
         { status: ttsRes.status },
       )
+      } catch (fetchErr) {
+        const latencyMs = Date.now() - start
+        return NextResponse.json(
+          {
+            success: false, executed: false, traceId, output: null, audioUrl: null,
+            capability: capabilities, routedProvider: null, routedModel: null,
+            executionMode: 'specialist', fallback_used: false,
+            error: `Voice synthesis service unavailable: ${fetchErr instanceof Error ? fetchErr.message : 'connection failed'}. Configure a TTS provider in Admin → AI Providers.`,
+            latencyMs, timestamp: new Date().toISOString(),
+          },
+          { status: 503 },
+        )
+      }
     }
 
     if (specialistType === 'stt') {
@@ -225,6 +249,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (specialistType === 'image') {
+      try {
       const imageRes = await fetch(`${origin}/api/brain/image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -251,6 +276,21 @@ export async function POST(request: NextRequest) {
         },
         { status: imageSuccess ? 200 : (imageRes.ok ? 503 : imageRes.status) },
       )
+      } catch (fetchErr) {
+        const latencyMs = Date.now() - start
+        return NextResponse.json(
+          {
+            success: false, executed: false, traceId,
+            output: null, imageUrl: null,
+            capability: capabilities, routedProvider: null, routedModel: null,
+            executionMode: 'specialist', fallback_used: false,
+            error: `Image generation service unavailable: ${fetchErr instanceof Error ? fetchErr.message : 'connection failed'}. Ensure an image-capable provider is configured in Admin → AI Providers.`,
+            code: 'image_service_unavailable',
+            latencyMs, timestamp: new Date().toISOString(),
+          },
+          { status: 503 },
+        )
+      }
     }
 
     if (specialistType === 'image_editing') {
@@ -382,7 +422,7 @@ export async function POST(request: NextRequest) {
         success: false, executed: false, traceId, output: null, videoStatus: 'unavailable',
         capability: capabilities, routedProvider: null, routedModel: null,
         executionMode: 'specialist', fallback_used: false,
-        error: 'Video generation requires a Replicate API key. Use POST /api/brain/video-generate.',
+        error: 'Video generation is not currently available. Configure a video-capable provider (Replicate or HuggingFace) in Admin → AI Providers to enable this capability.',
         latencyMs: Date.now() - start, timestamp: new Date().toISOString(),
       })
     }

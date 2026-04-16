@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 const FOOTER_COLS = [
   {
-    heading: 'Product',
+    heading: 'Platform',
     links: [
       { href: '/', label: 'Home' },
       { href: '/apps', label: 'Ecosystem' },
@@ -11,7 +11,7 @@ const FOOTER_COLS = [
   {
     heading: 'Company',
     links: [
-      { href: '/about', label: 'About' },
+      { href: '/about', label: 'About Us' },
       { href: '/contact', label: 'Contact' },
     ],
   },
@@ -38,7 +38,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-500">
-              The AI operating system powering multiple connected applications from one intelligence core.
+              The intelligence platform powering a connected ecosystem of applications — unified, adaptive, and built to scale.
             </p>
           </div>
 
@@ -66,7 +66,7 @@ export default function Footer() {
         <div className="my-12 h-px w-full bg-white/[0.06]" />
 
         <p className="text-xs text-slate-600">
-          &copy; {new Date().getFullYear()} AmarktAI Network. All rights reserved.
+          &copy; {new Date().getFullYear()} Amarktai Network. All rights reserved.
         </p>
       </div>
     </footer>

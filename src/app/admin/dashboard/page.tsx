@@ -221,7 +221,7 @@ export default function DashboardOverview() {
   }
 
   return (
-    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-8">
+    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
 
       {/* ─── Header ─────────────────────────────────────────────── */}
       <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -230,8 +230,8 @@ export default function DashboardOverview() {
             <Gauge className="w-5 h-5 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Command Center</h1>
-            <p className="text-xs text-slate-500 mt-0.5">System overview &amp; network health</p>
+            <h1 className="text-xl font-bold text-white tracking-tight">Command Center</h1>
+            <p className="text-[11px] text-slate-500 mt-0.5">System overview &amp; network health</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -266,41 +266,43 @@ export default function DashboardOverview() {
         </motion.div>
       )}
 
-      {/* ─── Metric Strip ───────────────────────────────────────── */}
-      <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {[
-          { label: 'System Health', value: `${healthScore}%`, icon: Gauge,      color: healthScore >= 80 ? 'text-emerald-400' : healthScore >= 50 ? 'text-amber-400' : 'text-red-400', gradient: 'from-emerald-500/10 to-emerald-500/5' },
-          { label: 'Active Apps',   value: totalApps,         icon: Server,     color: 'text-blue-400',    gradient: 'from-blue-500/10 to-blue-500/5' },
-          { label: 'AI Requests',   value: totalReqs.toLocaleString(), icon: Brain, color: 'text-violet-400', gradient: 'from-violet-500/10 to-violet-500/5' },
-          { label: 'Cost Burn',     value: budgetData?.totalEstimatedSpendUsd != null ? `$${budgetData.totalEstimatedSpendUsd.toFixed(2)}` : '—', icon: DollarSign, color: 'text-amber-400', gradient: 'from-amber-500/10 to-amber-500/5' },
-          { label: 'Alerts',        value: alertEvents.length, icon: Bell,       color: alertEvents.length > 0 ? 'text-red-400' : 'text-slate-400', gradient: alertEvents.length > 0 ? 'from-red-500/10 to-red-500/5' : 'from-slate-500/10 to-slate-500/5' },
-        ].map(m => (
-          <div key={m.label} className={`bg-gradient-to-br ${m.gradient} border border-white/[0.06] rounded-2xl p-5`}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">{m.label}</span>
-              <m.icon className={`w-4 h-4 ${m.color}`} />
+      {/* ─── Key Metrics ────────────────────────────────────────── */}
+      <motion.div variants={fadeUp}>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {[
+            { label: 'Health', value: `${healthScore}%`, icon: Gauge,      color: healthScore >= 80 ? 'text-emerald-400' : healthScore >= 50 ? 'text-amber-400' : 'text-red-400', gradient: 'from-emerald-500/8 to-emerald-500/3' },
+            { label: 'Apps',   value: totalApps,         icon: Server,     color: 'text-blue-400',    gradient: 'from-blue-500/8 to-blue-500/3' },
+            { label: 'Requests', value: totalReqs.toLocaleString(), icon: Brain, color: 'text-violet-400', gradient: 'from-violet-500/8 to-violet-500/3' },
+            { label: 'Spend',  value: budgetData?.totalEstimatedSpendUsd != null ? `$${budgetData.totalEstimatedSpendUsd.toFixed(2)}` : '—', icon: DollarSign, color: 'text-amber-400', gradient: 'from-amber-500/8 to-amber-500/3' },
+            { label: 'Alerts', value: alertEvents.length, icon: Bell,       color: alertEvents.length > 0 ? 'text-red-400' : 'text-slate-500', gradient: alertEvents.length > 0 ? 'from-red-500/8 to-red-500/3' : 'from-slate-500/8 to-slate-500/3' },
+          ].map(m => (
+            <div key={m.label} className={`bg-gradient-to-br ${m.gradient} border border-white/[0.05] rounded-2xl px-4 py-4`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">{m.label}</span>
+                <m.icon className={`w-3.5 h-3.5 ${m.color} opacity-60`} />
+              </div>
+              <p className={`text-xl font-bold font-mono ${m.color}`}>{m.value}</p>
             </div>
-            <p className={`text-2xl font-bold font-mono ${m.color}`}>{m.value}</p>
-          </div>
-        ))}
+          ))}
+        </div>
       </motion.div>
 
-      {/* ─── Main Grid ──────────────────────────────────────────── */}
-      <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT — App Network */}
+      {/* ─── Primary Grid: Apps + Intelligence ──────────────────── */}
+      <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* App Network */}
         <div className={CARD}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
               <Server className="w-4 h-4 text-cyan-400" /> App Network
             </h2>
-            <Link href="/admin/dashboard/apps" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+            <Link href="/admin/dashboard/apps" className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
               All <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="p-4 space-y-1 max-h-[340px] overflow-y-auto">
+          <div className="p-4 space-y-1 max-h-[280px] overflow-y-auto">
             {totalApps === 0 ? (
-              <div className="py-10 text-center">
-                <Server className="w-6 h-6 text-slate-700 mx-auto mb-3" />
+              <div className="py-8 text-center">
+                <Server className="w-5 h-5 text-slate-700 mx-auto mb-2" />
                 <p className="text-sm text-slate-500">No apps registered</p>
                 <Link href="/admin/dashboard/apps" className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300 transition-colors">
                   Register your first app →
@@ -310,7 +312,7 @@ export default function DashboardOverview() {
               data?.productStats?.map(app => {
                 const cfg = appStatusCfg(app.status, app.integration?.healthStatus)
                 return (
-                  <div key={app.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.03] transition-colors">
+                  <div key={app.id} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/[0.03] transition-colors">
                     <span className="relative flex h-2 w-2 shrink-0">
                       {cfg.label === 'Live' && <span className={`animate-ping absolute inset-0 rounded-full ${cfg.dot} opacity-75`} />}
                       <span className={`relative inline-flex rounded-full h-2 w-2 ${cfg.dot}`} />
@@ -333,159 +335,104 @@ export default function DashboardOverview() {
           </div>
         </div>
 
-        {/* CENTER — Intelligence Activity */}
+        {/* Intelligence Performance */}
         <div className={CARD}>
-          <div className="px-5 py-4 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
               <Brain className="w-4 h-4 text-violet-400" /> Intelligence
             </h2>
+            <Link href="/admin/dashboard/operations" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors">Providers →</Link>
           </div>
-          <div className="p-4 space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+          <div className="p-4 space-y-3">
+            {/* Performance metrics */}
+            <div className="grid grid-cols-3 gap-2">
               {[
                 { label: 'Success', value: totalReqs > 0 ? `${successRate}%` : '—', color: successRate >= 90 ? 'text-emerald-400' : successRate >= 70 ? 'text-amber-400' : 'text-red-400' },
                 { label: 'Latency', value: data?.brainStats?.avgLatencyMs ? `${data.brainStats.avgLatencyMs}ms` : '—', color: 'text-white' },
-                { label: 'Errors',  value: errorReqs.toLocaleString(), color: errorReqs > 0 ? 'text-red-400' : 'text-slate-400' },
+                { label: 'Errors',  value: errorReqs.toLocaleString(), color: errorReqs > 0 ? 'text-red-400' : 'text-slate-500' },
               ].map(m => (
-                <div key={m.label} className="bg-white/[0.02] rounded-xl p-3 border border-white/[0.04]">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">{m.label}</p>
-                  <p className={`text-lg font-bold font-mono mt-1 ${m.color}`}>{m.value}</p>
+                <div key={m.label} className="bg-white/[0.02] rounded-xl p-2.5 border border-white/[0.04]">
+                  <p className="text-[9px] text-slate-500 uppercase tracking-wider">{m.label}</p>
+                  <p className={`text-base font-bold font-mono mt-0.5 ${m.color}`}>{m.value}</p>
                 </div>
               ))}
             </div>
 
-            {/* Providers */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Providers</p>
-                <Link href="/admin/dashboard/operations" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors">Manage →</Link>
-              </div>
-              {providers.length === 0 ? (
-                <p className="text-xs text-slate-600 py-3 text-center">No providers configured</p>
-              ) : (
-                <div className="space-y-1 max-h-[100px] overflow-y-auto">
-                  {providers.slice(0, 6).map(p => {
-                    const cfg = H[p.healthStatus as keyof typeof H] ?? H.unconfigured
-                    const isActive = p.healthStatus === 'healthy'
-                    return (
-                      <div key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] transition-colors">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
-                        <span className={`text-xs truncate flex-1 ${isActive ? 'text-white' : 'text-slate-500'}`}>{p.displayName}</span>
-                        <span className={`text-[10px] font-mono ${cfg.color}`}>{isActive ? 'Active' : cfg.label}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Memory */}
-            <div className="bg-white/[0.02] rounded-xl p-3 border border-white/[0.04]">
-              <div className="flex items-center gap-2 mb-2">
-                <Database className="w-3.5 h-3.5 text-cyan-400" />
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Memory</p>
-                <span className={`ml-auto text-[9px] font-mono font-semibold px-2 py-0.5 rounded-full ${
-                  memory?.statusLabel === 'saving'
-                    ? 'bg-emerald-400/10 text-emerald-400'
-                    : memory?.statusLabel === 'empty'
-                    ? 'bg-amber-400/10 text-amber-400'
-                    : 'bg-slate-500/10 text-slate-500'
-                }`}>
-                  {memory?.statusLabel === 'saving' ? 'ACTIVE' : memory?.statusLabel === 'empty' ? 'EMPTY' : 'OFF'}
-                </span>
-              </div>
-              <div className="flex items-center gap-4 text-xs font-mono">
-                <span className="text-white">{(memory?.totalEntries ?? 0).toLocaleString()} <span className="text-slate-500">entries</span></span>
-                <span className="text-white">{memory?.appSlugs?.length ?? 0} <span className="text-slate-500">namespaces</span></span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT — Alerts */}
-        <div className={CARD}>
-          <div className="px-5 py-4 border-b border-white/[0.06]">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-red-400" /> Alerts
-            </h2>
-          </div>
-          <div className="p-4 space-y-4 max-h-[340px] overflow-y-auto">
-            {/* Missing API keys */}
-            {unconfiguredProvs.length > 0 && (
+            {/* Providers + Memory in a compact row */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Providers */}
               <div>
-                <p className="text-[10px] text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Zap className="w-3 h-3" /> Missing Keys
-                </p>
-                <div className="space-y-1">
-                  {unconfiguredProvs.slice(0, 3).map(p => (
-                    <div key={p.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-400/[0.04] border border-amber-400/10">
-                      <WifiOff className="w-3 h-3 text-amber-400 shrink-0" />
-                      <span className="text-xs text-white truncate flex-1">{p.displayName}</span>
-                      <Link href="/admin/dashboard/operations" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors shrink-0">
-                        Fix
-                      </Link>
-                    </div>
-                  ))}
-                  {unconfiguredProvs.length > 3 && <p className="text-[10px] text-slate-600 pl-2">+{unconfiguredProvs.length - 3} more</p>}
+                <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Providers</p>
+                {providers.length === 0 ? (
+                  <p className="text-xs text-slate-600 py-2 text-center">None configured</p>
+                ) : (
+                  <div className="space-y-0.5 max-h-[80px] overflow-y-auto">
+                    {providers.slice(0, 5).map(p => {
+                      const cfg = H[p.healthStatus as keyof typeof H] ?? H.unconfigured
+                      const isActive = p.healthStatus === 'healthy'
+                      return (
+                        <div key={p.id} className="flex items-center gap-1.5 px-1.5 py-1 rounded-lg hover:bg-white/[0.03] transition-colors">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+                          <span className={`text-[11px] truncate flex-1 ${isActive ? 'text-white' : 'text-slate-500'}`}>{p.displayName}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Memory */}
+              <div className="bg-white/[0.02] rounded-xl p-3 border border-white/[0.04]">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Database className="w-3 h-3 text-cyan-400" />
+                  <p className="text-[9px] text-slate-500 uppercase tracking-wider">Memory</p>
+                  <span className={`ml-auto text-[8px] font-mono font-semibold px-1.5 py-0.5 rounded-full ${
+                    memory?.statusLabel === 'saving'
+                      ? 'bg-emerald-400/10 text-emerald-400'
+                      : memory?.statusLabel === 'empty'
+                      ? 'bg-amber-400/10 text-amber-400'
+                      : 'bg-slate-500/10 text-slate-500'
+                  }`}>
+                    {memory?.statusLabel === 'saving' ? 'ON' : memory?.statusLabel === 'empty' ? 'EMPTY' : 'OFF'}
+                  </span>
+                </div>
+                <div className="space-y-0.5 text-[11px] font-mono">
+                  <div className="text-white">{(memory?.totalEntries ?? 0).toLocaleString()} <span className="text-slate-500">entries</span></div>
+                  <div className="text-white">{memory?.appSlugs?.length ?? 0} <span className="text-slate-500">ns</span></div>
                 </div>
               </div>
-            )}
-
-            {/* Errors */}
-            <div>
-              <p className="text-[10px] text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <AlertCircle className="w-3 h-3" /> Recent Errors
-              </p>
-              {errorEvents.length === 0 ? (
-                <div className="py-6 text-center">
-                  <CheckCircle className="w-5 h-5 text-emerald-400/30 mx-auto mb-2" />
-                  <p className="text-xs text-slate-600">All clear</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {errorEvents.map(ev => (
-                    <div key={ev.id} className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/[0.03] transition-colors">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                      <span className="text-xs text-white truncate flex-1">{ev.title}</span>
-                      <span className="text-[10px] text-slate-600 font-mono shrink-0">
-                        {formatDistanceToNow(new Date(ev.timestamp), { addSuffix: true })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* ─── Activity Feed ──────────────────────────────────────── */}
-      <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ─── Secondary Grid: Activity + Alerts + Actions ─────── */}
+      <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Recent AI Activity — spans 2 cols */}
         <div className={`${CARD} lg:col-span-2`}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Brain className="w-4 h-4 text-violet-400" /> Recent AI Activity
+              <Brain className="w-4 h-4 text-violet-400" /> Recent Activity
             </h2>
-            <Link href="/admin/dashboard/events" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+            <Link href="/admin/dashboard/events" className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
               View All <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
           <div className="p-4">
             {(data?.recentBrainEvents?.length ?? 0) === 0 ? (
-              <div className="py-10 text-center">
-                <Brain className="w-6 h-6 text-slate-700 mx-auto mb-3" />
+              <div className="py-8 text-center">
+                <Brain className="w-5 h-5 text-slate-700 mx-auto mb-2" />
                 <p className="text-sm text-slate-500">No AI requests logged yet</p>
-                <p className="text-xs text-slate-600 mt-1">Activity appears here once apps start making requests</p>
+                <p className="text-[11px] text-slate-600 mt-1">Activity appears here once apps start making requests</p>
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {(data?.recentBrainEvents ?? []).slice(0, 8).map(ev => (
-                  <div key={ev.id} className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-white/[0.03] transition-colors">
+                  <div key={ev.id} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-white/[0.03] transition-colors">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ev.success ? 'bg-emerald-500' : 'bg-red-500'}`} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate font-mono">{ev.taskType}</p>
-                      <p className="text-[11px] text-slate-600 truncate">{ev.appSlug} · {ev.routedProvider ?? 'no provider'}</p>
+                      <p className="text-[13px] text-white truncate font-mono">{ev.taskType}</p>
+                      <p className="text-[10px] text-slate-600 truncate">{ev.appSlug} · {ev.routedProvider ?? 'no provider'}</p>
                     </div>
                     <div className="text-right shrink-0 flex items-center gap-2">
                       <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${ev.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
@@ -494,7 +441,7 @@ export default function DashboardOverview() {
                       {ev.latencyMs != null && (
                         <span className="text-[10px] text-slate-600 font-mono">{ev.latencyMs}ms</span>
                       )}
-                      <span className="text-[10px] text-slate-600 font-mono w-20 text-right">
+                      <span className="text-[10px] text-slate-600 font-mono w-16 text-right hidden sm:inline">
                         {formatDistanceToNow(new Date(ev.timestamp), { addSuffix: true })}
                       </span>
                     </div>
@@ -505,31 +452,94 @@ export default function DashboardOverview() {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className={CARD}>
-          <div className="px-5 py-4 border-b border-white/[0.06]">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" /> Quick Actions
-            </h2>
-          </div>
-          <div className="p-4 grid grid-cols-2 gap-3">
-            {[
-              { label: 'Studio',     href: '/admin/dashboard/build-studio',  icon: FlaskConical, gradient: 'from-blue-500/15 to-violet-500/15' },
-              { label: 'Apps',       href: '/admin/dashboard/apps',          icon: Server,       gradient: 'from-cyan-500/15 to-blue-500/15' },
-              { label: 'Models',     href: '/admin/dashboard/models',        icon: Brain,        gradient: 'from-violet-500/15 to-purple-500/15' },
-              { label: 'Providers',  href: '/admin/dashboard/operations',    icon: Activity,     gradient: 'from-rose-500/15 to-pink-500/15' },
-              { label: 'Artifacts',  href: '/admin/dashboard/artifacts',     icon: Layers,       gradient: 'from-amber-500/15 to-yellow-500/15' },
-              { label: 'Events',     href: '/admin/dashboard/events',        icon: Cpu,          gradient: 'from-emerald-500/15 to-green-500/15' },
-            ].map(action => (
-              <Link
-                key={action.label}
-                href={action.href}
-                className={`flex flex-col items-center gap-2.5 px-4 py-5 rounded-2xl bg-gradient-to-br ${action.gradient} border border-white/[0.06] hover:border-white/[0.12] hover:scale-[1.02] transition-all text-center`}
-              >
-                <action.icon className="w-5 h-5 text-white" />
-                <span className="text-[11px] text-white font-medium">{action.label}</span>
-              </Link>
-            ))}
+        {/* Alerts + Quick Actions combined */}
+        <div className="space-y-5">
+          {/* Alerts */}
+          {(unconfiguredProvs.length > 0 || errorEvents.length > 0) && (
+            <div className={CARD}>
+              <div className="px-5 py-3.5 border-b border-white/[0.06]">
+                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-red-400" /> Alerts
+                </h2>
+              </div>
+              <div className="p-4 space-y-3 max-h-[200px] overflow-y-auto">
+                {unconfiguredProvs.length > 0 && (
+                  <div>
+                    <p className="text-[9px] text-amber-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <Zap className="w-3 h-3" /> Missing Keys
+                    </p>
+                    <div className="space-y-1">
+                      {unconfiguredProvs.slice(0, 3).map(p => (
+                        <div key={p.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-amber-400/[0.04] border border-amber-400/10">
+                          <WifiOff className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span className="text-[11px] text-white truncate flex-1">{p.displayName}</span>
+                          <Link href="/admin/dashboard/operations" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors shrink-0">Fix</Link>
+                        </div>
+                      ))}
+                      {unconfiguredProvs.length > 3 && <p className="text-[10px] text-slate-600 pl-2">+{unconfiguredProvs.length - 3} more</p>}
+                    </div>
+                  </div>
+                )}
+                {errorEvents.length > 0 && (
+                  <div>
+                    <p className="text-[9px] text-red-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> Recent Errors
+                    </p>
+                    <div className="space-y-1">
+                      {errorEvents.map(ev => (
+                        <div key={ev.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.03] transition-colors">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                          <span className="text-[11px] text-white truncate flex-1">{ev.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* No alerts — show all-clear */}
+          {unconfiguredProvs.length === 0 && errorEvents.length === 0 && (
+            <div className={CARD}>
+              <div className="px-5 py-3.5 border-b border-white/[0.06]">
+                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-emerald-400" /> Status
+                </h2>
+              </div>
+              <div className="p-4 py-6 text-center">
+                <CheckCircle className="w-5 h-5 text-emerald-400/40 mx-auto mb-2" />
+                <p className="text-xs text-slate-500">All systems operational</p>
+              </div>
+            </div>
+          )}
+
+          {/* Quick Actions */}
+          <div className={CARD}>
+            <div className="px-5 py-3.5 border-b border-white/[0.06]">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400" /> Quick Actions
+              </h2>
+            </div>
+            <div className="p-3 grid grid-cols-3 gap-2">
+              {[
+                { label: 'Studio',    href: '/admin/dashboard/build-studio',  icon: FlaskConical, gradient: 'from-blue-500/15 to-violet-500/15' },
+                { label: 'Apps',      href: '/admin/dashboard/apps',          icon: Server,       gradient: 'from-cyan-500/15 to-blue-500/15' },
+                { label: 'Models',    href: '/admin/dashboard/models',        icon: Brain,        gradient: 'from-violet-500/15 to-purple-500/15' },
+                { label: 'Providers', href: '/admin/dashboard/operations',    icon: Activity,     gradient: 'from-rose-500/15 to-pink-500/15' },
+                { label: 'Artifacts', href: '/admin/dashboard/artifacts',     icon: Layers,       gradient: 'from-amber-500/15 to-yellow-500/15' },
+                { label: 'Events',    href: '/admin/dashboard/events',        icon: Cpu,          gradient: 'from-emerald-500/15 to-green-500/15' },
+              ].map(action => (
+                <Link
+                  key={action.label}
+                  href={action.href}
+                  className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl bg-gradient-to-br ${action.gradient} border border-white/[0.06] hover:border-white/[0.12] hover:scale-[1.02] transition-all text-center`}
+                >
+                  <action.icon className="w-4 h-4 text-white" />
+                  <span className="text-[10px] text-white font-medium">{action.label}</span>
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </motion.div>
