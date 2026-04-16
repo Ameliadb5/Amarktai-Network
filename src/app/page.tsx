@@ -41,17 +41,17 @@ const POWER_DOMAINS = [
 ]
 
 const ARCHITECTURE = [
-  { icon: Brain,       label: 'Central Super-Brain',          desc: 'One intelligence core. Context compounds across every app instead of resetting.', accent: 'blue' },
-  { icon: Bot,         label: 'Dedicated App Agents',         desc: 'Each app gets its own AI agent with unique rules, persona, and voice.', accent: 'violet' },
-  { icon: GitBranch,   label: 'Multi-Provider Routing',       desc: '13+ providers with real fallback chains. No single point of failure.', accent: 'cyan' },
+  { icon: Brain,       label: 'Central Intelligence Core',     desc: 'One unified brain powering your entire app ecosystem. Context compounds across every application instead of resetting.', accent: 'blue' },
+  { icon: Bot,         label: 'Dedicated App Agents',         desc: 'Each app gets its own AI agent with unique rules, persona, and voice — all connected.', accent: 'violet' },
+  { icon: GitBranch,   label: 'Adaptive Multi-Provider Routing', desc: 'Intelligent routing across multiple providers with real fallback chains. No single point of failure.', accent: 'cyan' },
   { icon: ShieldCheck, label: 'Operator-Grade Controls',      desc: 'Per-app budgets, safety filters, capability locks, and full audit trails.', accent: 'emerald' },
-  { icon: Cpu,         label: 'Persistent Memory',            desc: 'Knowledge graphs, vector search, and cross-session context that learns.', accent: 'amber' },
-  { icon: Lock,        label: 'Self-Healing Infrastructure',  desc: 'Circuit breakers, automatic failover, and provider health monitoring.', accent: 'rose' },
+  { icon: Cpu,         label: 'Persistent Memory',            desc: 'Knowledge graphs, vector search, and cross-session context that learns and evolves.', accent: 'amber' },
+  { icon: Lock,        label: 'Self-Healing Infrastructure',  desc: 'Circuit breakers, automatic failover, and continuous health monitoring for maximum uptime.', accent: 'rose' },
 ]
 
 const DIFFERENTIATORS = [
-  { title: 'Not a wrapper.',         desc: 'Every capability is orchestrated through a routing engine that picks the optimal provider, model, and execution strategy per request.' },
-  { title: 'Not a single model.',    desc: 'OpenAI, Anthropic, Google, Groq, DeepSeek, Together, Replicate, HuggingFace — all competing to serve each task best.' },
+  { title: 'Not a wrapper.',         desc: 'Every capability is orchestrated through a routing engine that picks the optimal execution strategy per request — automatically.' },
+  { title: 'Not a single model.',    desc: 'Multiple best-in-class AI providers compete on every task — quality, speed, and cost are optimized in real time.' },
   { title: 'Not a chatbot.',         desc: 'Image generation, voice synthesis, music composition, video production, code creation, research — all from one system.' },
   { title: 'Not temporary.',         desc: 'Persistent memory, knowledge graphs, and learning loops mean your apps get smarter the more they operate.' },
 ]
@@ -96,7 +96,7 @@ export default function HomePage() {
           >
             The intelligence layer behind your entire product stack.
             One system that creates, reasons, sees, speaks, composes, codes, and builds —
-            orchestrated across 13+ AI providers through a single command center.
+            orchestrated across multiple AI providers through a single command center.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -178,17 +178,17 @@ export default function HomePage() {
               </p>
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
                 A Living Brain.<br />
-                <span className="text-slate-400">Not a Static API.</span>
+                <span className="text-slate-400">Always Adapting.</span>
               </h2>
               <p className="mt-6 text-slate-400 leading-relaxed text-base">
-                At the center of every request is a neural routing core — choosing the optimal provider, compounding context across sessions, and activating capabilities on demand. Every signal you see is real intelligence flow.
+                At the center of every request is a neural routing core — choosing the optimal path, compounding context across sessions, and activating capabilities on demand. Every signal you see is real intelligence flow.
               </p>
               <p className="mt-4 text-slate-500 leading-relaxed text-sm">
-                It doesn&apos;t just route — it learns. Provider performance, task success patterns, and cost efficiency are continuously optimized across every app in the network.
+                It doesn&apos;t just route — it learns. Performance, task success patterns, and cost efficiency are continuously optimized across every app in the network.
               </p>
               <div className="mt-10 grid grid-cols-2 gap-4">
                 {[
-                  { value: '13+', label: 'AI Providers' },
+                  { value: '30+', label: 'Planned Apps' },
                   { value: '8', label: 'Capability Domains' },
                   { value: '<200ms', label: 'Routing Latency' },
                   { value: '∞', label: 'Context Depth' },
@@ -233,7 +233,7 @@ export default function HomePage() {
               <span className="text-slate-400">By Design.</span>
             </h2>
             <p className="mx-auto mt-5 max-w-2xl text-slate-500">
-              Not a wrapper around one API. A full multi-provider AI operating system with persistent intelligence, per-app agents, and operator-grade infrastructure.
+              A complete intelligence operating system with persistent memory, per-app agents, adaptive routing, and operator-grade infrastructure — built for scale.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -366,7 +366,7 @@ export default function HomePage() {
                   ))}
                 </div>
                 <div className="space-y-2">
-                  {['chat → openai/gpt-4o → 340ms → ✓', 'image → replicate/flux → 2.1s → ✓', 'code → anthropic/claude → 890ms → ✓'].map(line => (
+                  {['chat → intelligent routing → 340ms → ✓', 'image → creative engine → 2.1s → ✓', 'code → analysis pipeline → 890ms → ✓'].map(line => (
                     <div key={line} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                       <span className="text-[11px] font-mono text-slate-400">{line}</span>
@@ -396,7 +396,7 @@ export default function HomePage() {
             <span className="text-slate-400">Not the General Public.</span>
           </h2>
           <p className="mx-auto mt-6 max-w-xl text-slate-400 leading-relaxed">
-            AmarktAI Network is infrastructure-grade intelligence — designed for builders who need real multi-modal AI orchestration, not another chatbot wrapper. If you&apos;re building something serious, let&apos;s talk.
+            Amarktai Network is infrastructure-grade intelligence — designed for builders who need real multi-modal AI orchestration, not another chatbot wrapper. If you&apos;re building something serious, let&apos;s talk.
           </p>
           <div className="mt-14 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link

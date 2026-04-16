@@ -25,12 +25,12 @@ function FadeUp({ children, delay = 0, className = '' }: { children: React.React
 }
 
 const ARCHITECTURE = [
-  { icon: GitBranch, title: 'Multi-Provider Orchestration', desc: '13+ AI providers with real fallback chains. Requests route to the optimal model based on capability, cost tier, and provider health.' },
+  { icon: GitBranch, title: 'Multi-Provider Orchestration', desc: 'Adaptive routing across multiple best-in-class providers with real fallback chains. Requests route to the optimal model based on capability, cost tier, and health.' },
   { icon: Database,  title: 'Persistent Memory Layer',      desc: 'Long-term memory, knowledge graphs, and vector search. Apps share context and compound intelligence over time.' },
   { icon: Bot,       title: 'Per-App Agent System',         desc: 'Every connected app gets a dedicated AI agent — its own persona, capability permissions, safety rules, and budget mode.' },
   { icon: Cpu,       title: 'Async Job Processing',         desc: 'Job queues for video generation, learning tasks, embeddings, and agent dispatch. Full retry and status tracking.' },
-  { icon: Network,   title: 'Self-Healing Infrastructure',  desc: 'Circuit breakers, automatic failover, provider health checks, and alert routing. The system recovers without manual intervention.' },
-  { icon: Shield,    title: 'Operator Dashboard',           desc: 'Full visibility into routing decisions, provider health, cost burn, alerts, jobs, and app performance — all in one command center.' },
+  { icon: Network,   title: 'Self-Healing Infrastructure',  desc: 'Circuit breakers, automatic failover, health checks, and alert routing. The system recovers without manual intervention.' },
+  { icon: Shield,    title: 'Operator Dashboard',           desc: 'Full visibility into routing decisions, health, cost burn, alerts, jobs, and app performance — all in one command center.' },
 ]
 
 const PRINCIPLES = [
@@ -54,14 +54,14 @@ export default function AboutPage() {
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}>
             <p className="mb-5 text-xs font-semibold uppercase tracking-[0.15em] text-blue-400">
-              About AmarktAI
+              About Us
             </p>
             <h1 className="font-heading text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] mb-8 tracking-tight text-white">
               The System Behind<br />
               <span className="gradient-text">The Intelligence.</span>
             </h1>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-              AmarktAI Network is not a single AI model, not a chatbot, and not a wrapper around someone else&apos;s API. It is a complete multi-app AI operating system — built to power, connect, and continuously improve multiple applications from one intelligence core.
+              Amarktai Network is not a single AI model, not a chatbot, and not a simple integration layer. It is a complete multi-app intelligence operating system — built to power, connect, and continuously improve multiple applications from one unified core.
             </p>
           </motion.div>
         </div>
