@@ -4,6 +4,12 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { callProvider, logBrainEvent } from '@/lib/brain'
 import { orchestrate } from '@/lib/orchestrator'
+import { POST as handleBrainTTS } from '@/app/api/brain/tts/route'
+import { POST as handleBrainImage } from '@/app/api/brain/image/route'
+import { POST as handleBrainImageEdit } from '@/app/api/brain/image-edit/route'
+import { POST as handleBrainSuggestiveImage } from '@/app/api/brain/suggestive-image/route'
+import { POST as handleBrainAdultImage } from '@/app/api/brain/adult-image/route'
+import { POST as handleBrainResearch } from '@/app/api/brain/research/route'
 import {
   classifyCapabilities,
   resolveCapabilityRoutes,
@@ -74,6 +80,19 @@ function resolveSpecialistType(
   }
 
   return null
+}
+
+/** Invoke an internal route handler directly (no network self-fetch). */
+function buildInternalJsonRequest(
+  request: NextRequest,
+  path: string,
+  body: Record<string, unknown>,
+): NextRequest {
+  return new NextRequest(new URL(path, request.url).toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 }
 
 /**
@@ -166,34 +185,16 @@ export async function POST(request: NextRequest) {
   // Passing providerKey to callProvider for image tasks would silently route
   // to the default chat model (e.g. gpt-4o-mini) instead of the image API.
   if (isSpecialist) {
-    // Derive the internal origin for server-to-server specialist calls.
-    // Prefer explicit env vars; fall back to request origin only when env vars
-    // are missing (e.g. local dev). The request origin is safe here because
-    // this is an authenticated admin-only route behind session auth, and the
-    // internal fetch targets hardcoded API paths (not user-controlled paths).
-    const envOrigin = process.env.NEXTAUTH_URL?.replace(/\/$/, '')
-      || process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
-    let origin: string
-    if (envOrigin) {
-      origin = envOrigin
-    } else {
-      const requestUrl = new URL(request.url)
-      origin = `${requestUrl.protocol}//${requestUrl.host}`
-    }
-
     if (specialistType === 'tts') {
       try {
-      const ttsRes = await fetch(`${origin}/api/brain/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: body.message,
-          voiceId: body.voiceId,
-          gender: body.gender,
-          accent: body.accent,
-          provider: body.ttsProvider ?? 'auto',
-        }),
+      const ttsReq = buildInternalJsonRequest(request, '/api/brain/tts', {
+        text: body.message,
+        voiceId: body.voiceId,
+        gender: body.gender,
+        accent: body.accent,
+        provider: body.ttsProvider ?? 'auto',
       })
+      const ttsRes = await handleBrainTTS(ttsReq)
       const latencyMs = Date.now() - start
       if (ttsRes.ok) {
         const buffer = await ttsRes.arrayBuffer()
@@ -250,11 +251,10 @@ export async function POST(request: NextRequest) {
 
     if (specialistType === 'image') {
       try {
-      const imageRes = await fetch(`${origin}/api/brain/image`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: body.message }),
+      const imageReq = buildInternalJsonRequest(request, '/api/brain/image', {
+        prompt: body.message,
       })
+      const imageRes = await handleBrainImage(imageReq)
       const latencyMs = Date.now() - start
       const imageData = await imageRes.json().catch(() => ({})) as {
         imageUrl?: string; imageBase64?: string; error?: string; provider?: string; model?: string;
@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
             output: null, imageUrl: null,
             capability: capabilities, routedProvider: null, routedModel: null,
             executionMode: 'specialist', fallback_used: false,
-            error: `Image generation service unavailable: ${fetchErr instanceof Error ? fetchErr.message : 'connection failed'}. Ensure an image-capable provider is configured in Admin → AI Providers.`,
+            error: `Image generation handler invocation failed: ${fetchErr instanceof Error ? fetchErr.message : 'unknown error'}`,
             code: 'image_service_unavailable',
             latencyMs, timestamp: new Date().toISOString(),
           },
@@ -296,11 +296,10 @@ export async function POST(request: NextRequest) {
     if (specialistType === 'image_editing') {
       // Image editing requires an actual image to be provided. From the lab (text-only),
       // return a structured response explaining the required inputs rather than failing silently.
-      const editRes = await fetch(`${origin}/api/brain/image-edit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: body.message }),
+      const editReq = buildInternalJsonRequest(request, '/api/brain/image-edit', {
+        prompt: body.message,
       })
+      const editRes = await handleBrainImageEdit(editReq)
       const latencyMs = Date.now() - start
       const editData = await editRes.json().catch(() => ({})) as {
         executed?: boolean; imageUrl?: string; imageBase64?: string;
@@ -329,11 +328,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (specialistType === 'suggestive') {
-      const imageRes = await fetch(`${origin}/api/brain/suggestive-image`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: body.message, appSlug: body.appSlug }),
+      const suggestiveReq = buildInternalJsonRequest(request, '/api/brain/suggestive-image', {
+        prompt: body.message,
+        appSlug: body.appSlug,
       })
+      const imageRes = await handleBrainSuggestiveImage(suggestiveReq)
       const latencyMs = Date.now() - start
       const imageData = await imageRes.json().catch(() => ({})) as {
         imageUrl?: string; imageBase64?: string; error?: string; provider?: string; model?: string
@@ -365,11 +364,11 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         )
       }
-      const imageRes = await fetch(`${origin}/api/brain/adult-image`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: body.message, appSlug: body.appSlug }),
+      const adultReq = buildInternalJsonRequest(request, '/api/brain/adult-image', {
+        prompt: body.message,
+        appSlug: body.appSlug,
       })
+      const imageRes = await handleBrainAdultImage(adultReq)
       const latencyMs = Date.now() - start
       const imageData = await imageRes.json().catch(() => ({})) as {
         imageBase64?: string; error?: string; provider?: string; model?: string;
@@ -394,11 +393,11 @@ export async function POST(request: NextRequest) {
 
     if (specialistType === 'research') {
       const depth = body.taskType === 'deep_research' ? 'deep' : 'shallow'
-      const researchRes = await fetch(`${origin}/api/brain/research`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: body.message, depth }),
+      const researchReq = buildInternalJsonRequest(request, '/api/brain/research', {
+        query: body.message,
+        depth,
       })
+      const researchRes = await handleBrainResearch(researchReq)
       const latencyMs = Date.now() - start
       const rd = await researchRes.json().catch(() => ({})) as {
         answer?: string; sources?: string[]; reasoning?: string[];

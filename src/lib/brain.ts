@@ -131,6 +131,19 @@ function defaultModelFor(providerKey: string): string {
   return getDefaultModelForProvider(providerKey)
 }
 
+const BEARER_PREFIX = 'bearer '
+
+function normalizeProviderApiKey(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (trimmed.toLowerCase().startsWith(BEARER_PREFIX)) {
+    const token = trimmed.slice(BEARER_PREFIX.length).trim()
+    return token || null
+  }
+  return trimmed
+}
+
 export interface ProviderCallResult {
   ok: boolean
   output: string | null
@@ -158,7 +171,10 @@ export async function getVaultApiKey(providerKey: string): Promise<string | null
       where: { providerKey },
       select: { apiKey: true },
     })
-    if (row?.apiKey) return decryptVaultKey(row.apiKey)
+    if (row?.apiKey) {
+      const decrypted = decryptVaultKey(row.apiKey)
+      return normalizeProviderApiKey(decrypted)
+    }
   } catch {
     // DB unavailable — fall through to env
   }
@@ -181,7 +197,7 @@ export async function getVaultApiKey(providerKey: string): Promise<string | null
     mistral:     'MISTRAL_API_KEY',
   }
   const envVar = envMap[providerKey]
-  if (envVar && process.env[envVar]) return process.env[envVar]!
+  if (envVar && process.env[envVar]) return normalizeProviderApiKey(process.env[envVar]!) ?? null
 
   return null
 }
@@ -229,7 +245,7 @@ export async function callProvider(
     }
   }
 
-  const resolvedApiKey = decryptVaultKey(vault.apiKey) ?? ''
+  const resolvedApiKey = normalizeProviderApiKey(decryptVaultKey(vault.apiKey)) ?? ''
   if (!resolvedApiKey) {
     return {
       ok: false, output: null,
