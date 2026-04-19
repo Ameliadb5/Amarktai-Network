@@ -72,6 +72,7 @@ export default function TestAITab() {
   const [sttFile, setSttFile] = useState<File | null>(null)
   const [videoJobId, setVideoJobId] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [savingArtifact, setSavingArtifact] = useState(false)
   const videoPollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadProviders = useCallback(async () => {
@@ -234,6 +235,37 @@ export default function TestAITab() {
 
   useEffect(() => { return () => { if (videoPollingRef.current) clearInterval(videoPollingRef.current) } }, [])
 
+  const saveArtifact = useCallback(async () => {
+    if (!result) return
+    const contentUrl = result.imageUrl ?? result.audioUrl ?? videoUrl ?? null
+    if (!contentUrl) return
+    const type = result.imageUrl ? 'image' : result.audioUrl ? 'audio' : 'video'
+    setSavingArtifact(true)
+    try {
+      const res = await fetch('/api/admin/artifacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appSlug: '__workspace__',
+          type,
+          subType: capability,
+          title: `${capability} test output`,
+          description: prompt,
+          provider: result.routedProvider ?? '',
+          model: result.routedModel ?? '',
+          contentUrl,
+          metadata: { capability, prompt },
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? `Save failed: HTTP ${res.status}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save artifact')
+    } finally {
+      setSavingArtifact(false)
+    }
+  }, [result, videoUrl, capability, prompt])
+
   const capEntry = capabilityStatus.find(c => c.capability === capability)
 
   return (
@@ -392,6 +424,10 @@ export default function TestAITab() {
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/80 backdrop-blur-sm text-xs text-white font-medium hover:bg-blue-500 transition-colors">
                     <Download className="w-3 h-3" /> Download
                   </a>
+                  <button onClick={saveArtifact} disabled={savingArtifact}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/80 backdrop-blur-sm text-xs text-white font-medium hover:bg-emerald-500 disabled:opacity-50 transition-colors">
+                    {savingArtifact ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />} Save
+                  </button>
                 </div>
               </div>
             </div>
@@ -404,6 +440,9 @@ export default function TestAITab() {
               <a href={result.audioUrl} download className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300">
                 Download audio
               </a>
+              <button onClick={saveArtifact} disabled={savingArtifact} className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 disabled:opacity-50">
+                {savingArtifact ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />} Save
+              </button>
             </div>
           )}
 
@@ -420,6 +459,9 @@ export default function TestAITab() {
               <a href={videoUrl} download className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300">
                 <Download className="w-3 h-3" /> Download video
               </a>
+              <button onClick={saveArtifact} disabled={savingArtifact} className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 disabled:opacity-50">
+                {savingArtifact ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />} Save
+              </button>
             </div>
           )}
 

@@ -149,13 +149,16 @@ function RoutingTab({ data }: { data: unknown }) {
 
 function MemoryTab({ data }: { data: unknown }) {
   const d = data as {
+    statusLabel?: string
+    totalEntries?: number
+    appSlugs?: string[]
     status?: string; stats?: { total?: number; namespaces?: string[]; appSlugs?: string[] }
     entries?: unknown[]; total?: number
   } | null
 
-  const status = d?.status ?? 'unknown'
-  const total = d?.stats?.total ?? d?.total ?? d?.entries?.length ?? 0
-  const namespaces = d?.stats?.namespaces ?? d?.stats?.appSlugs ?? []
+  const status = d?.statusLabel ?? d?.status ?? 'unknown'
+  const total = d?.totalEntries ?? d?.stats?.total ?? d?.total ?? d?.entries?.length ?? 0
+  const namespaces = d?.appSlugs ?? d?.stats?.namespaces ?? d?.stats?.appSlugs ?? []
 
   const statusColor = status === 'saving' ? 'bg-emerald-400' : status === 'not_configured' ? 'bg-amber-400' : 'bg-white/20'
 

@@ -19,9 +19,12 @@ describe('Routing Engine — Go-Live', () => {
     const { routeRequest } = await import('../routing-engine')
     const decision = await routeRequest({
       appSlug: '__admin_test__',
+      appCategory: 'general',
       taskType: 'chat',
-      capabilities: ['chat'],
-      prompt: 'Hello',
+      taskComplexity: 'simple',
+      message: 'Hello',
+      requiresRetrieval: false,
+      requiresMultimodal: false,
     })
     expect(decision).toBeDefined()
     expect(decision).toHaveProperty('primaryModel')
@@ -33,9 +36,12 @@ describe('Routing Engine — Go-Live', () => {
     const { routeRequest } = await import('../routing-engine')
     const decision = await routeRequest({
       appSlug: '__admin_test__',
+      appCategory: 'general',
       taskType: 'code',
-      capabilities: ['code'],
-      prompt: 'Write a test',
+      taskComplexity: 'simple',
+      message: 'Write a test',
+      requiresRetrieval: false,
+      requiresMultimodal: false,
     })
     expect(decision).toHaveProperty('fallbackModels')
     expect(Array.isArray(decision.fallbackModels)).toBe(true)
@@ -112,7 +118,7 @@ describe('Model Registry — Go-Live', () => {
   it('provider health tracking works', async () => {
     const { setProviderHealth, getProviderHealth, clearProviderHealthCache } = await import('../model-registry')
     clearProviderHealthCache()
-    setProviderHealth('test_provider', 'healthy', 'ok')
+    setProviderHealth('test_provider', 'healthy')
     const health = getProviderHealth('test_provider')
     expect(health).toBe('healthy')
     clearProviderHealthCache()
@@ -425,9 +431,12 @@ describe('Cross-system Validation — Go-Live', () => {
 
     const decision = await routeRequest({
       appSlug: '__admin_test__',
+      appCategory: 'general',
       taskType: 'chat',
-      capabilities: ['chat'],
-      prompt: 'test',
+      taskComplexity: 'simple',
+      message: 'test',
+      requiresRetrieval: false,
+      requiresMultimodal: false,
     })
     if (decision.primaryModel) {
       expect(decision.primaryModel).toHaveProperty('provider')

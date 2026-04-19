@@ -70,6 +70,7 @@ describe('Content Filter', () => {
       categories: ['violence'],
       message: 'blocked',
       confidence: 1.0,
+      scanner: 'keyword_fallback',
     };
     const alert = buildModerationAlert('trace-123', 'my-app', filterResult, 'dangerous text');
     expect(alert).not.toBeNull();
@@ -84,6 +85,7 @@ describe('Content Filter', () => {
       categories: [],
       message: '',
       confidence: 0,
+      scanner: 'keyword_fallback',
     };
     const alert = buildModerationAlert('trace-123', 'my-app', filterResult, 'safe text');
     expect(alert).toBeNull();

@@ -197,7 +197,7 @@ describe('Video Stack Truth', () => {
   })
 
   it('classifyCapabilities can identify video tasks', () => {
-    const result = classifyCapabilities({ taskType: 'video_planning', message: 'Plan a video about cooking' })
+    const result = classifyCapabilities('video_planning', 'Plan a video about cooking')
     expect(result.length).toBeGreaterThan(0)
   })
 })

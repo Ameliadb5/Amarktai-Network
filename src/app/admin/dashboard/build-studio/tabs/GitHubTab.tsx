@@ -22,6 +22,7 @@ export default function GitHubTab() {
   const [pushResult, setPushResult] = useState<{ success: boolean; commitUrl?: string; error?: string } | null>(null)
   const [selectedRepo, setSelectedRepo] = useState<string>('')
   const [branch, setBranch] = useState<string>('build-studio/output')
+  const [exportNotes, setExportNotes] = useState<string>('# Workspace Export\n\nGenerated from Amarktai Workspace.\n')
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -49,7 +50,18 @@ export default function GitHubTab() {
     try {
       const res = await fetch('/api/admin/github/push', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoName: selectedRepo, branch }),
+        body: JSON.stringify({
+          projectId: 0,
+          repoFullName: selectedRepo,
+          branch,
+          commitMessage: `Workspace export — ${new Date().toISOString()}`,
+          files: [
+            {
+              path: `workspace/exports/workspace-export-${Date.now()}.md`,
+              content: exportNotes,
+            },
+          ],
+        }),
       })
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ error: `Push failed: HTTP ${res.status}` }))
@@ -59,7 +71,7 @@ export default function GitHubTab() {
       const data = await res.json().catch(() => ({ success: false, error: 'Invalid response from server' }))
       setPushResult(data)
     } catch (e) { setPushResult({ success: false, error: e instanceof Error ? e.message : 'Push failed' }) } finally { setPushing(false) }
-  }, [selectedRepo, branch])
+  }, [selectedRepo, branch, exportNotes])
 
   if (loading) {
     return <div className="flex items-center gap-2 py-16 justify-center text-slate-400 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Checking GitHub connection…</div>
@@ -96,11 +108,18 @@ export default function GitHubTab() {
             <select value={selectedRepo} onChange={e => setSelectedRepo(e.target.value)}
               className="bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white">
               <option value="">Select repository…</option>
-              {status.repos?.map(r => <option key={r.fullName} value={r.name}>{r.fullName}</option>)}
+              {status.repos?.map(r => <option key={r.fullName} value={r.fullName}>{r.fullName}</option>)}
             </select>
             <input value={branch} onChange={e => setBranch(e.target.value)} placeholder="Branch name"
               className="bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/40" />
           </div>
+          <textarea
+            value={exportNotes}
+            onChange={(e) => setExportNotes(e.target.value)}
+            rows={5}
+            placeholder="Export notes/spec to commit"
+            className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/40"
+          />
           <button onClick={pushToGitHub} disabled={pushing || !selectedRepo}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium disabled:opacity-40 transition-colors">
             {pushing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Rocket className="w-3 h-3" />}

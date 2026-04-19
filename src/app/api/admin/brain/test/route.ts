@@ -10,6 +10,7 @@ import { POST as handleBrainImageEdit } from '@/app/api/brain/image-edit/route'
 import { POST as handleBrainSuggestiveImage } from '@/app/api/brain/suggestive-image/route'
 import { POST as handleBrainAdultImage } from '@/app/api/brain/adult-image/route'
 import { POST as handleBrainResearch } from '@/app/api/brain/research/route'
+import { POST as handleBrainVideoGenerate } from '@/app/api/brain/video-generate/route'
 import {
   classifyCapabilities,
   resolveCapabilityRoutes,
@@ -17,6 +18,7 @@ import {
 } from '@/lib/capability-engine'
 import { getAppSafetyConfig } from '@/lib/content-filter'
 import { syncProviderHealthFromDB } from '@/lib/sync-provider-health'
+import { recordUsage } from '@/lib/usage-meter'
 
 const testSchema = z.object({
   message: z.string().min(1).max(16_000),
@@ -146,6 +148,7 @@ export async function POST(request: NextRequest) {
 
   const start = Date.now()
   const traceId = randomUUID()
+  const usageAppSlug = '__workspace__'
 
   try {
 
@@ -200,6 +203,15 @@ export async function POST(request: NextRequest) {
         const buffer = await ttsRes.arrayBuffer()
         const base64 = Buffer.from(buffer).toString('base64')
         const audioUrl = `data:audio/mpeg;base64,${base64}`
+        await recordUsage({
+          appSlug: usageAppSlug,
+          capability: 'tts',
+          provider: ttsRes.headers.get('X-Provider') ?? 'unknown',
+          model: ttsRes.headers.get('X-Model') ?? '',
+          success: true,
+          latencyMs,
+          artifactCreated: true,
+        })
         return NextResponse.json({
           success: true, executed: true, traceId,
           output: '[TTS audio generated]', audioUrl,
@@ -211,6 +223,14 @@ export async function POST(request: NextRequest) {
         })
       }
       const ttsErr = await ttsRes.json().catch(() => ({})) as { error?: string }
+      await recordUsage({
+        appSlug: usageAppSlug,
+        capability: 'tts',
+        provider: 'unknown',
+        model: '',
+        success: false,
+        latencyMs,
+      })
       return NextResponse.json(
         {
           success: false, executed: false, traceId, output: null, audioUrl: null,
@@ -261,6 +281,15 @@ export async function POST(request: NextRequest) {
         code?: string; candidate_models?: unknown; rejection_reasons?: string[];
       }
       const imageSuccess = imageRes.ok && (!!imageData.imageUrl || !!imageData.imageBase64)
+      await recordUsage({
+        appSlug: usageAppSlug,
+        capability: 'image_generation',
+        provider: imageData.provider ?? 'unknown',
+        model: imageData.model ?? '',
+        success: imageSuccess,
+        latencyMs,
+        artifactCreated: imageSuccess,
+      })
       return NextResponse.json(
         {
           success: imageSuccess,
@@ -337,6 +366,15 @@ export async function POST(request: NextRequest) {
       const imageData = await imageRes.json().catch(() => ({})) as {
         imageUrl?: string; imageBase64?: string; error?: string; provider?: string; model?: string
       }
+      await recordUsage({
+        appSlug: usageAppSlug,
+        capability: 'suggestive_image_generation',
+        provider: imageData.provider ?? 'unknown',
+        model: imageData.model ?? '',
+        success: imageRes.ok && (!!imageData.imageUrl || !!imageData.imageBase64),
+        latencyMs,
+        artifactCreated: imageRes.ok && (!!imageData.imageUrl || !!imageData.imageBase64),
+      })
       return NextResponse.json(
         {
           success: imageRes.ok && (!!imageData.imageUrl || !!imageData.imageBase64),
@@ -375,6 +413,15 @@ export async function POST(request: NextRequest) {
         code?: string; gating_required?: boolean
       }
       const imageSuccess = imageRes.ok && !!imageData.imageBase64
+      await recordUsage({
+        appSlug: usageAppSlug,
+        capability: 'adult_image_generation',
+        provider: imageData.provider ?? 'unknown',
+        model: imageData.model ?? '',
+        success: imageSuccess,
+        latencyMs,
+        artifactCreated: imageSuccess,
+      })
       return NextResponse.json(
         {
           success: imageSuccess, executed: imageSuccess, traceId,
@@ -403,6 +450,14 @@ export async function POST(request: NextRequest) {
         answer?: string; sources?: string[]; reasoning?: string[];
         provider?: string; model?: string; error?: string
       }
+      await recordUsage({
+        appSlug: usageAppSlug,
+        capability: 'research',
+        provider: rd.provider ?? 'unknown',
+        model: rd.model ?? '',
+        success: researchRes.ok,
+        latencyMs,
+      })
       return NextResponse.json(
         {
           success: researchRes.ok, executed: researchRes.ok, traceId,
@@ -417,13 +472,49 @@ export async function POST(request: NextRequest) {
     }
 
     if (specialistType === 'video') {
-      return NextResponse.json({
-        success: false, executed: false, traceId, output: null, videoStatus: 'unavailable',
-        capability: capabilities, routedProvider: null, routedModel: null,
-        executionMode: 'specialist', fallback_used: false,
-        error: 'Video generation is not currently available. Configure a video-capable provider (Replicate or HuggingFace) in Admin → AI Providers to enable this capability.',
-        latencyMs: Date.now() - start, timestamp: new Date().toISOString(),
+      const videoReq = buildInternalJsonRequest(request, '/api/brain/video-generate', {
+        prompt: body.message,
+        appSlug: body.appSlug ?? '__workspace__',
+        provider: body.providerKey === 'auto' ? undefined : body.providerKey,
+        model: body.modelId,
       })
+      const videoRes = await handleBrainVideoGenerate(videoReq)
+      const latencyMs = Date.now() - start
+      const videoData = await videoRes.json().catch(() => ({})) as {
+        executed?: boolean
+        error?: string
+        provider?: string
+        model?: string
+        jobId?: string
+        status?: string
+      }
+      await recordUsage({
+        appSlug: usageAppSlug,
+        capability: 'video_generation',
+        provider: videoData.provider ?? 'unknown',
+        model: videoData.model ?? '',
+        success: videoRes.ok && !!videoData.executed,
+        latencyMs,
+      })
+      return NextResponse.json(
+        {
+          success: videoRes.ok && !!videoData.executed,
+          executed: videoRes.ok && !!videoData.executed,
+          traceId,
+          output: videoData.executed ? '[Video generation job created]' : null,
+          videoStatus: videoData.status ?? null,
+          videoJobId: videoData.jobId ?? null,
+          capability: capabilities,
+          routedProvider: videoData.provider ?? null,
+          routedModel: videoData.model ?? null,
+          executionMode: 'specialist',
+          fallback_used: false,
+          error: videoData.error ?? null,
+          latencyMs,
+          timestamp: new Date().toISOString(),
+        },
+        { status: videoRes.ok ? 202 : videoRes.status },
+      )
     }
   }
 
@@ -456,6 +547,14 @@ export async function POST(request: NextRequest) {
       routedProvider: body.providerKey, routedModel: result.model,
       validationUsed: false, consensusUsed: false, confidenceScore: null,
       success: result.ok, errorMessage: result.error ?? null, warningsJson: '[]', latencyMs,
+    })
+    await recordUsage({
+      appSlug: usageAppSlug,
+      capability: body.taskType,
+      provider: body.providerKey,
+      model: result.model,
+      success: result.ok,
+      latencyMs,
     })
     return NextResponse.json(
       {
@@ -497,6 +596,14 @@ export async function POST(request: NextRequest) {
     confidenceScore: orchResult.confidenceScore, success,
     errorMessage: orchResult.errors.length > 0 ? orchResult.errors.join('; ') : null,
     warningsJson: JSON.stringify(orchResult.warnings), latencyMs,
+  })
+  await recordUsage({
+    appSlug: usageAppSlug,
+    capability: body.taskType,
+    provider: orchResult.routedProvider ?? 'unknown',
+    model: orchResult.routedModel ?? '',
+    success,
+    latencyMs,
   })
 
   return NextResponse.json(

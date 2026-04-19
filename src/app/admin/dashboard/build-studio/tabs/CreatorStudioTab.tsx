@@ -50,6 +50,11 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
   const [instrumental, setInstrumental] = useState(false)
   // Campaign-specific
   const [campaignNiche, setCampaignNiche] = useState('')
+  const [voiceGender, setVoiceGender] = useState<'male' | 'female' | ''>('')
+  const [voiceId, setVoiceId] = useState('')
+  const [voiceAccent, setVoiceAccent] = useState('')
+  const [videoJobId, setVideoJobId] = useState<string | null>(null)
+  const [savingArtifact, setSavingArtifact] = useState(false)
 
   // Sync mode when initialMode changes
   useEffect(() => {
@@ -67,14 +72,37 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
           body: JSON.stringify({ appId: '__admin_test__', appSecret: 'admin-test-secret', taskType: 'image', message: prompt }),
         })
       } else if (mode === 'music') {
+        const genreMap: Record<string, string> = {
+          Pop: 'pop', Rock: 'rock', Gospel: 'gospel', Amapiano: 'amapiano',
+          EDM: 'edm', 'Hip-Hop': 'hip_hop', 'R&B': 'rnb', Jazz: 'jazz',
+          Classical: 'classical', Cinematic: 'cinematic', 'Lo-Fi': 'lofi',
+          Afrobeats: 'afrobeats', Country: 'country', Reggae: 'reggae',
+        }
         res = await fetch('/api/admin/music-studio', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'generate', title: prompt, genre, mood, vocalStyle: instrumental ? 'instrumental' : 'vocal', durationSeconds: 120, lyrics: prompt }),
+          body: JSON.stringify({
+            action: 'create',
+            request: {
+              appSlug: '__workspace__',
+              title: prompt,
+              theme: `${prompt}. Mood: ${mood}`,
+              genre: genreMap[genre] ?? 'pop',
+              vocalStyle: instrumental ? 'instrumental_only' : 'female_lead',
+              durationSeconds: 120,
+            },
+          }),
         })
       } else if (mode === 'voice') {
         res = await fetch('/api/brain/tts', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ appId: '__admin_test__', appSecret: 'admin-test-secret', text: prompt }),
+          body: JSON.stringify({
+            appId: '__admin_test__',
+            appSecret: 'admin-test-secret',
+            text: prompt,
+            gender: voiceGender || undefined,
+            voiceId: voiceId || undefined,
+            accent: voiceAccent || undefined,
+          }),
         })
       } else if (mode === 'video') {
         res = await fetch('/api/brain/video-generate', {
@@ -116,19 +144,96 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
         }
         return await res.json().catch(() => ({ success: false, error: 'Invalid JSON response from server' }))
       })()
-      setResult({
-        success: data.success ?? (!!data.output || !!data.audioUrl),
-        output: data.output ?? data.text ?? null,
-        imageUrl: data.imageUrl ?? null,
-        audioUrl: data.audioUrl ?? null,
-        videoUrl: data.videoUrl ?? null,
-        error: data.error ?? null,
-        provider: data.routedProvider ?? data.provider ?? null,
-        model: data.routedModel ?? data.model ?? null,
-        latencyMs: data.latencyMs ?? 0,
-      })
+      const normalized = mode === 'music'
+        ? {
+            success: !!data?.artifact?.audioUrl || data?.status === 'blueprint_only',
+            output: data?.message ?? data?.lyrics?.lyrics ?? null,
+            imageUrl: data?.artifact?.coverArtUrl ?? null,
+            audioUrl: data?.artifact?.audioUrl ?? null,
+            videoUrl: null,
+            error: data?.error ?? null,
+            provider: data?.artifact?.musicProvider ?? null,
+            model: data?.artifact?.lyricsModel ?? null,
+            latencyMs: 0,
+          }
+        : {
+            success: data.success ?? (!!data.output || !!data.audioUrl),
+            output: data.output ?? data.text ?? null,
+            imageUrl: data.imageUrl ?? null,
+            audioUrl: data.audioUrl ?? null,
+            videoUrl: data.videoUrl ?? null,
+            error: data.error ?? null,
+            provider: data.routedProvider ?? data.provider ?? null,
+            model: data.routedModel ?? data.model ?? null,
+            latencyMs: data.latencyMs ?? 0,
+          }
+
+      setResult(normalized)
+      if (mode === 'video' && data.jobId) {
+        setVideoJobId(data.jobId as string)
+        const poll = setInterval(async () => {
+          try {
+            const pr = await fetch(`/api/brain/video-generate/${data.jobId}`)
+            if (!pr.ok) return
+            const pj = await pr.json().catch(() => null) as { status?: string; resultUrl?: string } | null
+            if (!pj) return
+            if (pj.status === 'succeeded' && pj.resultUrl) {
+              setResult((prev) => prev ? { ...prev, success: true, videoUrl: pj.resultUrl, output: '[Video generated]' } : prev)
+              clearInterval(poll)
+            } else if (pj.status === 'failed') {
+              setResult((prev) => prev ? { ...prev, success: false, error: 'Video generation failed' } : prev)
+              clearInterval(poll)
+            }
+          } catch { /* retry */ }
+        }, 5000)
+      } else {
+        setVideoJobId(null)
+      }
     } catch (e) { setError(e instanceof Error ? e.message : 'Creation failed') } finally { setRunning(false) }
-  }, [mode, prompt, genre, mood, instrumental, campaignNiche])
+  }, [mode, prompt, genre, mood, instrumental, campaignNiche, voiceGender, voiceId, voiceAccent])
+
+  const saveArtifact = useCallback(async () => {
+    if (!result) return
+    const preferAudio = mode === 'music' || mode === 'voice'
+    const primaryAudioUrl = preferAudio ? (result.audioUrl ?? null) : null
+    const primaryImageUrl = result.imageUrl ?? null
+    const primaryVideoUrl = result.videoUrl ?? null
+    const fallbackAudioUrl = !preferAudio ? (result.audioUrl ?? null) : null
+    const contentUrl = primaryAudioUrl ?? primaryImageUrl ?? primaryVideoUrl ?? fallbackAudioUrl
+    if (!contentUrl) return
+    const type =
+      contentUrl === primaryAudioUrl
+        ? (mode === 'music' ? 'music' : 'audio')
+        : contentUrl === primaryImageUrl
+          ? 'image'
+          : 'video'
+    const subType = mode === 'voice' ? 'tts' : mode
+    setSavingArtifact(true)
+    try {
+      const res = await fetch('/api/admin/artifacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appSlug: '__workspace__',
+          type,
+          subType,
+          title: `${mode} output`,
+          description: prompt,
+          provider: result.provider ?? '',
+          model: result.model ?? '',
+          contentUrl,
+          metadata: { mode, prompt },
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? `Save failed (HTTP ${res.status})`)
+      setResult((prev) => prev ? { ...prev, output: `${prev.output ?? ''}\n[Saved to Artifacts: ${data.artifact?.id ?? 'ok'}]`.trim() } : prev)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save artifact')
+    } finally {
+      setSavingArtifact(false)
+    }
+  }, [mode, prompt, result])
 
   // Show mode selector only when opened without a specific initialMode
   const showModeSelector = !initialMode
@@ -178,6 +283,21 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
               <input type="checkbox" checked={instrumental} onChange={e => setInstrumental(e.target.checked)} className="rounded border-slate-600 bg-transparent" />
               Instrumental only
             </label>
+          </div>
+        )}
+
+        {mode === 'voice' && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <select value={voiceGender} onChange={e => setVoiceGender(e.target.value as 'male' | 'female' | '')}
+              className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2.5 text-xs text-white">
+              <option value="">Any gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+            <input value={voiceId} onChange={e => setVoiceId(e.target.value)} placeholder="Voice ID (optional)"
+              className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-500" />
+            <input value={voiceAccent} onChange={e => setVoiceAccent(e.target.value)} placeholder="Accent (optional)"
+              className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-500" />
           </div>
         )}
 
@@ -277,10 +397,22 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
           {result.audioUrl && (
             <div className="p-5 space-y-3">
               <audio controls src={result.audioUrl} className="w-full rounded-xl" />
-              <a href={result.audioUrl} download
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] transition-colors">
-                <Download className="w-3 h-3" /> Download Audio
-              </a>
+              <div className="flex items-center gap-2">
+                <a href={result.audioUrl} download
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] transition-colors">
+                  <Download className="w-3 h-3" /> Download Audio
+                </a>
+                <button onClick={saveArtifact} disabled={savingArtifact}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors">
+                  {savingArtifact ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />} Save to Artifacts
+                </button>
+              </div>
+            </div>
+          )}
+
+          {videoJobId && !result.videoUrl && (
+            <div className="p-5 text-xs text-blue-300">
+              Video generation in progress… Job {videoJobId.slice(0, 8)}…
             </div>
           )}
 
@@ -288,10 +420,26 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
           {result.videoUrl && (
             <div className="p-5 space-y-3">
               <video controls src={result.videoUrl} className="w-full rounded-xl border border-white/[0.06]" />
-              <a href={result.videoUrl} download
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] transition-colors">
-                <Download className="w-3 h-3" /> Download Video
-              </a>
+              <div className="flex items-center gap-2">
+                <a href={result.videoUrl} download
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] transition-colors">
+                  <Download className="w-3 h-3" /> Download Video
+                </a>
+                <button onClick={saveArtifact} disabled={savingArtifact}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors">
+                  {savingArtifact ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />} Save to Artifacts
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Image save action */}
+          {result.imageUrl && (
+            <div className="px-5 pb-5">
+              <button onClick={saveArtifact} disabled={savingArtifact}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors">
+                {savingArtifact ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />} Save to Artifacts
+              </button>
             </div>
           )}
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
 import { FlaskConical, Rocket, ImageIcon, Mic, Film, Music, Layers, Workflow, GitBranch } from 'lucide-react'
@@ -29,12 +29,32 @@ const tabs: { key: TabKey; label: string; icon: React.ComponentType<React.SVGPro
 
 export default function WorkspacePage() {
   const [active, setActive] = useState<TabKey>('test-ai')
+  const [usage, setUsage] = useState<{ totalRequests: number; totalCostCents: number } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/admin/usage?appSlug=__workspace__&days=30')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled) {
+          setUsage(d?.usage ?? null)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setUsage(null)
+      })
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-[#0a1226] to-[#050a17] p-6">
         <h1 className="text-2xl font-bold text-white">Workspace</h1>
         <p className="mt-1 text-sm text-slate-400">Central operator hub for testing AI, building apps, generating media, comparing outputs, and preparing export.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-300">
+          <span>Workspace requests (30d): <span className="text-white">{usage?.totalRequests ?? 0}</span></span>
+          <span>Workspace est. cost (30d): <span className="text-white">${(((usage?.totalCostCents ?? 0) / 100)).toFixed(2)}</span></span>
+        </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
