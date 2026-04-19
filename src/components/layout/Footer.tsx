@@ -1,18 +1,20 @@
 import Link from 'next/link'
 
-const FOOTER_COLS = [
+const columns = [
   {
     heading: 'Platform',
     links: [
       { href: '/', label: 'Home' },
       { href: '/apps', label: 'Ecosystem' },
+      { href: '/about', label: 'Architecture' },
     ],
   },
   {
-    heading: 'Company',
+    heading: 'Access',
     links: [
-      { href: '/about', label: 'About Us' },
-      { href: '/contact', label: 'Contact' },
+      { href: '/contact', label: 'Request Access' },
+      { href: '/admin/login', label: 'Operator Login' },
+      { href: '/voice-access', label: 'Voice Access Preview' },
     ],
   },
   {
@@ -26,35 +28,24 @@ const FOOTER_COLS = [
 
 export default function Footer() {
   return (
-    <footer className="border-t border-white/[0.06] bg-[#030712]">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-        <div className="grid grid-cols-2 gap-10 md:grid-cols-12 lg:gap-16">
-          {/* Brand */}
-          <div className="col-span-2 md:col-span-5">
-            <Link href="/" className="inline-flex items-center">
-              <span className="text-lg font-bold tracking-tight font-heading">
-                <span className="text-white">Amarkt</span>
-                <span className="text-blue-500">AI</span>
-              </span>
-            </Link>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-500">
-              The intelligence platform powering a connected ecosystem of applications — unified, adaptive, and built to scale.
+    <footer className="border-t border-white/10 bg-[#020711]">
+      <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="grid gap-10 md:grid-cols-12">
+          <div className="md:col-span-5">
+            <p className="text-lg font-bold text-white">Amarktai Network</p>
+            <p className="mt-3 max-w-sm text-sm text-slate-400">
+              The operator-grade AI operating system for app creation, orchestration, automation, and multimodal production.
             </p>
           </div>
 
-          {FOOTER_COLS.map((col) => (
-            <div key={col.heading} className="md:col-span-2">
-              <h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                {col.heading}
-              </h4>
-              <ul className="space-y-3">
-                {col.links.map((l) => (
-                  <li key={`${col.heading}-${l.href}`}>
-                    <Link
-                      href={l.href}
-                      className="text-sm text-slate-500 transition-colors duration-200 hover:text-white"
-                    >
-                      {l.label}
+          {columns.map((column) => (
+            <div key={column.heading} className="md:col-span-2">
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{column.heading}</h4>
+              <ul className="space-y-2">
+                {column.links.map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href} className="text-sm text-slate-400 hover:text-white">
+                      {link.label}
                     </Link>
                   </li>
                 ))}
@@ -63,11 +54,9 @@ export default function Footer() {
           ))}
         </div>
 
-        <div className="my-12 h-px w-full bg-white/[0.06]" />
-
-        <p className="text-xs text-slate-600">
-          &copy; {new Date().getFullYear()} Amarktai Network. All rights reserved.
-        </p>
+        <div className="mt-10 border-t border-white/10 pt-5 text-xs text-slate-500">
+          © {new Date().getFullYear()} Amarktai Network. All rights reserved.
+        </div>
       </div>
     </footer>
   )

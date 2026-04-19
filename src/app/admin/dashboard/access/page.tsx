@@ -6,6 +6,7 @@ import {
   Settings, Shield, Key, Globe, Database, Bell, Lock,
   RefreshCw, AlertCircle, CheckCircle,
 } from 'lucide-react'
+import Link from 'next/link'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
@@ -224,6 +225,19 @@ export default function AccessPage() {
             Data refreshes automatically on page load.
           </p>
         </div>
+      </motion.div>
+
+      <motion.div
+        variants={fadeUp}
+        className="bg-cyan-500/5 border border-cyan-500/20 rounded-xl p-4 flex items-center justify-between gap-3"
+      >
+        <div>
+          <p className="text-sm text-white font-medium">Voice Access Setup</p>
+          <p className="text-xs text-slate-400 mt-0.5">Future login-ready voice enrollment frontend is now available.</p>
+        </div>
+        <Link href="/admin/dashboard/system/voice-access" className="text-xs px-3 py-2 rounded-lg border border-cyan-400/30 text-cyan-300 hover:bg-cyan-400/10 transition-colors">
+          Open Voice Access
+        </Link>
       </motion.div>
 
       {/* Settings Grid */}
