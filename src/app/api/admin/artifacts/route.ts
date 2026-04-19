@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const artifact = await createArtifact({
-      appSlug: (body.appSlug as string) || '__workspace__',
+      appSlug: (body.appSlug as string) || 'workspace',
       type,
       subType: body.subType as string | undefined,
       title: body.title as string | undefined,

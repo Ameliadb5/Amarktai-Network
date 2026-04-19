@@ -72,6 +72,17 @@ const DEFAULT_SAFETY_CONFIG: SafetyConfig = {
   suggestiveMode: false,
 };
 
+const ADMIN_ALWAYS_ADULT_APPS = new Set(['workspace', '__workspace__', '__admin_test__'])
+
+function getAdminSafetyOverride(appSlug: string): SafetyConfig | null {
+  if (!ADMIN_ALWAYS_ADULT_APPS.has(appSlug)) return null
+  return {
+    safeMode: false,
+    adultMode: true,
+    suggestiveMode: true,
+  }
+}
+
 /** Runtime per-app safety overrides (write-through cache). */
 const appSafetyConfigs = new Map<string, SafetyConfig>();
 
@@ -125,6 +136,8 @@ export function setAppSafetyConfig(appSlug: string, config: Partial<SafetyConfig
  * Use `loadAppSafetyConfigFromDB` to warm the cache from the database.
  */
 export function getAppSafetyConfig(appSlug: string): SafetyConfig {
+  const adminOverride = getAdminSafetyOverride(appSlug)
+  if (adminOverride) return adminOverride
   return appSafetyConfigs.get(appSlug) ?? { ...DEFAULT_SAFETY_CONFIG };
 }
 
@@ -135,6 +148,11 @@ export function getAppSafetyConfig(appSlug: string): SafetyConfig {
  * Call this from any GET endpoint that needs to return the persisted state.
  */
 export async function loadAppSafetyConfigFromDB(appSlug: string): Promise<SafetyConfig> {
+  const adminOverride = getAdminSafetyOverride(appSlug)
+  if (adminOverride) {
+    appSafetyConfigs.set(appSlug, adminOverride)
+    return adminOverride
+  }
   try {
     const row = await prisma.appAiProfile.findUnique({
       where: { appSlug },

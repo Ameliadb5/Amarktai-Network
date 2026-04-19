@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
 
   const start = Date.now()
   const traceId = randomUUID()
-  const usageAppSlug = '__workspace__'
+  const usageAppSlug = 'workspace'
 
   try {
 
@@ -474,7 +474,7 @@ export async function POST(request: NextRequest) {
     if (specialistType === 'video') {
       const videoReq = buildInternalJsonRequest(request, '/api/brain/video-generate', {
         prompt: body.message,
-        appSlug: body.appSlug ?? '__workspace__',
+        appSlug: body.appSlug ?? 'workspace',
         provider: body.providerKey === 'auto' ? undefined : body.providerKey,
         model: body.modelId,
       })

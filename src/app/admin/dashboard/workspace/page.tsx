@@ -33,7 +33,7 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/admin/usage?appSlug=__workspace__&days=30')
+    fetch('/api/admin/usage?appSlug=workspace&days=30')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!cancelled) {

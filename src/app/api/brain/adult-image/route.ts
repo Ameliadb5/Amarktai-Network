@@ -75,6 +75,12 @@ const HF_ADULT_MODELS: ReadonlyArray<{
   },
 ] as const;
 
+const TOGETHER_ADULT_MODELS: ReadonlyArray<{ id: string; steps: number }> = [
+  { id: 'black-forest-labs/FLUX.1-schnell-Free', steps: 4 },
+  { id: 'black-forest-labs/FLUX.1-schnell', steps: 4 },
+  { id: 'stabilityai/stable-diffusion-xl-base-1.0', steps: 30 },
+];
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -257,6 +263,53 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Provider fallback: Together AI ───────────────────────────────────
+    const togetherKey = await getVaultApiKey('together');
+    if (togetherKey) {
+      for (const model of TOGETHER_ADULT_MODELS) {
+        try {
+          const response = await fetch('https://api.together.xyz/v1/images/generations', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${togetherKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: model.id,
+              prompt: prompt.trim(),
+              n: 1,
+              steps: model.steps,
+              width,
+              height,
+            }),
+            signal: AbortSignal.timeout(60_000),
+          });
+
+          if (response.ok) {
+            const data = await response.json().catch(() => ({})) as { data?: Array<{ url?: string }> };
+            const imageUrl = data.data?.[0]?.url;
+            if (imageUrl) {
+              return NextResponse.json({
+                capability: 'adult_18plus_image',
+                executed: true,
+                imageBase64: imageUrl,
+                provider: 'together',
+                model: model.id,
+                modelLabel: model.id,
+                size: resolvedSize,
+                promptUsed: prompt.trim(),
+              });
+            }
+          }
+        } catch (err) {
+          console.warn(
+            `[brain/adult-image] Together ${model.id} error:`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
+    }
+
     // ── No provider available ────────────────────────────────────────────
     const rejectionReasons: string[] = [];
     if (!hfKey) {
@@ -272,6 +325,11 @@ export async function POST(request: NextRequest) {
         'private HuggingFace Inference Endpoint.',
       );
     }
+    if (!togetherKey) {
+      rejectionReasons.push('together: no API key configured. Set TOGETHER_API_KEY (Admin → AI Providers → Together AI).');
+    } else {
+      rejectionReasons.push('together: all model attempts failed.');
+    }
 
     return NextResponse.json(
       {
@@ -282,7 +340,7 @@ export async function POST(request: NextRequest) {
           'No adult image generation provider is available. ' +
           'A HuggingFace API key is required (Admin → AI Providers → Hugging Face). ' +
           'Models tried: ' + HF_ADULT_MODELS.map((m) => m.id).join(', '),
-        providers_checked: ['huggingface'],
+        providers_checked: ['huggingface', 'together'],
         rejection_reasons: rejectionReasons,
       },
       { status: 503 },

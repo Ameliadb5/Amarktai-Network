@@ -150,9 +150,14 @@ export default function AdminLoginPage() {
           <p className="text-xs text-slate-600 font-mono">
             Restricted access — authorized personnel only
           </p>
-          <Link href="/" className="text-xs text-slate-600 hover:text-slate-400 transition-colors">
-            ← Back to site
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/admin/voice-login" className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
+              Voice login →
+            </Link>
+            <Link href="/" className="text-xs text-slate-600 hover:text-slate-400 transition-colors">
+              ← Back to site
+            </Link>
+          </div>
         </div>
       </motion.div>
     </div>

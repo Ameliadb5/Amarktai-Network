@@ -38,6 +38,18 @@ function deriveCapabilities(m: ModelEntry): string[] {
   return caps
 }
 
+function toEstimatedCostTier(costTier: string): 'cheap' | 'medium' | 'expensive' {
+  if (['free', 'very_low', 'low'].includes(costTier)) return 'cheap'
+  if (['premium', 'high'].includes(costTier)) return 'expensive'
+  return 'medium'
+}
+
+function toShortDescription(m: ModelEntry): string {
+  const secondary = m.secondary_roles.slice(0, 2).join(', ')
+  const rolePart = secondary ? `${m.primary_role} + ${secondary}` : m.primary_role
+  return `${m.family} • ${rolePart}`.slice(0, 140)
+}
+
 /**
  * GET /api/admin/models — returns model registry entries.
  *
@@ -101,6 +113,8 @@ export async function GET(request: NextRequest) {
       contextWindow: m.context_window,
       latencyTier: m.latency_tier,
       costTier: m.cost_tier,
+      shortDescription: toShortDescription(m),
+      estimatedCostTier: toEstimatedCostTier(m.cost_tier),
       // legacy snake_case aliases kept for backward compat
       display_name: m.model_name,
       roles: [m.primary_role, ...m.secondary_roles],

@@ -236,11 +236,26 @@ export async function pushProjectToGitHub(
     }
     const defaultBranch = (repoInfo.body as { default_branch: string }).default_branch
 
-    const refRes = await githubFetch(`/repos/${owner}/${repo}/git/refs/heads/${defaultBranch}`, token)
-    if (!refRes.ok) {
-      return { success: false, commitSha: null, commitUrl: null, branch: input.branch, filesChanged: 0, error: 'Could not get branch ref', pushedAt }
+    const defaultRefRes = await githubFetch(`/repos/${owner}/${repo}/git/refs/heads/${defaultBranch}`, token)
+    if (!defaultRefRes.ok) {
+      return { success: false, commitSha: null, commitUrl: null, branch: input.branch, filesChanged: 0, error: 'Could not get default branch ref', pushedAt }
     }
-    const baseSha = ((refRes.body as { object: { sha: string } }).object).sha
+    const defaultBaseSha = ((defaultRefRes.body as { object: { sha: string } }).object).sha
+
+    // Use target branch as base when it already exists, otherwise base from default branch.
+    const existingBranch = await githubFetch(
+      `/repos/${owner}/${repo}/git/refs/heads/${input.branch}`,
+      token,
+    )
+    const baseSha = existingBranch.ok
+      ? ((existingBranch.body as { object: { sha: string } }).object).sha
+      : defaultBaseSha
+
+    const commitResInfo = await githubFetch(`/repos/${owner}/${repo}/git/commits/${baseSha}`, token)
+    if (!commitResInfo.ok) {
+      return { success: false, commitSha: null, commitUrl: null, branch: input.branch, filesChanged: 0, error: 'Could not resolve base commit', pushedAt }
+    }
+    const baseTreeSha = (commitResInfo.body as { tree: { sha: string } }).tree.sha
 
     // 2. Create blobs for each file
     const treeItems = await Promise.all(input.files.map(async (f) => {
@@ -260,7 +275,7 @@ export async function pushProjectToGitHub(
     // 3. Create tree
     const treeRes = await githubFetch(`/repos/${owner}/${repo}/git/trees`, token, {
       method: 'POST',
-      body: JSON.stringify({ base_tree: baseSha, tree: treeItems }),
+      body: JSON.stringify({ base_tree: baseTreeSha, tree: treeItems }),
     })
     if (!treeRes.ok) {
       return { success: false, commitSha: null, commitUrl: null, branch: input.branch, filesChanged: 0, error: 'Failed to create git tree', pushedAt }
@@ -283,21 +298,38 @@ export async function pushProjectToGitHub(
 
     // 5. Create or update the target branch
     const branchRef = `refs/heads/${input.branch}`
-    const existingBranch = await githubFetch(
-      `/repos/${owner}/${repo}/git/refs/heads/${input.branch}`,
-      token,
-    )
-
     if (existingBranch.ok) {
-      await githubFetch(`/repos/${owner}/${repo}/git/refs/heads/${input.branch}`, token, {
+      const updateRef = await githubFetch(`/repos/${owner}/${repo}/git/refs/heads/${input.branch}`, token, {
         method: 'PATCH',
         body: JSON.stringify({ sha: commitSha, force: false }),
       })
+      if (!updateRef.ok) {
+        return {
+          success: false,
+          commitSha: null,
+          commitUrl: null,
+          branch: input.branch,
+          filesChanged: 0,
+          error: 'Failed to update target branch ref',
+          pushedAt,
+        }
+      }
     } else {
-      await githubFetch(`/repos/${owner}/${repo}/git/refs`, token, {
+      const createRef = await githubFetch(`/repos/${owner}/${repo}/git/refs`, token, {
         method: 'POST',
         body: JSON.stringify({ ref: branchRef, sha: commitSha }),
       })
+      if (!createRef.ok) {
+        return {
+          success: false,
+          commitSha: null,
+          commitUrl: null,
+          branch: input.branch,
+          filesChanged: 0,
+          error: 'Failed to create target branch ref',
+          pushedAt,
+        }
+      }
     }
 
     // Update project lastPushedAt

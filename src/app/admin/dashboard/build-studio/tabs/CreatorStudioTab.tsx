@@ -83,7 +83,7 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
           body: JSON.stringify({
             action: 'create',
             request: {
-              appSlug: '__workspace__',
+              appSlug: 'workspace',
               title: prompt,
               theme: `${prompt}. Mood: ${mood}`,
               genre: genreMap[genre] ?? 'pop',
@@ -200,13 +200,15 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
     const primaryVideoUrl = result.videoUrl ?? null
     const fallbackAudioUrl = !preferAudio ? (result.audioUrl ?? null) : null
     const contentUrl = primaryAudioUrl ?? primaryImageUrl ?? primaryVideoUrl ?? fallbackAudioUrl
-    if (!contentUrl) return
-    const type =
-      contentUrl === primaryAudioUrl
-        ? (mode === 'music' ? 'music' : 'audio')
-        : contentUrl === primaryImageUrl
-          ? 'image'
-          : 'video'
+    const textOutput = !contentUrl && result.output ? result.output : null
+    if (!contentUrl && !textOutput) return
+    const type = contentUrl
+      ? (contentUrl === primaryAudioUrl
+          ? (mode === 'music' ? 'music' : 'audio')
+          : contentUrl === primaryImageUrl
+            ? 'image'
+            : 'video')
+      : 'code'
     const subType = mode === 'voice' ? 'tts' : mode
     setSavingArtifact(true)
     try {
@@ -214,7 +216,7 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          appSlug: '__workspace__',
+          appSlug: 'workspace',
           type,
           subType,
           title: `${mode} output`,
@@ -222,6 +224,8 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
           provider: result.provider ?? '',
           model: result.model ?? '',
           contentUrl,
+          contentBase64: textOutput ? btoa(unescape(encodeURIComponent(textOutput))) : undefined,
+          mimeType: textOutput ? 'text/plain; charset=utf-8' : undefined,
           metadata: { mode, prompt },
         }),
       })
@@ -448,6 +452,12 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
             <div className="p-5">
               <div className="bg-white/[0.02] rounded-xl p-5 text-sm text-slate-300 whitespace-pre-wrap max-h-[500px] overflow-y-auto leading-relaxed border border-white/[0.04]">
                 {result.output}
+              </div>
+              <div className="mt-3">
+                <button onClick={saveArtifact} disabled={savingArtifact}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors">
+                  {savingArtifact ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />} Save to Artifacts
+                </button>
               </div>
             </div>
           )}
