@@ -131,12 +131,14 @@ function defaultModelFor(providerKey: string): string {
   return getDefaultModelForProvider(providerKey)
 }
 
+const BEARER_PREFIX = 'bearer '
+
 function normalizeProviderApiKey(raw: string | null | undefined): string | null {
   if (!raw) return null
   const trimmed = raw.trim()
   if (!trimmed) return null
-  if (trimmed.toLowerCase().startsWith('bearer ')) {
-    const token = trimmed.slice(7).trim()
+  if (trimmed.toLowerCase().startsWith(BEARER_PREFIX)) {
+    const token = trimmed.slice(BEARER_PREFIX.length).trim()
     return token || null
   }
   return trimmed

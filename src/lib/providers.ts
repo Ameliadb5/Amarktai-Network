@@ -29,11 +29,13 @@ export interface HealthCheckResult {
   message: string
 }
 
+const BEARER_PREFIX = 'bearer '
+
 function normalizeApiKey(raw: string): string {
   const trimmed = raw.trim()
   if (!trimmed) return ''
-  if (trimmed.toLowerCase().startsWith('bearer ')) {
-    return trimmed.slice(7).trim()
+  if (trimmed.toLowerCase().startsWith(BEARER_PREFIX)) {
+    return trimmed.slice(BEARER_PREFIX.length).trim()
   }
   return trimmed
 }
