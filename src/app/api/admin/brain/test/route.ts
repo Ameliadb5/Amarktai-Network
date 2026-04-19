@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
             output: null, imageUrl: null,
             capability: capabilities, routedProvider: null, routedModel: null,
             executionMode: 'specialist', fallback_used: false,
-            error: `Image generation specialist failed before execution: ${fetchErr instanceof Error ? fetchErr.message : 'unknown error'}`,
+            error: `Image generation handler invocation failed: ${fetchErr instanceof Error ? fetchErr.message : 'unknown error'}`,
             code: 'image_service_unavailable',
             latencyMs, timestamp: new Date().toISOString(),
           },

@@ -40,9 +40,14 @@ function normalizeApiKey(raw: string): string {
 
 function resolveStoredApiKey(rawStoredKey: string): string {
   const decrypted = decryptVaultKey(rawStoredKey)
+  if (decrypted === null && rawStoredKey.startsWith('v1:')) {
+    console.warn('[providers] Encrypted provider key could not be decrypted for health check.')
+  }
   const candidate = decrypted ?? rawStoredKey
   return normalizeApiKey(candidate)
 }
+
+const HF_HEALTHCHECK_MODEL = 'distilbert-base-uncased-finetuned-sst-2-english'
 
 /**
  * Run a live health check for the given provider.
@@ -166,7 +171,7 @@ export async function runProviderHealthCheck(
         // Some tokens can run inference even when whoami is restricted; verify
         // the exact path used by runtime image/audio routes before marking invalid.
         const inferenceRes = await fetch(
-          'https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english',
+          `https://api-inference.huggingface.co/models/${HF_HEALTHCHECK_MODEL}`,
           {
             method: 'POST',
             headers: {
