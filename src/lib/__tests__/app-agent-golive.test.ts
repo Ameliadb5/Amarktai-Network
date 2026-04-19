@@ -3,6 +3,7 @@
  * admin setup flow, daily learning, and go-live hardening.
  */
 import { describe, it, expect } from 'vitest'
+import type { AppAgentConfig } from '@/lib/app-agent'
 
 // ── App Agent Tests ─────────────────────────────────────────────────────────
 
@@ -95,6 +96,7 @@ describe('App Agent — Core Architecture', () => {
       preferredProviders: [],
       preferredModels: [],
       fallbackChain: [],
+      allowedCapabilities: [],
       memoryNamespace: 'mem_test-app',
       retrievalNamespace: 'ret_test-app',
     }
@@ -163,6 +165,7 @@ describe('App Agent — Core Architecture', () => {
       preferredProviders: [],
       preferredModels: [],
       fallbackChain: [],
+      allowedCapabilities: [],
       memoryNamespace: '',
       retrievalNamespace: '',
     }
@@ -539,7 +542,7 @@ describe('Go-Live Hardening', () => {
 
 // ── Helper ──────────────────────────────────────────────────────────────────
 
-function makeMinimalConfig(overrides: Record<string, unknown> = {}) {
+function makeMinimalConfig(overrides: Record<string, unknown> = {}): AppAgentConfig {
   // type imported above
   return {
     id: 'test', appSlug: 'test', appName: 'Test', appUrl: '', appType: 'general',
@@ -555,6 +558,7 @@ function makeMinimalConfig(overrides: Record<string, unknown> = {}) {
     religiousBranch: '', approvedSourcePacks: [], doctrineAwareRouting: false,
     preferredProviders: [], preferredModels: [], fallbackChain: [],
     memoryNamespace: '', retrievalNamespace: '',
+    allowedCapabilities: [],
     ...overrides,
-  }
+  } as AppAgentConfig
 }
