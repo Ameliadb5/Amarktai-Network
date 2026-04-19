@@ -16,6 +16,7 @@ import {
   getProviderHealth,
 } from './model-registry';
 import { getAppProfile } from './app-profiles';
+import { loadAppSafetyConfigFromDB } from './content-filter';
 
 // ── State enums ─────────────────────────────────────────────────────────────
 
@@ -247,6 +248,7 @@ const SETTINGS_GATED = new Set([
   'suggestive_image_generation',
   'suggestive_video_planning',
   'suggestive_video_generation',
+  'adult_18plus_image',
 ]);
 
 /** Type-safe lookup of a boolean capability flag on a model entry. */
@@ -341,9 +343,15 @@ export async function getCapabilityTruth(
     providerTruth.filter((p) => p.isActive).map((p) => p.providerKey),
   );
 
-  // Check app-profile safety flags for settings-gated capabilities
+  // Check app-profile safety flags from persisted DB-backed safety config.
+  const persistedSafety = appSlug ? await loadAppSafetyConfigFromDB(appSlug) : null;
   const profile = appSlug ? getAppProfile(appSlug) : null;
-  const suggestiveAllowed = profile?.suggestive_mode === true;
+  const suggestiveAllowed = persistedSafety
+    ? !persistedSafety.safeMode && persistedSafety.suggestiveMode
+    : profile?.suggestive_mode === true;
+  const adultAllowed = persistedSafety
+    ? !persistedSafety.safeMode && persistedSafety.adultMode
+    : false;
 
   return Object.entries(CAPABILITY_META).map(([cap, meta]) => {
     const flagKey = CAP_TO_MODEL_FLAG[cap] as keyof (typeof MODEL_REGISTRY)[number] | undefined;
@@ -355,7 +363,9 @@ export async function getCapabilityTruth(
     const hasActiveProvider = capableModels.some((m) =>
       activeProviders.has(m.provider),
     );
-    const blockedBySettings = SETTINGS_GATED.has(cap) && !suggestiveAllowed;
+    const blockedBySettings = cap === 'adult_18plus_image'
+      ? !!appSlug && !adultAllowed
+      : SETTINGS_GATED.has(cap) && !suggestiveAllowed;
 
     // Derive states
     let state: CapabilityState;
@@ -369,7 +379,11 @@ export async function getCapabilityTruth(
     } else if (blockedBySettings) {
       state = 'BLOCKED_BY_SETTINGS';
       implementationState = 'BLOCKED_BY_SETTINGS';
-      reason = 'Capability is gated by safety settings (suggestive_mode).';
+      if (cap === 'adult_18plus_image') {
+        reason = 'Adult 18+ image generation is gated for this app. Set safeMode=false and adultMode=true in Admin → App Safety.';
+      } else {
+        reason = 'Capability is gated by safety settings (suggestive_mode).';
+      }
     } else if (cap === 'realtime_voice' && !process.env.REALTIME_SERVICE_URL?.trim()) {
       // Realtime voice requires a separately-deployed WebSocket service in
       // addition to an OpenAI provider. Without REALTIME_SERVICE_URL the
