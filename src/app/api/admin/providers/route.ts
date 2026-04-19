@@ -83,15 +83,16 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const data = createSchema.parse(body)
-    const masked = maskApiKey(data.apiKey)
-    const encryptedKey = data.apiKey ? encryptVaultKey(data.apiKey) : ''
+    const normalizedApiKey = data.apiKey.trim()
+    const masked = maskApiKey(normalizedApiKey)
+    const encryptedKey = normalizedApiKey ? encryptVaultKey(normalizedApiKey) : ''
     const provider = await prisma.aiProvider.create({
       data: {
         ...data,
         apiKey: encryptedKey,
         maskedPreview: masked,
-        healthStatus: data.apiKey ? 'configured' : 'unconfigured',
-        healthMessage: data.apiKey ? 'Key configured · not yet tested' : 'No API key configured',
+        healthStatus: normalizedApiKey ? 'configured' : 'unconfigured',
+        healthMessage: normalizedApiKey ? 'Key configured · not yet tested' : 'No API key configured',
       },
     })
     // Return without raw key

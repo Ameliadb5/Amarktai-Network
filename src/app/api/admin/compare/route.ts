@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { POST as handleAdminBrainTest } from '@/app/api/admin/brain/test/route'
 
 interface ComparisonResult {
   provider: string
@@ -33,17 +34,9 @@ export async function POST(req: NextRequest) {
     const promises = modelsToCompare.map(async (m: { provider: string; model: string }) => {
       const start = Date.now()
       try {
-        // Use the admin brain-test endpoint — it has session auth bypass, correct
-        // schema, and handles specialist routing. Sending to /api/brain/request
-        // would require appId + appSecret which are not available here.
-        const testUrl = new URL('/api/admin/brain/test', req.url)
-        const response = await fetch(testUrl.toString(), {
+        const internalReq = new NextRequest(new URL('/api/admin/brain/test', req.url).toString(), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // Forward cookies so session auth is preserved across the internal call
-            cookie: req.headers.get('cookie') ?? '',
-          },
+          headers: req.headers,
           body: JSON.stringify({
             message: prompt,
             taskType: capability || 'chat',
@@ -52,6 +45,7 @@ export async function POST(req: NextRequest) {
             appSlug: appSlug || '__admin_test__',
           }),
         })
+        const response = await handleAdminBrainTest(internalReq)
         const data = await response.json()
         const latencyMs = Date.now() - start
 

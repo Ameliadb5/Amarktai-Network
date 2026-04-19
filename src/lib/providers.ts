@@ -5,6 +5,8 @@
  * This file MUST NOT be imported from client components.
  */
 
+import { decryptVaultKey } from '@/lib/crypto-vault'
+
 /**
  * Generate a safe masked preview of an API key.
  * Shows prefix (up to 8 chars or up to the first '-') and last 4 chars.
@@ -27,6 +29,21 @@ export interface HealthCheckResult {
   message: string
 }
 
+function normalizeApiKey(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  if (trimmed.toLowerCase().startsWith('bearer ')) {
+    return trimmed.slice(7).trim()
+  }
+  return trimmed
+}
+
+function resolveStoredApiKey(rawStoredKey: string): string {
+  const decrypted = decryptVaultKey(rawStoredKey)
+  const candidate = decrypted ?? rawStoredKey
+  return normalizeApiKey(candidate)
+}
+
 /**
  * Run a live health check for the given provider.
  * Returns a truthful status — never fakes healthy.
@@ -37,6 +54,13 @@ export async function runProviderHealthCheck(
   baseUrl: string,
 ): Promise<HealthCheckResult> {
   if (!apiKey) return { status: 'unconfigured', message: 'No API key configured' }
+  const resolvedApiKey = resolveStoredApiKey(apiKey)
+  if (!resolvedApiKey || resolvedApiKey.startsWith('v1:')) {
+    return {
+      status: 'error',
+      message: 'Stored API key could not be decrypted. Verify VAULT_ENCRYPTION_KEY configuration.',
+    }
+  }
 
   const timeout = 10_000 // 10 s
 
@@ -45,7 +69,7 @@ export async function runProviderHealthCheck(
       case 'openai': {
         const endpoint = `${baseUrl || 'https://api.openai.com'}/v1/models`
         const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${apiKey}` },
+          headers: { Authorization: `Bearer ${resolvedApiKey}` },
           signal: AbortSignal.timeout(timeout),
         })
         if (res.ok) return { status: 'healthy', message: 'Connected · models endpoint responding' }
@@ -57,7 +81,7 @@ export async function runProviderHealthCheck(
       case 'groq': {
         const endpoint = `${baseUrl || 'https://api.groq.com/openai'}/v1/models`
         const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${apiKey}` },
+          headers: { Authorization: `Bearer ${resolvedApiKey}` },
           signal: AbortSignal.timeout(timeout),
         })
         if (res.ok) return { status: 'healthy', message: 'Connected · Groq API responding' }
@@ -69,7 +93,7 @@ export async function runProviderHealthCheck(
       case 'deepseek': {
         const endpoint = `${baseUrl || 'https://api.deepseek.com'}/v1/models`
         const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${apiKey}` },
+          headers: { Authorization: `Bearer ${resolvedApiKey}` },
           signal: AbortSignal.timeout(timeout),
         })
         if (res.ok) return { status: 'healthy', message: 'Connected · DeepSeek API responding' }
@@ -83,7 +107,7 @@ export async function runProviderHealthCheck(
         const endpoint = `${baseUrl || 'https://openrouter.ai/api'}/v1/models`
         const res = await fetch(endpoint, {
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${resolvedApiKey}`,
             'HTTP-Referer': 'https://amarktai.network',
             'X-Title': 'AmarktAI Network',
           },
@@ -98,7 +122,7 @@ export async function runProviderHealthCheck(
       case 'together': {
         const endpoint = `${baseUrl || 'https://api.together.xyz'}/v1/models`
         const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${apiKey}` },
+          headers: { Authorization: `Bearer ${resolvedApiKey}` },
           signal: AbortSignal.timeout(timeout),
         })
         if (res.ok) return { status: 'healthy', message: 'Connected · Together AI API responding' }
@@ -109,7 +133,7 @@ export async function runProviderHealthCheck(
 
       case 'gemini': {
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(resolvedApiKey)}`,
           { signal: AbortSignal.timeout(timeout) },
         )
         if (res.ok) return { status: 'healthy', message: 'Connected · Gemini API responding' }
@@ -121,7 +145,7 @@ export async function runProviderHealthCheck(
       case 'grok': {
         const endpoint = `${baseUrl || 'https://api.x.ai'}/v1/models`
         const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${apiKey}` },
+          headers: { Authorization: `Bearer ${resolvedApiKey}` },
           signal: AbortSignal.timeout(timeout),
         })
         if (res.ok) return { status: 'healthy', message: 'Connected · xAI API responding' }
@@ -131,13 +155,52 @@ export async function runProviderHealthCheck(
       }
 
       case 'huggingface': {
-        const res = await fetch('https://huggingface.co/api/whoami', {
-          headers: { Authorization: `Bearer ${apiKey}` },
+        const whoamiRes = await fetch('https://huggingface.co/api/whoami-v2', {
+          headers: { Authorization: `Bearer ${resolvedApiKey}` },
           signal: AbortSignal.timeout(timeout),
         })
-        if (res.ok) return { status: 'healthy', message: 'Connected · Hugging Face API responding' }
-        if (res.status === 401) return { status: 'error', message: 'Invalid API key (401 Unauthorized)' }
-        return { status: 'degraded', message: `HTTP ${res.status} from Hugging Face API` }
+        if (whoamiRes.ok) {
+          return { status: 'healthy', message: 'Connected · Hugging Face account endpoint responding' }
+        }
+
+        // Some tokens can run inference even when whoami is restricted; verify
+        // the exact path used by runtime image/audio routes before marking invalid.
+        const inferenceRes = await fetch(
+          'https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${resolvedApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ inputs: 'health check' }),
+            signal: AbortSignal.timeout(timeout),
+          },
+        )
+
+        if (inferenceRes.ok || inferenceRes.status === 503) {
+          return {
+            status: 'degraded',
+            message:
+              `Account endpoint HTTP ${whoamiRes.status}, but inference access is valid. ` +
+              'Token is usable for runtime Hugging Face inference routes.',
+          }
+        }
+        if (inferenceRes.status === 401 || inferenceRes.status === 403) {
+          return {
+            status: 'error',
+            message:
+              `Hugging Face token rejected by inference endpoint (HTTP ${inferenceRes.status}). ` +
+              'Invalid token or missing model/inference access scope.',
+          }
+        }
+
+        return {
+          status: 'degraded',
+          message:
+            `Hugging Face health check mismatch: whoami HTTP ${whoamiRes.status}, ` +
+            `inference HTTP ${inferenceRes.status}.`,
+        }
       }
 
       case 'anthropic': {
@@ -146,7 +209,7 @@ export async function runProviderHealthCheck(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
+            'x-api-key': resolvedApiKey,
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
@@ -168,7 +231,7 @@ export async function runProviderHealthCheck(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${resolvedApiKey}`,
           },
           body: JSON.stringify({
             model: 'command-r',
@@ -185,7 +248,7 @@ export async function runProviderHealthCheck(
       case 'qwen': {
         const endpoint = `${baseUrl || 'https://dashscope-intl.aliyuncs.com/compatible-mode'}/v1/models`
         const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${apiKey}` },
+          headers: { Authorization: `Bearer ${resolvedApiKey}` },
           signal: AbortSignal.timeout(timeout),
         })
         if (res.ok) return { status: 'healthy', message: 'Connected · Qwen/DashScope API responding' }
@@ -201,7 +264,7 @@ export async function runProviderHealthCheck(
       case 'mistral': {
         const endpoint = `${baseUrl || 'https://api.mistral.ai'}/v1/models`
         const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${apiKey}` },
+          headers: { Authorization: `Bearer ${resolvedApiKey}` },
           signal: AbortSignal.timeout(timeout),
         })
         if (res.ok) return { status: 'healthy', message: 'Connected · Mistral AI API responding' }
