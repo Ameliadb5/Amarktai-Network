@@ -304,7 +304,9 @@ function mapExplicitTaskTypeToCapabilities(taskType: string): CapabilityClass[] 
   if (t === 'suggestive_video_generation') return ['suggestive_video_generation'];
   if (t === 'research_search' || t === 'research') return ['research_search'];
   if (t === 'deep_research') return ['deep_research'];
-  if (t === 'onboarding_assistant') return ['deep_reasoning'];
+  // Onboarding assistant requires structured planning outputs (commands/env/code/verification),
+  // so we route it through the reasoning class and keep it off voice/image specialist routes.
+  if (t === 'onboarding_assistant') return ['deep_reasoning']; // structured onboarding planning requires reasoning routes only
 
   return [];
 }

@@ -35,7 +35,7 @@ export function mapHealthStatusToTruthState(
   status: HealthCheckResult['status'],
 ): ProviderTruthState {
   if (status === 'healthy') return 'WORKING'
-  if (status === 'error' || status === 'unconfigured' || status === 'disabled') return 'MISCONFIGURED'
+  if (status === 'error' || status === 'unconfigured') return 'MISCONFIGURED'
   return 'UNAVAILABLE'
 }
 

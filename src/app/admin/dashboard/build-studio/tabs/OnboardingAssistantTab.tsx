@@ -158,8 +158,6 @@ export default function OnboardingAssistantTab() {
           appId: '__admin_test__',
           appSecret: 'admin-test-secret',
           taskType: 'onboarding_assistant',
-          providerKey: 'openai',
-          modelId: 'gpt-4o',
           message: `${SYSTEM_PROMPT}\n\n---\n\nOperator request: ${appDescription}`,
         }),
       })

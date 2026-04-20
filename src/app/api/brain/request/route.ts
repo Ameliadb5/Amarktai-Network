@@ -190,8 +190,9 @@ export async function POST(request: NextRequest) {
 
   if (!capabilityResolution.routeResult.allSatisfied) {
     const missing = capabilityResolution.routeResult.missingCapabilities[0] ?? 'Capability is unavailable'
-    const blockedByPolicy =
-      /requires adult mode|requires suggestive mode|onboarding/i.test(missing)
+    const blockedByPolicy = capabilityResolution.routeResult.routes.some(
+      (route) => !route.available && SETTINGS_BLOCKED_CAPABILITIES.has(route.capability),
+    )
     return NextResponse.json(
       {
         ...errorResponse({
@@ -389,11 +390,10 @@ export async function POST(request: NextRequest) {
   }).catch(() => { /* webhook delivery errors must not affect the response */ })
 
   // ── Usage metering + provider reliability ─────────────────────────────
+  const tokenEstimate = estimateTokenCounts(body.message, result.output ?? '')
   try {
-    const estimatedInputTokens = Math.max(1, Math.ceil(body.message.length / 4))
-    const estimatedOutputTokens = Math.max(0, Math.ceil((result.output ?? '').length / 4))
     const estimatedCost = result.routedModel
-      ? estimateCostUsd(result.routedModel, estimatedInputTokens + estimatedOutputTokens)
+      ? estimateCostUsd(result.routedModel, tokenEstimate.inputTokens + tokenEstimate.outputTokens)
       : 0
     await recordUsage({
       appSlug: app.slug,
@@ -401,8 +401,8 @@ export async function POST(request: NextRequest) {
       provider: result.routedProvider ?? 'unknown',
       model: result.routedModel ?? '',
       success,
-      inputTokens: estimatedInputTokens,
-      outputTokens: estimatedOutputTokens,
+      inputTokens: tokenEstimate.inputTokens,
+      outputTokens: tokenEstimate.outputTokens,
       latencyMs,
       costUsdCents: Math.max(0, Math.round(estimatedCost * 100)),
     })
@@ -521,10 +521,8 @@ export async function POST(request: NextRequest) {
     validationPassed: result.validationUsed ? !result.warnings.some(w => w.includes('Validator flagged')) : null,
   })
 
-  const estimatedInputTokens = Math.max(1, Math.ceil(body.message.length / 4))
-  const estimatedOutputTokens = Math.max(0, Math.ceil((result.output ?? '').length / 4))
   const estimatedCostUsd = result.routedModel
-    ? estimateCostUsd(result.routedModel, estimatedInputTokens + estimatedOutputTokens)
+    ? estimateCostUsd(result.routedModel, tokenEstimate.inputTokens + tokenEstimate.outputTokens)
     : 0
   let cumulativeCostUsd: number | null = null
   try {
@@ -563,6 +561,15 @@ export async function POST(request: NextRequest) {
 }
 
 // ── Helper ────────────────────────────────────────────────────────────────────
+
+function estimateTokenCounts(input: string, output: string): { inputTokens: number; outputTokens: number } {
+  // Heuristic estimate only: ~4 chars/token works as a coarse average for UI/runtime cost visibility.
+  // Real provider tokenization varies by language/content and may differ from this approximation.
+  return {
+    inputTokens: Math.max(1, Math.ceil(input.length / 4)),
+    outputTokens: Math.max(0, Math.ceil(output.length / 4)),
+  }
+}
 
 function errorResponse(opts: {
   traceId: string
@@ -616,3 +623,9 @@ function mapAppPersonality(category: string): PersonalityType {
   }
   return 'professional'
 }
+const SETTINGS_BLOCKED_CAPABILITIES = new Set([
+  'adult_18plus_image',
+  'suggestive_image_generation',
+  'suggestive_video_planning',
+  'suggestive_video_generation',
+])

@@ -76,6 +76,7 @@ function checkModalitySupport(model: ModelEntry | null | undefined, modality: st
 const CONSENSUS_LENGTH_RATIO_THRESHOLD = 1.2
 // Warn about differing consensus outputs if length difference exceeds this (chars)
 const CONSENSUS_LENGTH_DIFF_THRESHOLD = 200
+const FALLBACK_DISABLED_WARNING = 'Primary model failed and fallback is disabled by policy.'
 
 /** Task types that require image-generation routing (evaluated once at module load). */
 const IMAGE_TASK_TYPES_SET = new Set(['image_generation', 'image', 'image_gen', 'generate_image', 'create_image', 'image_editing'])
@@ -957,9 +958,7 @@ export async function orchestrate(opts: {
             classification,
           }
         }
-        if (!allowFallback) {
-          warnings.push('Primary model failed and fallback is disabled by policy.')
-        }
+        if (!allowFallback) warnings.push(FALLBACK_DISABLED_WARNING)
       }
 
       // ── Semantic cache lookup (text-only tasks) ──────────────────────
@@ -1077,9 +1076,7 @@ export async function orchestrate(opts: {
           errors.push(fallback.error ?? 'Fallback provider also failed')
           } // end fallbackCapabilityOk else
         }
-        if (!allowFallback) {
-          warnings.push('Primary model failed and fallback is disabled by policy.')
-        }
+        if (!allowFallback) warnings.push(FALLBACK_DISABLED_WARNING)
       }
 
       // Cache successful primary response

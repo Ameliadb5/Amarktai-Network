@@ -84,6 +84,10 @@ function resolveSpecialistType(
   return null
 }
 
+function isRoutingExcludedTask(taskType: string): boolean {
+  return taskType === 'onboarding_assistant'
+}
+
 /** Invoke an internal route handler directly (no network self-fetch). */
 function buildInternalJsonRequest(
   request: NextRequest,
@@ -201,7 +205,7 @@ export async function POST(request: NextRequest) {
   // This prevents the critical bug where taskType="chat" + message="create an image"
   // detects image_generation capability but no specialist handler matches, causing
   // fallthrough to orchestrate() which routes to gpt-4o-mini for a text response.
-  const specialistType = body.taskType === 'onboarding_assistant'
+  const specialistType = isRoutingExcludedTask(body.taskType)
     ? null
     : resolveSpecialistType(capabilityResolution.primaryCapability, capabilities)
   const isSpecialist = specialistType !== null
