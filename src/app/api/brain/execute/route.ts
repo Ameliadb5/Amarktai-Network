@@ -30,6 +30,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { POST as handleRequest } from '@/app/api/brain/request/route'
 import { POST as handleAdminTest } from '@/app/api/admin/brain/test/route'
+import { resolveCapability } from '@/lib/capability-engine'
 
 /** Convert execute-route body to the admin/brain/test schema. */
 function toAdminTestBody(raw: Record<string, unknown>): Record<string, unknown> {
@@ -91,6 +92,20 @@ function normaliseToStandard(raw: Record<string, unknown>): Record<string, unkno
   }
 }
 
+function applyResolvedTaskType(body: Record<string, unknown>): Record<string, unknown> {
+  const metadata = typeof body.metadata === 'object' && body.metadata !== null
+    ? body.metadata as Record<string, unknown>
+    : {}
+  const requestedCapability =
+    typeof metadata.requested_capability === 'string'
+      ? metadata.requested_capability
+      : undefined
+  const taskType = String(requestedCapability ?? body.taskType ?? 'chat')
+  const message = String(body.message ?? '')
+  const resolved = resolveCapability(taskType, message)
+  return { ...body, taskType: resolved.primaryCapability }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let raw: Record<string, unknown>
   try {
@@ -118,16 +133,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // ── Standard shape — pass through unchanged ──────────────────────────────
   if ('appId' in raw && 'taskType' in raw && 'message' in raw) {
+    const resolvedRaw = applyResolvedTaskType(raw)
     const stdReq = new NextRequest(request.url, {
       method: request.method,
       headers: request.headers,
-      body: JSON.stringify(raw),
+      body: JSON.stringify(resolvedRaw),
     })
     return handleRequest(stdReq) as Promise<NextResponse>
   }
 
   // ── Canonical / legacy shape — normalise and forward ────────────────────
-  const normalised = normaliseToStandard(raw)
+  const normalised = applyResolvedTaskType(normaliseToStandard(raw))
   const normReq = new NextRequest(request.url, {
     method: request.method,
     headers: request.headers,

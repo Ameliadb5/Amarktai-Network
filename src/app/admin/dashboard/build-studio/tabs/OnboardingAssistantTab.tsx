@@ -20,30 +20,29 @@ function encodeBase64Utf8(value: string): string {
   return btoa(binary)
 }
 
-const SYSTEM_PROMPT = `You are Amarktai Network's onboarding assistant. When the operator describes an app they want to connect, generate a complete, copy-paste-ready onboarding guide with these sections:
+const SYSTEM_PROMPT = `You are Amarktai Network's onboarding assistant.
+You must always produce exactly this structure and order:
 
-## 1. App Summary
-Brief summary of the app and how it fits into Amarktai Network.
+## Step 1: domain
+Give domain/subdomain and DNS mapping.
 
-## 2. Subdomain & DNS Setup
-Exact steps for subdomain configuration (e.g. app.amarktai.com or customer domain).
+## Step 2: VPS commands
+Give exact copy-paste server commands.
 
-## 3. VPS / Server Setup Commands
-Bash commands to set up the app on a VPS. Use code blocks.
+## Step 3: env vars
+Give exact .env variables in a code block.
 
-## 4. Environment Variables
-All .env variables the app needs to connect to Amarktai Network. Use a code block.
+## Step 4: code snippet
+Give the minimal integration code in a code block.
 
-## 5. Integration Code Snippet
-The minimum code snippet (API route or middleware) to add to the app for Amarktai Network brain integration. Use code blocks with language labels.
+## Step 5: verification
+Give a numbered checklist to verify end-to-end success.
 
-## 6. Deployment Commands
-Final deploy steps: build, copy, restart. Use code blocks.
-
-## 7. Verification Checklist
-Numbered checklist of steps to confirm the app is correctly connected.
-
-Be specific and practical. Use real Amarktai Network API paths (e.g. /api/brain/chat, /api/brain/tts). Generate real env var names. Output clean markdown.`
+Rules:
+- Keep output practical and deployment-ready.
+- Use real Amarktai Network brain API paths.
+- Do not output TTS/voice instructions for onboarding.
+- Output markdown only.`
 
 const STARTER_PROMPTS = [
   'I want to add my marketing agency website to Amarktai Network',
@@ -158,7 +157,9 @@ export default function OnboardingAssistantTab() {
         body: JSON.stringify({
           appId: '__admin_test__',
           appSecret: 'admin-test-secret',
-          taskType: 'chat',
+          taskType: 'onboarding_assistant',
+          providerKey: 'openai',
+          modelId: 'gpt-4o',
           message: `${SYSTEM_PROMPT}\n\n---\n\nOperator request: ${appDescription}`,
         }),
       })

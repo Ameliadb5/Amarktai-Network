@@ -588,9 +588,11 @@ export async function orchestrate(opts: {
    * ensuring the agent persona is applied without polluting the user message.
    */
   agentSystemPrompt?: string
+  /** Explicit fallback opt-in. Silent fallback is disabled by default. */
+  allowFallback?: boolean
 }): Promise<OrchestrationResult> {
   const start = Date.now()
-  const { appSlug, appCategory, taskType, message, providerOverride, modelOverride, budgetMode, agentSystemPrompt } = opts
+  const { appSlug, appCategory, taskType, message, providerOverride, modelOverride, budgetMode, agentSystemPrompt, allowFallback = false } = opts
 
   // Hydrate smart-router state from Redis on first request (fire-and-forget)
   loadSmartRouterState().catch(() => {})
@@ -870,7 +872,7 @@ export async function orchestrate(opts: {
       if (!result.ok) {
         errors.push(result.error ?? 'Premium escalation provider call failed')
         // Try fallback from routing decision
-        if (routingDecision.fallbackModels.length > 0) {
+        if (allowFallback && routingDecision.fallbackModels.length > 0) {
           const fb = routingDecision.fallbackModels[0]
           warnings.push(`Premium escalation failed — attempting fallback to ${fb.provider}/${fb.model_id}`)
           const fallback = await callProvider(fb.provider, fb.model_id, specialistMessage, agentSystemPrompt)
@@ -955,6 +957,9 @@ export async function orchestrate(opts: {
             classification,
           }
         }
+        if (!allowFallback) {
+          warnings.push('Primary model failed and fallback is disabled by policy.')
+        }
       }
 
       // ── Semantic cache lookup (text-only tasks) ──────────────────────
@@ -1016,7 +1021,7 @@ export async function orchestrate(opts: {
         // Attempt fallback if a secondary is available, but ONLY if the secondary
         // supports the required modality. Never fall back to a text model for an
         // image/voice/video/embeddings task — that produces wrong-type output.
-        if (decision.secondaryProvider) {
+        if (allowFallback && decision.secondaryProvider) {
           const secondaryModel = getModelById(
             decision.secondaryProvider.providerKey,
             decision.secondaryProvider.model,
@@ -1071,6 +1076,9 @@ export async function orchestrate(opts: {
           }
           errors.push(fallback.error ?? 'Fallback provider also failed')
           } // end fallbackCapabilityOk else
+        }
+        if (!allowFallback) {
+          warnings.push('Primary model failed and fallback is disabled by policy.')
         }
       }
 

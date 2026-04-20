@@ -12,7 +12,7 @@ import { POST as handleBrainAdultImage } from '@/app/api/brain/adult-image/route
 import { POST as handleBrainResearch } from '@/app/api/brain/research/route'
 import { POST as handleBrainVideoGenerate } from '@/app/api/brain/video-generate/route'
 import {
-  classifyCapabilities,
+  resolveCapability,
   resolveCapabilityRoutes,
   type CapabilityClass,
 } from '@/lib/capability-engine'
@@ -168,19 +168,42 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const capabilities = classifyCapabilities(body.taskType, body.message)
   const safetyConfig = body.appSlug ? getAppSafetyConfig(body.appSlug) : undefined
-  const capabilityRoutes = resolveCapabilityRoutes({
-    capabilities,
+  const capabilityResolution = resolveCapability(body.taskType, body.message, {
     adultMode: safetyConfig?.adultMode,
     safeMode: safetyConfig?.safeMode,
+    suggestiveMode: safetyConfig?.suggestiveMode,
   })
+  const capabilities = capabilityResolution.capabilities
+  const capabilityRoutes = capabilityResolution.routeResult
+
+  if (!capabilityRoutes.allSatisfied) {
+    const reason = capabilityRoutes.missingCapabilities[0] ?? 'Capability unavailable'
+    return NextResponse.json(
+      {
+        success: false,
+        executed: false,
+        traceId,
+        capability: capabilities,
+        routedProvider: null,
+        routedModel: null,
+        executionMode: 'specialist',
+        fallback_used: false,
+        error: reason,
+        latencyMs: Date.now() - start,
+        timestamp: new Date().toISOString(),
+      },
+      { status: 503 },
+    )
+  }
 
   // Resolve specialist type from BOTH taskType AND detected capabilities.
   // This prevents the critical bug where taskType="chat" + message="create an image"
   // detects image_generation capability but no specialist handler matches, causing
   // fallthrough to orchestrate() which routes to gpt-4o-mini for a text response.
-  const specialistType = resolveSpecialistType(body.taskType, capabilities)
+  const specialistType = body.taskType === 'onboarding_assistant'
+    ? null
+    : resolveSpecialistType(capabilityResolution.primaryCapability, capabilities)
   const isSpecialist = specialistType !== null
 
   // Specialist tasks (image, TTS, STT, research, video, …) ALWAYS use the

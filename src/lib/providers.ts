@@ -29,6 +29,16 @@ export interface HealthCheckResult {
   message: string
 }
 
+export type ProviderTruthState = 'WORKING' | 'MISCONFIGURED' | 'UNAVAILABLE'
+
+export function mapHealthStatusToTruthState(
+  status: HealthCheckResult['status'],
+): ProviderTruthState {
+  if (status === 'healthy') return 'WORKING'
+  if (status === 'error' || status === 'unconfigured' || status === 'disabled') return 'MISCONFIGURED'
+  return 'UNAVAILABLE'
+}
+
 const BEARER_PREFIX = 'bearer '
 
 function normalizeApiKey(raw: string): string {
@@ -74,24 +84,36 @@ export async function runProviderHealthCheck(
   try {
     switch (providerKey) {
       case 'openai': {
-        const endpoint = `${baseUrl || 'https://api.openai.com'}/v1/models`
+        const endpoint = `${baseUrl || 'https://api.openai.com'}/v1/chat/completions`
         const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${resolvedApiKey}` },
+          method: 'POST',
+          headers: { Authorization: `Bearer ${resolvedApiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: 'health check' }],
+            max_tokens: 1,
+          }),
           signal: AbortSignal.timeout(timeout),
         })
-        if (res.ok) return { status: 'healthy', message: 'Connected · models endpoint responding' }
+        if (res.ok) return { status: 'healthy', message: 'Connected · chat execution path responding' }
         if (res.status === 401) return { status: 'error', message: 'Invalid API key (401 Unauthorized)' }
         if (res.status === 429) return { status: 'degraded', message: 'Rate limited (429) · key valid but quota exceeded' }
-        return { status: 'degraded', message: `HTTP ${res.status} from OpenAI models endpoint` }
+        return { status: 'degraded', message: `HTTP ${res.status} from OpenAI chat execution path` }
       }
 
       case 'groq': {
-        const endpoint = `${baseUrl || 'https://api.groq.com/openai'}/v1/models`
+        const endpoint = `${baseUrl || 'https://api.groq.com/openai'}/v1/chat/completions`
         const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${resolvedApiKey}` },
+          method: 'POST',
+          headers: { Authorization: `Bearer ${resolvedApiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'llama-3.1-8b-instant',
+            messages: [{ role: 'user', content: 'health check' }],
+            max_tokens: 1,
+          }),
           signal: AbortSignal.timeout(timeout),
         })
-        if (res.ok) return { status: 'healthy', message: 'Connected · Groq API responding' }
+        if (res.ok) return { status: 'healthy', message: 'Connected · Groq execution path responding' }
         if (res.status === 401) return { status: 'error', message: 'Invalid API key (401 Unauthorized)' }
         if (res.status === 429) return { status: 'degraded', message: 'Rate limited (429)' }
         return { status: 'degraded', message: `HTTP ${res.status} from Groq API` }

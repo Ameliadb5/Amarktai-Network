@@ -272,6 +272,83 @@ export function classifyCapabilities(
   return Array.from(matched);
 }
 
+export interface ResolveCapabilityResult {
+  taskType: string;
+  primaryCapability: CapabilityClass;
+  capabilities: CapabilityClass[];
+  routeResult: CapabilityRouteResult;
+}
+
+export interface ResolveCapabilityOptions
+  extends Omit<CapabilityRouteRequest, 'capabilities'> {}
+
+function mapExplicitTaskTypeToCapabilities(taskType: string): CapabilityClass[] {
+  const t = (taskType ?? '').toLowerCase().trim();
+
+  if (!t || t === 'chat' || t === 'general_chat') return ['general_chat'];
+  if (t === 'deep_reasoning' || t === 'reasoning') return ['deep_reasoning'];
+  if (t === 'coding' || t === 'code') return ['coding'];
+  if (t === 'retrieval' || t === 'rag') return ['retrieval'];
+  if (t === 'embeddings' || t === 'embedding') return ['embeddings'];
+  if (t === 'reranking' || t === 'rerank') return ['reranking'];
+  if (t === 'moderation') return ['moderation'];
+  if (t === 'image_generation' || t === 'image' || t === 'generate_image' || t === 'create_image') return ['image_generation'];
+  if (t === 'image_editing' || t === 'image_edit') return ['image_editing'];
+  if (t === 'video_generation' || t === 'video') return ['video_generation'];
+  if (t === 'video_planning') return ['video_planning'];
+  if (t === 'voice_input' || t === 'stt') return ['voice_input'];
+  if (t === 'voice_output' || t === 'tts') return ['voice_output'];
+  if (t === 'realtime_voice') return ['realtime_voice'];
+  if (t === 'adult_18plus_image' || t === 'adult_image') return ['adult_18plus_image'];
+  if (t === 'suggestive_image_generation' || t === 'suggestive' || t === 'suggestive_image') return ['suggestive_image_generation'];
+  if (t === 'suggestive_video_planning') return ['suggestive_video_planning'];
+  if (t === 'suggestive_video_generation') return ['suggestive_video_generation'];
+  if (t === 'research_search' || t === 'research') return ['research_search'];
+  if (t === 'deep_research') return ['deep_research'];
+  if (t === 'onboarding_assistant') return ['deep_reasoning'];
+
+  return [];
+}
+
+function isGenericExplicitCapability(cap: CapabilityClass): boolean {
+  return cap === 'general_chat' || cap === 'deep_reasoning';
+}
+
+/**
+ * Authoritative capability resolver.
+ *
+ * Resolution is ALWAYS based on:
+ *  1) explicit taskType mapping
+ *  2) message capability detection
+ *
+ * The explicit taskType remains authoritative for non-generic capabilities.
+ */
+export function resolveCapability(
+  taskType: string,
+  message: string,
+  options?: ResolveCapabilityOptions,
+): ResolveCapabilityResult {
+  const explicitCaps = mapExplicitTaskTypeToCapabilities(taskType);
+  const detectedCaps = classifyCapabilities(taskType, message);
+  const explicitNonGeneric = explicitCaps.some((cap) => !isGenericExplicitCapability(cap));
+  const merged = explicitNonGeneric
+    ? explicitCaps
+    : Array.from(new Set<CapabilityClass>([...explicitCaps, ...detectedCaps]));
+  const capabilities = merged.length > 0 ? merged : ['general_chat'];
+  const routeResult = resolveCapabilityRoutes({
+    ...options,
+    capabilities,
+  });
+  const primaryCapability = explicitCaps[0] ?? detectedCaps[0] ?? capabilities[0];
+
+  return {
+    taskType,
+    primaryCapability,
+    capabilities,
+    routeResult,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Capability resolution: find models that satisfy a capability
 // ---------------------------------------------------------------------------

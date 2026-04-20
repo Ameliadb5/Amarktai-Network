@@ -22,6 +22,8 @@ export interface AudioRecorderProps {
   model?: string
   /** ISO language code for transcription. */
   language?: string
+  /** Emits microphone availability state for clean voice enable/disable behavior. */
+  onAvailabilityChange?: (available: boolean, reason?: string) => void
 }
 
 export default function AudioRecorder({
@@ -29,6 +31,7 @@ export default function AudioRecorder({
   sttEndpoint = '/api/brain/stt',
   model = 'whisper-1',
   language,
+  onAvailabilityChange,
 }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -46,6 +49,7 @@ export default function AudioRecorder({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      onAvailabilityChange?.(true)
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
       mediaRecorderRef.current = mediaRecorder
       chunksRef.current = []
@@ -68,6 +72,8 @@ export default function AudioRecorder({
       mediaRecorder.start()
       setIsRecording(true)
     } catch (err) {
+      const reason = err instanceof Error ? err.message : 'Failed to access microphone'
+      onAvailabilityChange?.(false, reason)
       setError(
         err instanceof Error
           ? `Microphone access denied: ${err.message}`

@@ -46,6 +46,10 @@ export interface BrainResponse {
   latencyMs: number | null
   memoryUsed: boolean         // false until memory layer is built
   fallbackUsed: boolean
+  estimatedCostUsd?: number
+  cumulativeCostUsd?: number | null
+  resolvedCapability?: string
+  resolvedCapabilities?: string[]
   timestamp: string
 }
 

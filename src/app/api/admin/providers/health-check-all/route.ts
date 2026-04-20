@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { runProviderHealthCheck } from '@/lib/providers'
+import { mapHealthStatusToTruthState, runProviderHealthCheck } from '@/lib/providers'
 import { syncProviderHealthFromDB } from '@/lib/sync-provider-health'
 
 // Next.js route-segment cache — GET results are revalidated every 60 seconds.
@@ -86,7 +86,9 @@ export async function POST(req: NextRequest) {
           provider.apiKey,
           provider.baseUrl,
         )
-        status = check.status; message = check.message
+        const truthState = mapHealthStatusToTruthState(check.status)
+        status = check.status
+        message = `[${truthState}] ${check.message}`
       }
 
       return prisma.aiProvider.update({

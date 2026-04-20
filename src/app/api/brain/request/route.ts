@@ -11,18 +11,19 @@ import { saveMemory } from '@/lib/memory'
 import { retrieve } from '@/lib/retrieval-engine'
 import { logRouteOutcome } from '@/lib/learning-engine'
 import { scanContent, blockedExplanation, loadAppSafetyConfigFromDB, getAppSafetyConfig } from '@/lib/content-filter'
-import { getBudgetSummary } from '@/lib/budget-tracker'
+import { estimateCostUsd, getBudgetSummary } from '@/lib/budget-tracker'
 import { runEmotionPipeline, setAppContextWindow, type PersonalityType } from '@/lib/emotion-engine'
 import { runModerationPipeline } from '@/lib/moderation-pipeline'
 import { buildMemoryContext } from '@/lib/federated-memory'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit, getRateLimitHeaders } from '@/lib/rate-limiter'
 import { checkAppBudget } from '@/lib/app-budget-enforcement'
-import { recordUsage } from '@/lib/usage-meter'
+import { getMonthUsage, recordUsage } from '@/lib/usage-meter'
 import { recordProviderMetric } from '@/lib/provider-reliability'
 import { getAppAgent, buildAgentSystemPrompt } from '@/lib/app-agent'
 import { dispatchEvent } from '@/lib/webhook-manager'
 import { emitSystemEvent } from '@/lib/event-bus'
+import { resolveCapability } from '@/lib/capability-engine'
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -173,6 +174,43 @@ export async function POST(request: NextRequest) {
     ? '[App safety mode: Suggestive language, flirting, swearing, and tasteful adult themes are permitted. Explicit sexual acts, genitalia, minors in any adult context, and illegal content are strictly prohibited.]\n\n'
     : ''
 
+  const requestedCapability =
+    typeof body.metadata?.requested_capability === 'string'
+      ? String(body.metadata.requested_capability)
+      : null
+  const capabilityResolution = resolveCapability(
+    requestedCapability ?? body.taskType,
+    body.message,
+    {
+      safeMode: safetyConfig.safeMode,
+      adultMode: safetyConfig.adultMode,
+      suggestiveMode: safetyConfig.suggestiveMode,
+    },
+  )
+
+  if (!capabilityResolution.routeResult.allSatisfied) {
+    const missing = capabilityResolution.routeResult.missingCapabilities[0] ?? 'Capability is unavailable'
+    const blockedByPolicy =
+      /requires adult mode|requires suggestive mode|onboarding/i.test(missing)
+    return NextResponse.json(
+      {
+        ...errorResponse({
+          traceId,
+          taskType: body.taskType,
+          app,
+          error: missing,
+          statusCode: blockedByPolicy ? 403 : 503,
+          latencyMs: Date.now() - start,
+        }),
+        resolvedCapability: capabilityResolution.primaryCapability,
+        resolvedCapabilities: capabilityResolution.capabilities,
+      },
+      { status: blockedByPolicy ? 403 : 503 },
+    )
+  }
+
+  const effectiveTaskType = capabilityResolution.primaryCapability
+
   // ── Load App Agent system prompt (B1 fix) ─────────────────────────────
   // If the app has an active App Agent configured, inject its system prompt
   // into the orchestration call so the agent's tone, rules, and persona are
@@ -292,11 +330,12 @@ export async function POST(request: NextRequest) {
   const result = await orchestrate({
     appSlug: app.slug,
     appCategory: app.category,
-    taskType: body.taskType,
+    taskType: effectiveTaskType,
     message: suggestiveModeNote + emotionContext + federatedMemoryContext + memoryContext + body.message,
     agentSystemPrompt,
     providerOverride: typeof body.metadata?.provider_override === 'string' ? body.metadata.provider_override : undefined,
     modelOverride: typeof body.metadata?.model_override === 'string' ? body.metadata.model_override : undefined,
+    allowFallback: body.metadata?.allow_fallback === true,
   })
 
   const latencyMs = Date.now() - start
@@ -351,14 +390,21 @@ export async function POST(request: NextRequest) {
 
   // ── Usage metering + provider reliability ─────────────────────────────
   try {
+    const estimatedInputTokens = Math.max(1, Math.ceil(body.message.length / 4))
+    const estimatedOutputTokens = Math.max(0, Math.ceil((result.output ?? '').length / 4))
+    const estimatedCost = result.routedModel
+      ? estimateCostUsd(result.routedModel, estimatedInputTokens + estimatedOutputTokens)
+      : 0
     await recordUsage({
       appSlug: app.slug,
-      capability: body.taskType,
+      capability: effectiveTaskType,
       provider: result.routedProvider ?? 'unknown',
       model: result.routedModel ?? '',
       success,
+      inputTokens: estimatedInputTokens,
+      outputTokens: estimatedOutputTokens,
       latencyMs,
-      costUsdCents: 0, // Cost estimation done separately
+      costUsdCents: Math.max(0, Math.round(estimatedCost * 100)),
     })
   } catch { /* metering is best-effort */ }
 
@@ -475,13 +521,26 @@ export async function POST(request: NextRequest) {
     validationPassed: result.validationUsed ? !result.warnings.some(w => w.includes('Validator flagged')) : null,
   })
 
+  const estimatedInputTokens = Math.max(1, Math.ceil(body.message.length / 4))
+  const estimatedOutputTokens = Math.max(0, Math.ceil((result.output ?? '').length / 4))
+  const estimatedCostUsd = result.routedModel
+    ? estimateCostUsd(result.routedModel, estimatedInputTokens + estimatedOutputTokens)
+    : 0
+  let cumulativeCostUsd: number | null = null
+  try {
+    const month = await getMonthUsage(app.slug)
+    cumulativeCostUsd = month.costCents / 100
+  } catch {
+    cumulativeCostUsd = null
+  }
+
   const response: BrainResponse = {
     success,
     traceId,
     app: { id: app.id, name: app.name, slug: app.slug },
     routedProvider: result.routedProvider,
     routedModel: result.routedModel,
-    taskType: body.taskType,
+    taskType: effectiveTaskType,
     executionMode: result.executionMode,
     confidenceScore: result.confidenceScore,
     validationUsed: result.validationUsed,
@@ -492,6 +551,10 @@ export async function POST(request: NextRequest) {
     latencyMs,
     memoryUsed,
     fallbackUsed: result.fallbackUsed,
+    estimatedCostUsd,
+    cumulativeCostUsd,
+    resolvedCapability: capabilityResolution.primaryCapability,
+    resolvedCapabilities: capabilityResolution.capabilities,
     timestamp: new Date().toISOString(),
   }
 
