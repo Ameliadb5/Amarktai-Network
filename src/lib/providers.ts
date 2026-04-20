@@ -29,11 +29,11 @@ export interface HealthCheckResult {
   message: string
 }
 
-export type ProviderTruthState = 'WORKING' | 'MISCONFIGURED' | 'UNAVAILABLE'
+export type ProviderOperationalState = 'WORKING' | 'MISCONFIGURED' | 'UNAVAILABLE'
 
 export function mapHealthStatusToTruthState(
   status: HealthCheckResult['status'],
-): ProviderTruthState {
+): ProviderOperationalState {
   if (status === 'healthy') return 'WORKING'
   if (status === 'error' || status === 'unconfigured') return 'MISCONFIGURED'
   return 'UNAVAILABLE'

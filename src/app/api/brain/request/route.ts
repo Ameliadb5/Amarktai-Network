@@ -25,6 +25,14 @@ import { dispatchEvent } from '@/lib/webhook-manager'
 import { emitSystemEvent } from '@/lib/event-bus'
 import { resolveCapability } from '@/lib/capability-engine'
 
+const SETTINGS_BLOCKED_CAPABILITIES = new Set([
+  'adult_18plus_image',
+  'suggestive_image_generation',
+  'suggestive_video_planning',
+  'suggestive_video_generation',
+])
+const CHARS_PER_TOKEN_ESTIMATE = 4
+
 // ── Request schema ────────────────────────────────────────────────────────────
 
 const requestSchema = z.object({
@@ -566,8 +574,8 @@ function estimateTokenCounts(input: string, output: string): { inputTokens: numb
   // Heuristic estimate only: ~4 chars/token works as a coarse average for UI/runtime cost visibility.
   // Real provider tokenization varies by language/content and may differ from this approximation.
   return {
-    inputTokens: Math.max(1, Math.ceil(input.length / 4)),
-    outputTokens: Math.max(0, Math.ceil(output.length / 4)),
+    inputTokens: Math.max(1, Math.ceil(input.length / CHARS_PER_TOKEN_ESTIMATE)),
+    outputTokens: Math.max(0, Math.ceil(output.length / CHARS_PER_TOKEN_ESTIMATE)),
   }
 }
 
@@ -623,9 +631,3 @@ function mapAppPersonality(category: string): PersonalityType {
   }
   return 'professional'
 }
-const SETTINGS_BLOCKED_CAPABILITIES = new Set([
-  'adult_18plus_image',
-  'suggestive_image_generation',
-  'suggestive_video_planning',
-  'suggestive_video_generation',
-])
