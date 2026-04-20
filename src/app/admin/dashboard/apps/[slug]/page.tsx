@@ -1682,12 +1682,18 @@ function SafetyTab({ appSlug }: { appSlug: string }) {
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6">
         <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Adult 18+ Image Capability</h4>
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-red-400" />
-          <span className="text-xs text-slate-300">UNAVAILABLE — No reliable provider supports unrestricted adult content generation.</span>
+          <span className={`h-2 w-2 rounded-full ${config?.adultMode && !config?.safeMode ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+          <span className="text-xs text-slate-300">
+            {config?.adultMode && !config?.safeMode
+              ? 'ACTIVE — Adult mode enabled. Route: /api/brain/adult-image (HuggingFace SDXL → Together FLUX fallback).'
+              : config?.safeMode
+                ? 'BLOCKED — Safe Mode is ON. Disable Safe Mode and enable Adult Mode to unlock.'
+                : 'INACTIVE — Enable Adult Mode (Safe Mode OFF) to unlock adult image generation.'}
+          </span>
         </div>
         <p className="mt-2 text-[10px] text-slate-500">
-          Even with Adult Mode enabled, image generation for adult content requires a provider that supports it.
-          Currently no registered provider meets this requirement. This is truthful — we do not fake availability.
+          Uses HuggingFace diffusion models (RealVisXL, DreamShaper, SDXL Base) with Together FLUX fallback.
+          All prompts are scanned before generation. CSAM, violence, self-harm, and hate speech are always blocked.
         </p>
       </div>
     </div>

@@ -5,10 +5,47 @@ import Link from 'next/link'
 import { Server, Activity, Settings, Mic, ArrowRight } from 'lucide-react'
 
 const tabs = [
-  { key: 'operations', label: 'Operations', route: '/admin/dashboard/operations', icon: Server, desc: 'Providers, models, budgets, alerts, and readiness.' },
-  { key: 'events', label: 'Events', route: '/admin/dashboard/events', icon: Activity, desc: 'Operational event timelines and diagnostics.' },
-  { key: 'settings', label: 'Settings', route: '/admin/dashboard/access', icon: Settings, desc: 'Access controls and platform configuration.' },
-  { key: 'voice-access', label: 'Voice Access', route: '/admin/dashboard/system/voice-access', icon: Mic, desc: 'Future login-ready voice enrollment and microphone states.' },
+  {
+    key: 'operations',
+    label: 'Operations',
+    route: '/admin/dashboard/operations',
+    icon: Server,
+    desc: 'Providers, models, budgets, alerts, and readiness.',
+    links: [
+      { label: 'Operations', href: '/admin/dashboard/operations' },
+    ],
+  },
+  {
+    key: 'events',
+    label: 'Events',
+    route: '/admin/dashboard/events',
+    icon: Activity,
+    desc: 'Operational event timelines and diagnostics.',
+    links: [
+      { label: 'Events', href: '/admin/dashboard/events' },
+    ],
+  },
+  {
+    key: 'settings',
+    label: 'Settings',
+    route: '/admin/dashboard/access',
+    icon: Settings,
+    desc: 'Access controls and platform configuration.',
+    links: [
+      { label: 'Access & Settings', href: '/admin/dashboard/access' },
+    ],
+  },
+  {
+    key: 'voice-access',
+    label: 'Voice Access',
+    route: '/admin/dashboard/system/voice-access',
+    icon: Mic,
+    desc: 'Voice assistant config, wake phrase, login bridge, and enrollment.',
+    links: [
+      { label: 'Voice Access Setup', href: '/admin/dashboard/system/voice-access' },
+      { label: 'Voice Login Bridge', href: '/admin/voice-login' },
+    ],
+  },
 ] as const
 
 type TabKey = (typeof tabs)[number]['key']
@@ -33,14 +70,18 @@ export default function SystemHubPage() {
       </div>
 
       <div className="card-premium p-6">
-        <h2 className="text-lg font-semibold text-white">{tab.label}</h2>
-        <p className="mt-2 text-sm text-slate-400">{tab.desc}</p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">Condensed operator-critical controls</div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">Clear status, errors, and next actions</div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">Future-ready voice access integration path</div>
+        <div className="flex items-center gap-3 mb-3">
+          <tab.icon className="h-5 w-5 text-cyan-300" />
+          <h2 className="text-lg font-semibold text-white">{tab.label}</h2>
         </div>
-        <Link href={tab.route} className="btn-primary mt-5 inline-flex">Open {tab.label} <ArrowRight className="h-4 w-4" /></Link>
+        <p className="text-sm text-slate-400">{tab.desc}</p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          {tab.links.map(l => (
+            <Link key={l.href} href={l.href} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition-all">
+              {l.label} <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   )

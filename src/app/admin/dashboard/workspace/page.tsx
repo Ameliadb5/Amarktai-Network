@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
-import { FlaskConical, Rocket, ImageIcon, Mic, Film, Music, Layers, Workflow, GitBranch } from 'lucide-react'
+import { FlaskConical, Rocket, ImageIcon, Mic, Film, Music, Layers, Workflow, GitBranch, Bot, HelpCircle } from 'lucide-react'
 
 const TestAITab = dynamic(() => import('../build-studio/tabs/TestAITab'), { ssr: false })
 const CreateAppTab = dynamic(() => import('../build-studio/tabs/CreateAppTab'), { ssr: false })
@@ -12,8 +12,10 @@ const CreatorStudioTab = dynamic(() => import('../build-studio/tabs/CreatorStudi
 const WorkflowBuilderTab = dynamic(() => import('../build-studio/tabs/WorkflowBuilderTab'), { ssr: false })
 const GitHubTab = dynamic(() => import('../build-studio/tabs/GitHubTab'), { ssr: false })
 const CompareTab = dynamic(() => import('../build-studio/tabs/CompareTab'), { ssr: false })
+const OnboardingAssistantTab = dynamic(() => import('../build-studio/tabs/OnboardingAssistantTab'), { ssr: false })
+const AIPartnerWidget = dynamic(() => import('@/components/AIPartnerWidget'), { ssr: false })
 
-type TabKey = 'test-ai' | 'build-app' | 'images' | 'voice' | 'video' | 'music' | 'compare' | 'workflows' | 'export'
+type TabKey = 'test-ai' | 'build-app' | 'images' | 'voice' | 'video' | 'music' | 'compare' | 'workflows' | 'export' | 'onboard'
 
 const tabs: { key: TabKey; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }[] = [
   { key: 'test-ai', label: 'Test AI', icon: FlaskConical },
@@ -25,11 +27,13 @@ const tabs: { key: TabKey; label: string; icon: React.ComponentType<React.SVGPro
   { key: 'compare', label: 'Compare', icon: Layers },
   { key: 'workflows', label: 'Workflows', icon: Workflow },
   { key: 'export', label: 'Export', icon: GitBranch },
+  { key: 'onboard', label: 'Onboard App', icon: HelpCircle },
 ]
 
 export default function WorkspacePage() {
   const [active, setActive] = useState<TabKey>('test-ai')
   const [usage, setUsage] = useState<{ totalRequests: number; totalCostCents: number } | null>(null)
+  const [partnerOpen, setPartnerOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -49,8 +53,24 @@ export default function WorkspacePage() {
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-[#0a1226] to-[#050a17] p-6">
-        <h1 className="text-2xl font-bold text-white">Workspace</h1>
-        <p className="mt-1 text-sm text-slate-400">Central operator hub for testing AI, building apps, generating media, comparing outputs, and preparing export.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Workspace</h1>
+            <p className="mt-1 text-sm text-slate-400">Central operator hub for testing AI, building apps, generating media, comparing outputs, and preparing export.</p>
+          </div>
+          <button
+            onClick={() => setPartnerOpen(o => !o)}
+            title="Toggle AI Partner"
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs transition-all ${
+              partnerOpen
+                ? 'border-blue-400/40 bg-blue-400/10 text-blue-300'
+                : 'border-white/10 bg-white/5 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Bot className="h-4 w-4" />
+            AI Partner
+          </button>
+        </div>
         <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-300">
           <span>Workspace requests (30d): <span className="text-white">{usage?.totalRequests ?? 0}</span></span>
           <span>Workspace est. cost (30d): <span className="text-white">${(((usage?.totalCostCents ?? 0) / 100)).toFixed(2)}</span></span>
@@ -81,7 +101,11 @@ export default function WorkspacePage() {
         {active === 'compare' && <CompareTab />}
         {active === 'workflows' && <WorkflowBuilderTab />}
         {active === 'export' && <GitHubTab />}
+        {active === 'onboard' && <OnboardingAssistantTab />}
       </motion.div>
+
+      {/* AI Partner floating widget */}
+      <AIPartnerWidget open={partnerOpen} onClose={() => setPartnerOpen(false)} />
     </div>
   )
 }

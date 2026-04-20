@@ -51,6 +51,12 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<CreationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Image edit mode
+  const [imageEditMode, setImageEditMode] = useState(false)
+  const [editSourceFile, setEditSourceFile] = useState<File | null>(null)
+  const [editSourceB64, setEditSourceB64] = useState<string | null>(null)
+  const [editMaskFile, setEditMaskFile] = useState<File | null>(null)
+  const [editMaskB64, setEditMaskB64] = useState<string | null>(null)
   // Music-specific
   const [genre, setGenre] = useState('Pop')
   const [mood, setMood] = useState('Uplifting')
@@ -63,6 +69,27 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
   const [videoJobId, setVideoJobId] = useState<string | null>(null)
   const [savingArtifact, setSavingArtifact] = useState(false)
 
+  // Convert a File to base64 data-URI
+  const fileToB64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+
+  const handleEditSourceChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    setEditSourceFile(file)
+    setEditSourceB64(file ? await fileToB64(file) : null)
+  }, [])
+
+  const handleEditMaskChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    setEditMaskFile(file)
+    setEditMaskB64(file ? await fileToB64(file) : null)
+  }, [])
+
   // Sync mode when initialMode changes
   useEffect(() => {
     if (initialMode) setMode(initialMode)
@@ -73,7 +100,18 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
     setRunning(true); setError(null); setResult(null)
     try {
       let res: Response
-      if (mode === 'image') {
+      if (mode === 'image' && imageEditMode) {
+        if (!editSourceB64) { setError('Upload a source image to edit.'); setRunning(false); return }
+        res = await fetch('/api/brain/image-edit', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            image: editSourceB64,
+            mask: editMaskB64 ?? undefined,
+            size: '1024x1024',
+          }),
+        })
+      } else if (mode === 'image') {
         res = await fetch('/api/admin/brain/test', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ appId: '__admin_test__', appSecret: 'admin-test-secret', taskType: 'image', message: prompt }),
@@ -163,17 +201,29 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
             model: data?.artifact?.lyricsModel ?? null,
             latencyMs: 0,
           }
-        : {
-            success: data.success ?? (!!data.output || !!data.audioUrl),
-            output: data.output ?? data.text ?? null,
-            imageUrl: data.imageUrl ?? null,
-            audioUrl: data.audioUrl ?? null,
-            videoUrl: data.videoUrl ?? null,
-            error: data.error ?? null,
-            provider: data.routedProvider ?? data.provider ?? null,
-            model: data.routedModel ?? data.model ?? null,
-            latencyMs: data.latencyMs ?? 0,
-          }
+        : mode === 'image' && imageEditMode
+          ? {
+              success: !!(data.imageUrl ?? data.imageBase64),
+              output: data.executed === false ? null : '[Image edit generated]',
+              imageUrl: data.imageUrl ?? (data.imageBase64 ? `data:image/png;base64,${data.imageBase64}` : null),
+              audioUrl: null,
+              videoUrl: null,
+              error: data.error ?? null,
+              provider: data.provider ?? null,
+              model: data.model ?? null,
+              latencyMs: data.latencyMs ?? 0,
+            }
+          : {
+              success: data.success ?? (!!data.output || !!data.audioUrl),
+              output: data.output ?? data.text ?? null,
+              imageUrl: data.imageUrl ?? null,
+              audioUrl: data.audioUrl ?? null,
+              videoUrl: data.videoUrl ?? null,
+              error: data.error ?? null,
+              provider: data.routedProvider ?? data.provider ?? null,
+              model: data.routedModel ?? data.model ?? null,
+              latencyMs: data.latencyMs ?? 0,
+            }
 
       setResult(normalized)
       if (mode === 'video' && data.jobId) {
@@ -197,7 +247,7 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
         setVideoJobId(null)
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Creation failed') } finally { setRunning(false) }
-  }, [mode, prompt, genre, mood, instrumental, campaignNiche, voiceGender, voiceId, voiceAccent])
+  }, [mode, prompt, genre, mood, instrumental, campaignNiche, voiceGender, voiceId, voiceAccent, imageEditMode, editSourceB64, editMaskB64])
 
   const saveArtifact = useCallback(async () => {
     if (!result) return
@@ -264,10 +314,27 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
         </div>
       )}
 
+      {/* Image sub-mode: Generate vs Edit */}
+      {mode === 'image' && (
+        <div className="flex items-center gap-1">
+          <button onClick={() => { setImageEditMode(false); setResult(null) }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all
+              ${!imageEditMode ? 'bg-blue-500/10 border-blue-500/30 text-white' : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-white'}`}>
+            Generate
+          </button>
+          <button onClick={() => { setImageEditMode(true); setResult(null) }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all
+              ${imageEditMode ? 'bg-violet-500/10 border-violet-500/30 text-white' : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-white'}`}>
+            Edit / Inpaint
+          </button>
+        </div>
+      )}
+
       {/* Input form */}
       <div className="space-y-4">
         <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={3}
           placeholder={
+            mode === 'image' && imageEditMode ? 'Describe the edit you want to make…' :
             mode === 'image' ? 'Describe the image to generate…' :
             mode === 'music' ? 'Song title or theme…' :
             mode === 'voice' ? 'Text to convert to speech…' :
@@ -275,6 +342,38 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
             'Describe the campaign theme…'
           }
           className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10 resize-none transition-all" />
+
+        {/* Image edit upload controls */}
+        {mode === 'image' && imageEditMode && (
+          <div className="space-y-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
+            <div>
+              <label className="block text-xs text-slate-300 mb-1.5">
+                Source image <span className="text-red-400">*</span>
+                <span className="ml-2 text-slate-500">(PNG recommended, max ~4 MB)</span>
+              </label>
+              <input type="file" accept="image/png,image/jpeg,image/webp"
+                onChange={handleEditSourceChange}
+                className="block text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-violet-500/10 file:text-violet-300 file:cursor-pointer" />
+              {editSourceFile && (
+                <p className="text-[10px] text-slate-500 mt-1">{editSourceFile.name} ({Math.round(editSourceFile.size / 1024)} KB)</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs text-slate-300 mb-1.5">
+                Mask image <span className="text-slate-500">(optional — white = edit area, black = keep)</span>
+              </label>
+              <input type="file" accept="image/png"
+                onChange={handleEditMaskChange}
+                className="block text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-white/[0.06] file:text-slate-300 file:cursor-pointer" />
+              {editMaskFile && (
+                <p className="text-[10px] text-slate-500 mt-1">{editMaskFile.name}</p>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-500">
+              Route: /api/brain/image-edit → OpenAI DALL-E 2 → HuggingFace SD Inpainting fallback
+            </p>
+          </div>
+        )}
 
         {mode === 'music' && (
           <div className="flex items-center gap-3 flex-wrap">
@@ -320,10 +419,10 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
           </div>
         )}
 
-        <button onClick={create} disabled={running || !prompt.trim()}
+        <button onClick={create} disabled={running || !prompt.trim() || (mode === 'image' && imageEditMode && !editSourceB64)}
           className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:shadow-lg hover:shadow-blue-500/20 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all">
           {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          {running ? 'Creating…' : 'Create'}
+          {running ? 'Creating…' : mode === 'image' && imageEditMode ? 'Edit Image' : 'Create'}
         </button>
       </div>
 

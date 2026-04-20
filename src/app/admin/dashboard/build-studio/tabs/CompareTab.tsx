@@ -46,11 +46,11 @@ export default function CompareTab() {
     setSelectedModels(prev => prev.includes(id) ? prev.filter(m => m !== id) : prev.length < 4 ? [...prev, id] : prev)
   }
 
-  /** Build the { provider, model } array the API expects */
+  /** Build the { provider, model } array the API expects — model must be the registry model_id */
   const buildModelsPayload = useCallback(() => {
     return selectedModels.map(id => {
       const m = models.find(mod => mod.id === id)
-      return m ? { provider: m.provider, model: m.name } : null
+      return m ? { provider: m.provider, model: m.id } : null
     }).filter(Boolean)
   }, [selectedModels, models])
 

@@ -239,15 +239,18 @@ export default function TestAITab() {
       setResult(data)
       if (data.imageUrl) { /* image result */ }
       if (capability === 'video' || capability === 'video_planning') {
-        if (data.videoJobId) {
-          setVideoJobId(data.videoJobId)
+        // Backend returns jobId (not videoJobId) and uses status 'succeeded'/'failed' with resultUrl
+        const jobId = data.jobId ?? data.videoJobId ?? null
+        if (jobId) {
+          setVideoJobId(jobId)
           const poll = setInterval(async () => {
             try {
-              const pr = await fetch(`/api/brain/video-generate/${data.videoJobId}`)
+              const pr = await fetch(`/api/brain/video-generate/${jobId}`)
               if (!pr.ok) return // retry on next tick
               const pj = await pr.json().catch(() => null)
               if (!pj) return // retry on next tick
-              if (pj.status === 'completed' && pj.videoUrl) { setVideoUrl(pj.videoUrl); clearInterval(poll) }
+              if (pj.status === 'succeeded' && pj.resultUrl) { setVideoUrl(pj.resultUrl); clearInterval(poll) }
+              else if (pj.status === 'completed' && pj.videoUrl) { setVideoUrl(pj.videoUrl); clearInterval(poll) }
               else if (pj.status === 'failed') { clearInterval(poll) }
             } catch { /* retry next tick */ }
           }, 5000)

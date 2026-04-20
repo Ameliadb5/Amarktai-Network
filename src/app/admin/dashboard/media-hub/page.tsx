@@ -5,10 +5,51 @@ import Link from 'next/link'
 import { ImageIcon, Mic, Video, Music, ArrowRight } from 'lucide-react'
 
 const tabs = [
-  { key: 'images', label: 'Images', icon: ImageIcon, route: '/admin/dashboard/media', desc: 'Multimodal image generation and edit routing.' },
-  { key: 'voice', label: 'Voice', icon: Mic, route: '/admin/dashboard/voice', desc: 'Voice persona control and audio pipeline status.' },
-  { key: 'video', label: 'Video', icon: Video, route: '/admin/dashboard/video', desc: 'Video generation jobs and output queue.' },
-  { key: 'music', label: 'Music', icon: Music, route: '/admin/dashboard/music-studio', desc: 'Music generation, style controls, and exports.' },
+  {
+    key: 'images',
+    label: 'Images',
+    icon: ImageIcon,
+    route: '/admin/dashboard/media',
+    desc: 'Generate, edit, and manage images. Inline preview, save, and download.',
+    links: [
+      { label: 'Go to Images', href: '/admin/dashboard/media' },
+      { label: 'Open Workspace → Images', href: '/admin/dashboard/workspace' },
+    ],
+  },
+  {
+    key: 'voice',
+    label: 'Voice',
+    icon: Mic,
+    route: '/admin/dashboard/voice',
+    desc: 'TTS with multiple voices and accents. Voice access and login bridge setup.',
+    links: [
+      { label: 'Go to Voice', href: '/admin/dashboard/voice' },
+      { label: 'Voice Access Setup', href: '/admin/dashboard/system/voice-access' },
+      { label: 'Voice Login Bridge', href: '/admin/voice-login' },
+    ],
+  },
+  {
+    key: 'video',
+    label: 'Video',
+    icon: Video,
+    route: '/admin/dashboard/video',
+    desc: 'Video generation via Replicate (Wan2.1, MiniMax) and HuggingFace ZeroScope.',
+    links: [
+      { label: 'Go to Video', href: '/admin/dashboard/video' },
+      { label: 'Open Workspace → Video', href: '/admin/dashboard/workspace' },
+    ],
+  },
+  {
+    key: 'music',
+    label: 'Music',
+    icon: Music,
+    route: '/admin/dashboard/music-studio',
+    desc: 'Music generation with lyrics, genre, mood, vocal style, and cover art.',
+    links: [
+      { label: 'Go to Music Studio', href: '/admin/dashboard/music-studio' },
+      { label: 'Open Workspace → Music', href: '/admin/dashboard/workspace' },
+    ],
+  },
 ] as const
 
 type TabKey = (typeof tabs)[number]['key']
@@ -33,14 +74,18 @@ export default function MediaHubPage() {
       </div>
 
       <div className="card-premium p-6">
-        <h2 className="text-lg font-semibold text-white">{tab.label}</h2>
-        <p className="mt-2 text-sm text-slate-400">{tab.desc}</p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">Live status views</div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">Result and empty states</div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">Routing and provider signals</div>
+        <div className="flex items-center gap-3 mb-3">
+          <tab.icon className="h-5 w-5 text-cyan-300" />
+          <h2 className="text-lg font-semibold text-white">{tab.label}</h2>
         </div>
-        <Link href={tab.route} className="btn-primary mt-5 inline-flex">Open {tab.label} Control <ArrowRight className="h-4 w-4" /></Link>
+        <p className="text-sm text-slate-400">{tab.desc}</p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          {tab.links.map(l => (
+            <Link key={l.href} href={l.href} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition-all">
+              {l.label} <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   )
