@@ -11,8 +11,7 @@ interface VoiceRecognizer {
   maxAlternatives: number
   start(): void
   stop(): void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onresult: ((ev: any) => void) | null
+  onresult: ((ev: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => void) | null
   onerror: ((ev: Event) => void) | null
   onend: ((ev: Event) => void) | null
 }

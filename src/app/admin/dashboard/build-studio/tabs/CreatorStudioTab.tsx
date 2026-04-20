@@ -204,7 +204,7 @@ export default function CreatorStudioTab({ initialMode }: CreatorStudioTabProps)
         : mode === 'image' && imageEditMode
           ? {
               success: !!(data.imageUrl ?? data.imageBase64),
-              output: data.executed === false ? null : '[Image edit generated]',
+              output: data.executed === false ? null : `Image edited: "${prompt.slice(0, 60)}${prompt.length > 60 ? '…' : ''}"`,
               imageUrl: data.imageUrl ?? (data.imageBase64 ? `data:image/png;base64,${data.imageBase64}` : null),
               audioUrl: null,
               videoUrl: null,

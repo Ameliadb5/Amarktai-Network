@@ -16,6 +16,9 @@ interface Message {
   content: string
 }
 
+/** Maximum number of recent messages to include in conversation context sent to the AI. */
+const MAX_CONTEXT_MESSAGES = 10
+
 interface VoiceRecognizer {
   lang: string
   interimResults: boolean
@@ -65,7 +68,7 @@ export default function AIPartnerWidget({ open, onClose }: AIPartnerWidgetProps)
     setSending(true)
     try {
       const history = [...messages, userMsg]
-        .slice(-10) // keep last 10 msgs for context
+        .slice(-MAX_CONTEXT_MESSAGES)
         .map(m => `${m.role === 'user' ? 'Operator' : 'Partner'}: ${m.content}`)
         .join('\n')
       const systemNote = 'You are the Amarktai Network AI partner. You help the operator navigate the dashboard, understand features, and get things done. Be concise, direct, and helpful. You can explain what sections do, suggest next steps, and help with AI tasks. You cannot execute actions directly — you guide the operator instead.'

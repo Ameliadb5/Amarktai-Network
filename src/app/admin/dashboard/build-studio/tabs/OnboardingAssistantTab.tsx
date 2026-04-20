@@ -20,6 +20,31 @@ function encodeBase64Utf8(value: string): string {
   return btoa(binary)
 }
 
+const SYSTEM_PROMPT = `You are Amarktai Network's onboarding assistant. When the operator describes an app they want to connect, generate a complete, copy-paste-ready onboarding guide with these sections:
+
+## 1. App Summary
+Brief summary of the app and how it fits into Amarktai Network.
+
+## 2. Subdomain & DNS Setup
+Exact steps for subdomain configuration (e.g. app.amarktai.com or customer domain).
+
+## 3. VPS / Server Setup Commands
+Bash commands to set up the app on a VPS. Use code blocks.
+
+## 4. Environment Variables
+All .env variables the app needs to connect to Amarktai Network. Use a code block.
+
+## 5. Integration Code Snippet
+The minimum code snippet (API route or middleware) to add to the app for Amarktai Network brain integration. Use code blocks with language labels.
+
+## 6. Deployment Commands
+Final deploy steps: build, copy, restart. Use code blocks.
+
+## 7. Verification Checklist
+Numbered checklist of steps to confirm the app is correctly connected.
+
+Be specific and practical. Use real Amarktai Network API paths (e.g. /api/brain/chat, /api/brain/tts). Generate real env var names. Output clean markdown.`
+
 const STARTER_PROMPTS = [
   'I want to add my marketing agency website to Amarktai Network',
   'I want to connect a Next.js e-commerce app with AI chat support',
@@ -123,31 +148,6 @@ export default function OnboardingAssistantTab() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const SYSTEM_PROMPT = `You are Amarktai Network's onboarding assistant. When the operator describes an app they want to connect, generate a complete, copy-paste-ready onboarding guide with these sections:
-
-## 1. App Summary
-Brief summary of the app and how it fits into Amarktai Network.
-
-## 2. Subdomain & DNS Setup
-Exact steps for subdomain configuration (e.g. app.amarktai.com or customer domain).
-
-## 3. VPS / Server Setup Commands
-Bash commands to set up the app on a VPS. Use code blocks.
-
-## 4. Environment Variables
-All .env variables the app needs to connect to Amarktai Network. Use a code block.
-
-## 5. Integration Code Snippet
-The minimum code snippet (API route or middleware) to add to the app for Amarktai Network brain integration. Use code blocks with language labels.
-
-## 6. Deployment Commands
-Final deploy steps: build, copy, restart. Use code blocks.
-
-## 7. Verification Checklist
-Numbered checklist of steps to confirm the app is correctly connected.
-
-Be specific and practical. Use real Amarktai Network API paths (e.g. /api/brain/chat, /api/brain/tts). Generate real env var names. Output clean markdown.`
-
   const generate = useCallback(async () => {
     if (!appDescription.trim()) return
     setRunning(true); setError(null); setRawOutput(null); setSections([])
@@ -170,9 +170,8 @@ Be specific and practical. Use real Amarktai Network API paths (e.g. /api/brain/
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Onboarding generation failed')
     } finally {
-      setRunning(false) }
-  // SYSTEM_PROMPT is a stable constant defined in the same render scope — excluded intentionally
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      setRunning(false)
+    }
   }, [appDescription])
 
   const saveArtifact = useCallback(async () => {
