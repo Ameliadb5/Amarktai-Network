@@ -115,22 +115,45 @@ export async function POST(request: NextRequest) {
   } else if (rawContentUrl && typeof rawContentUrl === 'string' && rawContentUrl.startsWith('http')) {
     // External HTTP/HTTPS URL (e.g. OpenAI CDN) — fetch and store as binary so the
     // artifact remains accessible after the CDN URL expires (OpenAI URLs expire in ~1h).
+    //
+    // SSRF mitigation: only fetch from known AI provider CDN domains.
+    // This prevents the server from making arbitrary requests to internal/private hosts.
+    const ALLOWED_CDN_HOSTNAMES = [
+      'oaidalleapi.blob.core.windows.net',   // OpenAI DALL-E CDN
+      'openai.com',
+      'replicate.delivery',                   // Replicate output storage
+      'pbxt.replicate.delivery',
+      'api.together.xyz',                     // Together AI results
+      'storage.googleapis.com',               // Google/Gemini image storage
+      'lh3.googleusercontent.com',
+    ]
+    let fetchAllowed = false
     try {
-      const fetchRes = await fetch(rawContentUrl, { signal: AbortSignal.timeout(20_000) })
-      if (fetchRes.ok) {
-        const buf = Buffer.from(await fetchRes.arrayBuffer())
-        const ct = fetchRes.headers.get('content-type') ?? undefined
-        if (buf.length > 0) {
-          content = buf
-          mimeType = mimeType ?? ct
-          contentUrl = undefined  // Do not persist the expiring URL
-        }
-        // If fetch succeeded but returned 0 bytes, fall through to storing URL as-is
+      const parsed = new URL(rawContentUrl)
+      // Only allow HTTPS
+      if (parsed.protocol === 'https:') {
+        fetchAllowed = ALLOWED_CDN_HOSTNAMES.some(
+          (h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`),
+        )
       }
-      // If fetch not ok, fall through to storing URL as-is (best effort)
     } catch {
-      // Network error fetching CDN URL — fall back to storing URL as-is
-      // The artifact may expire but at least a record is created
+      // Malformed URL — do not fetch
+    }
+    if (fetchAllowed) {
+      try {
+        const fetchRes = await fetch(rawContentUrl, { signal: AbortSignal.timeout(20_000) })
+        if (fetchRes.ok) {
+          const buf = Buffer.from(await fetchRes.arrayBuffer())
+          const ct = fetchRes.headers.get('content-type') ?? undefined
+          if (buf.length > 0) {
+            content = buf
+            mimeType = mimeType ?? ct
+            contentUrl = undefined  // Do not persist the expiring URL
+          }
+        }
+      } catch {
+        // Network error fetching CDN URL — fall back to storing URL as-is
+      }
     }
   }
 

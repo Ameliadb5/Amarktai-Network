@@ -123,7 +123,7 @@ export default function WorkspacePage() {
 
           {usage && usage.totalRequests > 0 && usage.totalCostCents === 0 && (
             <p className="text-[11px] text-amber-400">
-              Requests recorded but cost shows $0.00 — this may mean all calls failed or ran before cost metering was active.
+              Requests recorded but cost shows $0.0000 — this may mean all calls failed or ran before cost metering was active.
             </p>
           )}
         </div>

@@ -80,9 +80,9 @@ export async function POST(request: NextRequest) {
      * Called fire-and-forget (void) so it never blocks the audio response.
      */
     const meterCall = (provider: string, model: string, inputText: string, success: boolean) => {
-      if (!meterAppSlug || typeof meterAppSlug !== 'string') return
-      const tokens = Math.max(1, Math.ceil(inputText.length / 4))
-      const estimated = Math.round(estimateCostUsd(model, tokens) * 100)
+      if (!meterAppSlug || typeof meterAppSlug !== 'string') return;
+      const tokens = Math.max(1, Math.ceil(inputText.length / 4));
+      const estimated = Math.round(estimateCostUsd(model, tokens) * 100);
       void recordUsage({
         appSlug: meterAppSlug,
         capability: 'tts',
@@ -91,8 +91,8 @@ export async function POST(request: NextRequest) {
         success,
         costUsdCents: success ? Math.max(10, estimated) : 0,
         artifactCreated: success,
-      })
-    }
+      });
+    };
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return NextResponse.json(

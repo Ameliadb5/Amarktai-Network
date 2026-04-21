@@ -53,7 +53,7 @@ const CAPABILITY_FLOOR_CENTS: Record<string, number> = {
   tts:                           10,   // $0.001
   stt:                           10,
   video_generation:             200,   // $0.020
-  video_planning:                 5,   // $0.0005 (text-only fallback)
+  video_planning:                 5,   // $0.050 (text-only fallback — one LLM completion)
   research:                      20,   // $0.002
   research_search:               20,
   default:                       10,   // $0.001
@@ -577,6 +577,7 @@ export async function POST(request: NextRequest) {
         note?: string
         fallbackMode?: string
       }
+      const isPlanning = videoData.capability === 'video_planning' || !!videoData.fallbackMode
       // A video job is considered "executed" if jobId is present, regardless of whether
       // the provider returned the executed flag. This ensures cost is metered when
       // a real generation job is created.
@@ -588,10 +589,12 @@ export async function POST(request: NextRequest) {
         model: videoData.model ?? '',
         success: videoExecuted,
         latencyMs,
-        costUsdCents: computeCostCents('video_generation', videoData.model ?? 'default', estimateTokens(body.message), videoExecuted),
+        // Planning fallback performs LLM script generation — use its own floor rate,
+        // not the full video_generation floor which is sized for GPU rendering jobs.
+        costUsdCents: isPlanning
+          ? computeCostCents('video_planning', videoData.model ?? 'default', estimateTokens(body.message), videoExecuted)
+          : computeCostCents('video_generation', videoData.model ?? 'default', estimateTokens(body.message), videoExecuted),
       })
-
-      const isPlanning = videoData.capability === 'video_planning' || !!videoData.fallbackMode
       return NextResponse.json(
         {
           success: videoExecuted,
