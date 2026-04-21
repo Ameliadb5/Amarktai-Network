@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getVaultApiKey } from '@/lib/brain';
 import { buildAffectiveVoiceConfig, type TTSProvider, type AffectiveVoiceConfig } from '@/lib/ssml-voice';
 import { detectEmotions } from '@/lib/emotion-engine';
+import { recordUsage } from '@/lib/usage-meter';
+import { estimateCostUsd } from '@/lib/budget-tracker';
 
 /**
  * POST /api/brain/tts — Text-to-Speech endpoint
@@ -69,7 +71,28 @@ export async function POST(request: NextRequest) {
       speed = 1.0,
       provider: requestedProvider = 'auto',
       emotionAware = false,
+      // Optional appSlug: when provided, usage is metered back to that app/workspace
+      appSlug: meterAppSlug,
     } = body;
+
+    /**
+     * Meter this TTS call back to the given appSlug if one was provided.
+     * Called fire-and-forget (void) so it never blocks the audio response.
+     */
+    const meterCall = (provider: string, model: string, inputText: string, success: boolean) => {
+      if (!meterAppSlug || typeof meterAppSlug !== 'string') return
+      const tokens = Math.max(1, Math.ceil(inputText.length / 4))
+      const estimated = Math.round(estimateCostUsd(model, tokens) * 100)
+      void recordUsage({
+        appSlug: meterAppSlug,
+        capability: 'tts',
+        provider,
+        model,
+        success,
+        costUsdCents: success ? Math.max(10, estimated) : 0,
+        artifactCreated: success,
+      })
+    }
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return NextResponse.json(
@@ -191,6 +214,7 @@ export async function POST(request: NextRequest) {
       }
 
       const audioBuffer = await response.arrayBuffer();
+      meterCall('groq', model, text, true);
       return new NextResponse(audioBuffer, {
         status: 200,
         headers: {
@@ -244,6 +268,7 @@ export async function POST(request: NextRequest) {
       }
 
       const audioBuffer = Buffer.from(audioData, 'base64');
+      meterCall('gemini', model, text, true);
       return new NextResponse(audioBuffer, {
         status: 200,
         headers: {
@@ -284,6 +309,7 @@ export async function POST(request: NextRequest) {
       }
 
       const audioBuffer = await response.arrayBuffer();
+      meterCall('huggingface', hfModel, text, true);
       return new NextResponse(audioBuffer, {
         status: 200,
         headers: {
@@ -325,6 +351,7 @@ export async function POST(request: NextRequest) {
     }
 
     const audioBuffer = await response.arrayBuffer();
+    meterCall('openai', model, text, true);
     return new NextResponse(audioBuffer, {
       status: 200,
       headers: {

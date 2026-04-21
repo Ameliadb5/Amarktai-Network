@@ -105,11 +105,32 @@ export async function POST(request: NextRequest) {
   if (rawContentBase64 && typeof rawContentBase64 === 'string') {
     content = Buffer.from(rawContentBase64, 'base64')
   } else if (rawContentUrl && typeof rawContentUrl === 'string' && rawContentUrl.startsWith('data:')) {
+    // data: URI — extract base64 and store as binary
     const match = rawContentUrl.match(/^data:([^;]+);base64,(.+)$/)
     if (match) {
       mimeType = mimeType ?? match[1]
       content = Buffer.from(match[2], 'base64')
       contentUrl = undefined
+    }
+  } else if (rawContentUrl && typeof rawContentUrl === 'string' && rawContentUrl.startsWith('http')) {
+    // External HTTP/HTTPS URL (e.g. OpenAI CDN) — fetch and store as binary so the
+    // artifact remains accessible after the CDN URL expires (OpenAI URLs expire in ~1h).
+    try {
+      const fetchRes = await fetch(rawContentUrl, { signal: AbortSignal.timeout(20_000) })
+      if (fetchRes.ok) {
+        const buf = Buffer.from(await fetchRes.arrayBuffer())
+        const ct = fetchRes.headers.get('content-type') ?? undefined
+        if (buf.length > 0) {
+          content = buf
+          mimeType = mimeType ?? ct
+          contentUrl = undefined  // Do not persist the expiring URL
+        }
+        // If fetch succeeded but returned 0 bytes, fall through to storing URL as-is
+      }
+      // If fetch not ok, fall through to storing URL as-is (best effort)
+    } catch {
+      // Network error fetching CDN URL — fall back to storing URL as-is
+      // The artifact may expire but at least a record is created
     }
   }
 

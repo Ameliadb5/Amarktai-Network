@@ -211,7 +211,14 @@ export default function TestAITab() {
       try {
         const res = await fetch('/api/brain/tts', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ appId: appProfile, appSecret: 'admin-test-secret', text: prompt, gender: ttsGender || undefined, voiceId: ttsVoiceId || undefined, accent: ttsAccent || undefined, provider: ttsProvider !== 'auto' ? ttsProvider : undefined }),
+          body: JSON.stringify({
+            appId: appProfile, appSecret: 'admin-test-secret',
+            text: prompt,
+            gender: ttsGender || undefined, voiceId: ttsVoiceId || undefined,
+            accent: ttsAccent || undefined, provider: ttsProvider !== 'auto' ? ttsProvider : undefined,
+            // Pass appSlug so the TTS route can meter cost back to Workspace
+            appSlug: 'workspace',
+          }),
         })
         if (!res.ok) {
           const errData = await res.json().catch(() => ({ error: `TTS failed: HTTP ${res.status}` }))

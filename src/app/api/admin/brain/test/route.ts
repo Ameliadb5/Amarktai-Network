@@ -32,6 +32,44 @@ function estimateTokens(message: string): number {
   return Math.max(1, Math.ceil(message.length / 4))
 }
 
+/**
+ * Minimum floor costs per capability type (in cents / hundredths of a USD).
+ *
+ * Purpose: prevent $0 display when prompt is very short and the token-based
+ * estimate rounds to zero. Floor values are conservative lower bounds based on
+ * cheapest real-world pricing for each operation class.
+ *
+ *   image_generation   $0.004 minimum — DALL·E 2 cheapest tier
+ *   tts                $0.001 minimum — Groq PlayAI ~100 char utterance
+ *   stt                $0.001 minimum — Whisper short clip
+ *   video_generation   $0.020 minimum — cheapest Replicate model short clip
+ *   research           $0.002 minimum — two LLM calls for query + synthesis
+ *   default (chat)     $0.001 minimum — short chat completion at cheap model rate
+ */
+const CAPABILITY_FLOOR_CENTS: Record<string, number> = {
+  image_generation:              40,   // $0.004
+  suggestive_image_generation:   40,
+  adult_image_generation:        40,
+  tts:                           10,   // $0.001
+  stt:                           10,
+  video_generation:             200,   // $0.020
+  video_planning:                 5,   // $0.0005 (text-only fallback)
+  research:                      20,   // $0.002
+  research_search:               20,
+  default:                       10,   // $0.001
+}
+
+/**
+ * Compute cost in cents with per-capability floor.
+ * Returns 0 when success is false (failed calls are never charged).
+ */
+function computeCostCents(capability: string, model: string, tokens: number, success: boolean): number {
+  if (!success) return 0
+  const estimated = Math.round(estimateCostUsd(model, tokens) * 100)
+  const floor = CAPABILITY_FLOOR_CENTS[capability] ?? CAPABILITY_FLOOR_CENTS.default
+  return Math.max(estimated, floor)
+}
+
 const testSchema = z.object({
   message: z.string().min(1).max(16_000),
   taskType: z.string().default('chat'),
@@ -250,7 +288,7 @@ export async function POST(request: NextRequest) {
           model: ttsModel,
           success: true,
           latencyMs,
-          costUsdCents: Math.round(estimateCostUsd(ttsModel, estimateTokens(body.message)) * 100),
+          costUsdCents: computeCostCents('tts', ttsModel, estimateTokens(body.message), true),
           artifactCreated: true,
         })
         return NextResponse.json({
@@ -330,7 +368,7 @@ export async function POST(request: NextRequest) {
         model: imageData.model ?? '',
         success: imageSuccess,
         latencyMs,
-        costUsdCents: imageSuccess ? Math.round(estimateCostUsd(imageData.model ?? 'default', estimateTokens(body.message)) * 100) : 0,
+        costUsdCents: computeCostCents('image_generation', imageData.model ?? 'default', estimateTokens(body.message), imageSuccess),
         artifactCreated: imageSuccess,
       })
       return NextResponse.json(
@@ -416,7 +454,7 @@ export async function POST(request: NextRequest) {
         model: imageData.model ?? '',
         success: imageRes.ok && (!!imageData.imageUrl || !!imageData.imageBase64),
         latencyMs,
-        costUsdCents: imageRes.ok ? Math.round(estimateCostUsd(imageData.model ?? 'default', estimateTokens(body.message)) * 100) : 0,
+        costUsdCents: computeCostCents('suggestive_image_generation', imageData.model ?? 'default', estimateTokens(body.message), imageRes.ok && (!!imageData.imageUrl || !!imageData.imageBase64)),
         artifactCreated: imageRes.ok && (!!imageData.imageUrl || !!imageData.imageBase64),
       })
       return NextResponse.json(
@@ -464,7 +502,7 @@ export async function POST(request: NextRequest) {
         model: imageData.model ?? '',
         success: imageSuccess,
         latencyMs,
-        costUsdCents: imageSuccess ? Math.round(estimateCostUsd(imageData.model ?? 'default', estimateTokens(body.message)) * 100) : 0,
+        costUsdCents: computeCostCents('adult_image_generation', imageData.model ?? 'default', estimateTokens(body.message), imageSuccess),
         artifactCreated: imageSuccess,
       })
       return NextResponse.json(
@@ -502,7 +540,7 @@ export async function POST(request: NextRequest) {
         model: rd.model ?? '',
         success: researchRes.ok,
         latencyMs,
-        costUsdCents: researchRes.ok ? Math.round(estimateCostUsd(rd.model ?? 'default', estimateTokens(body.message)) * 100) : 0,
+        costUsdCents: computeCostCents('research', rd.model ?? 'default', estimateTokens(body.message), researchRes.ok),
       })
       return NextResponse.json(
         {
@@ -533,29 +571,46 @@ export async function POST(request: NextRequest) {
         model?: string
         jobId?: string
         status?: string
+        // video_planning fallback fields
+        capability?: string
+        script?: string
+        note?: string
+        fallbackMode?: string
       }
+      // A video job is considered "executed" if jobId is present, regardless of whether
+      // the provider returned the executed flag. This ensures cost is metered when
+      // a real generation job is created.
+      const videoExecuted = videoRes.ok && (!!videoData.executed || !!videoData.jobId)
       await recordUsage({
         appSlug: usageAppSlug,
         capability: 'video_generation',
         provider: videoData.provider ?? 'unknown',
         model: videoData.model ?? '',
-        success: videoRes.ok && !!videoData.executed,
+        success: videoExecuted,
         latencyMs,
-        costUsdCents: (videoRes.ok && !!videoData.executed) ? Math.round(estimateCostUsd(videoData.model ?? 'default', estimateTokens(body.message)) * 100) : 0,
+        costUsdCents: computeCostCents('video_generation', videoData.model ?? 'default', estimateTokens(body.message), videoExecuted),
       })
+
+      const isPlanning = videoData.capability === 'video_planning' || !!videoData.fallbackMode
       return NextResponse.json(
         {
-          success: videoRes.ok && !!videoData.executed,
-          executed: videoRes.ok && !!videoData.executed,
+          success: videoExecuted,
+          executed: videoExecuted,
           traceId,
-          output: videoData.executed ? '[Video generation job created]' : null,
+          output: videoExecuted
+            ? (isPlanning
+                ? `[Video planning — no real-time video provider available]\n\n${videoData.note ?? ''}\n\n${videoData.script ?? ''}`.trim()
+                : '[Video generation job created]')
+            : null,
           videoStatus: videoData.status ?? null,
+          // Return both jobId and videoJobId so polling works regardless of which field the UI reads
+          jobId: videoData.jobId ?? null,
           videoJobId: videoData.jobId ?? null,
           capability: capabilities,
           routedProvider: videoData.provider ?? null,
           routedModel: videoData.model ?? null,
-          executionMode: 'specialist',
-          fallback_used: false,
+          executionMode: isPlanning ? 'video_planning' : 'specialist',
+          fallback_used: isPlanning,
           error: videoData.error ?? null,
           latencyMs,
           timestamp: new Date().toISOString(),
@@ -602,7 +657,7 @@ export async function POST(request: NextRequest) {
       model: result.model,
       success: result.ok,
       latencyMs,
-      costUsdCents: result.ok ? Math.round(estimateCostUsd(result.model, estimateTokens(body.message)) * 100) : 0,
+      costUsdCents: computeCostCents(body.taskType, result.model, estimateTokens(body.message), result.ok),
     })
     return NextResponse.json(
       {
@@ -652,7 +707,7 @@ export async function POST(request: NextRequest) {
     model: orchResult.routedModel ?? '',
     success,
     latencyMs,
-    costUsdCents: success ? Math.round(estimateCostUsd(orchResult.routedModel ?? 'default', estimateTokens(body.message)) * 100) : 0,
+    costUsdCents: computeCostCents(body.taskType, orchResult.routedModel ?? 'default', estimateTokens(body.message), success),
   })
 
   return NextResponse.json(

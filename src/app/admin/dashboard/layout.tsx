@@ -4,16 +4,58 @@ import '@fontsource-variable/inter'
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu, X, User, LayoutDashboard, AppWindow, Sparkles, Film, Brain, Server } from 'lucide-react'
+import {
+  Menu, X, User, LayoutDashboard, AppWindow, Sparkles, Film, Brain, Server,
+  Bot, Cpu, Archive, Plug, ClipboardList, Bell,
+} from 'lucide-react'
 
-const sections = [
-  { href: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { href: '/admin/dashboard/apps', label: 'Apps', icon: AppWindow },
-  { href: '/admin/dashboard/workspace', label: 'Workspace', icon: Sparkles },
-  { href: '/admin/dashboard/media-hub', label: 'Media', icon: Film },
-  { href: '/admin/dashboard/brain', label: 'Brain', icon: Brain },
-  { href: '/admin/dashboard/system', label: 'System', icon: Server },
+// ── Nav structure ─────────────────────────────────────────────────────────────
+// Grouped for clean sidebar. Groups without a label get no divider.
+
+const NAV_GROUPS: Array<{
+  label?: string
+  items: Array<{ href: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }>
+}> = [
+  {
+    items: [
+      { href: '/admin/dashboard',           label: 'Overview',     icon: LayoutDashboard },
+      { href: '/admin/dashboard/workspace', label: 'Workspace',    icon: Sparkles },
+    ],
+  },
+  {
+    label: 'Apps',
+    items: [
+      { href: '/admin/dashboard/apps',       label: 'Apps',        icon: AppWindow },
+      { href: '/admin/dashboard/app-agents', label: 'App Agents',  icon: Bot },
+      { href: '/admin/dashboard/integrations', label: 'Integrations', icon: Plug },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { href: '/admin/dashboard/brain',        label: 'Brain',        icon: Brain },
+      { href: '/admin/dashboard/intelligence', label: 'Intelligence', icon: Cpu },
+    ],
+  },
+  {
+    label: 'Output',
+    items: [
+      { href: '/admin/dashboard/media-hub', label: 'Media',     icon: Film },
+      { href: '/admin/dashboard/artifacts', label: 'Artifacts', icon: Archive },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { href: '/admin/dashboard/jobs',   label: 'Jobs',   icon: ClipboardList },
+      { href: '/admin/dashboard/alerts', label: 'Alerts', icon: Bell },
+      { href: '/admin/dashboard/system', label: 'System', icon: Server },
+    ],
+  },
 ]
+
+// Flat list for breadcrumb label lookup
+const ALL_NAV_ITEMS = NAV_GROUPS.flatMap(g => g.items)
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -40,16 +82,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4" aria-label="Dashboard sections">
-        {sections.map((item) => {
-          const active = isActive(item.href)
-          return (
-            <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'border border-cyan-400/30 bg-cyan-400/10 text-white' : 'border border-transparent text-slate-400 hover:bg-white/5 hover:text-white'}`}>
-              <item.icon className="h-4 w-4" />
-              <span>{item.label}</span>
-            </Link>
-          )
-        })}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4" aria-label="Dashboard navigation">
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={gi}>
+            {group.label && (
+              <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                {group.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const active = isActive(item.href)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
+                      active
+                        ? 'border border-cyan-400/30 bg-cyan-400/10 text-white'
+                        : 'border border-transparent text-slate-400 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       <div className="border-t border-white/10 p-4">
@@ -76,7 +138,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <button className="rounded-lg p-2 text-slate-400 lg:hidden" onClick={() => setMobileOpen(v => !v)}>
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
-              <span className="text-xs uppercase tracking-[0.14em] text-slate-500">{sections.find(s => isActive(s.href))?.label ?? 'Dashboard'}</span>
+              <span className="text-xs uppercase tracking-[0.14em] text-slate-500">
+                {ALL_NAV_ITEMS.find(s => isActive(s.href))?.label ?? 'Dashboard'}
+              </span>
             </div>
             <span className="text-xs text-slate-500">Amarktai Network</span>
           </div>
