@@ -232,6 +232,20 @@ function isTogetherImageModel(modelId: string): boolean {
 }
 
 /**
+ * Qwen Wanx model ID prefixes.
+ * Wanx models require the DashScope AIGC endpoint (/v1/services/aigc/) —
+ * NOT the compatible-mode /v1/chat/completions path.
+ * They must not be routed through callProvider's standard chat branch.
+ */
+const QWEN_WANX_MODEL_PREFIXES = [
+  'wanx',
+]
+
+function isQwenWanxModel(modelId: string): boolean {
+  return QWEN_WANX_MODEL_PREFIXES.some(prefix => modelId.startsWith(prefix))
+}
+
+/**
  * Call an AI provider via the single provider vault.
  * Reads API key + base URL from the vault — never from the request.
  * Returns a normalised result. Never throws.
@@ -337,7 +351,7 @@ export async function callProvider(
         // Wanx image/video models require DashScope AIGC endpoint, NOT the
         // compatible-mode chat/completions path. Return a clear error rather
         // than silently routing to the wrong endpoint.
-        if (providerKey === 'qwen' && resolvedModel.startsWith('wanx')) {
+        if (providerKey === 'qwen' && isQwenWanxModel(resolvedModel)) {
           return {
             ok: false,
             output: null,
