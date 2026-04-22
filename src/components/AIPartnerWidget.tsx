@@ -71,8 +71,8 @@ function requiresConfirmation(action: AssistantAction): boolean {
   return action.type === 'generate_image' || action.type === 'run_test'
 }
 
-/** System prompt — defined outside component to avoid recreating on every render */
-const SYSTEM_PROMPT = `You are the Amarktai Network AI Partner — a capable operator assistant embedded in the admin dashboard.
+/** Base system prompt — the memory context block is appended dynamically per-session */
+const BASE_SYSTEM_PROMPT = `You are the Amarktai Network AI Partner — a capable operator assistant embedded in the admin dashboard.
 You can answer questions, explain features, AND trigger real dashboard actions.
 
 Available actions you can dispatch (include at the END of your reply if appropriate):
@@ -86,7 +86,29 @@ Available actions you can dispatch (include at the END of your reply if appropri
 Rules:
 - Only include an ACTION block when the operator explicitly asks for an action or you are certain it is appropriate.
 - Destructive/expensive actions (generate_image, run_test) will always ask for operator confirmation before executing.
-- Be concise and direct. Avoid unnecessary explanation.`
+- Be concise and direct. Avoid unnecessary explanation.
+- When context or memory is provided below, reference it naturally in your replies to feel memory-aware.`
+
+interface PartnerContext {
+  memoryLines: string[]
+  usageLines: string[]
+  memoryCount: number
+}
+
+/** Build a full system prompt with injected memory/usage context */
+function buildSystemPrompt(ctx: PartnerContext | null): string {
+  if (!ctx || (ctx.memoryLines.length === 0 && ctx.usageLines.length === 0)) {
+    return BASE_SYSTEM_PROMPT
+  }
+  const sections: string[] = [BASE_SYSTEM_PROMPT]
+  if (ctx.memoryLines.length > 0) {
+    sections.push(`\nRecent workspace activity (memory context — use to inform replies):\n${ctx.memoryLines.join('\n')}`)
+  }
+  if (ctx.usageLines.length > 0) {
+    sections.push(`\nWorkspace usage snapshot:\n${ctx.usageLines.map(l => `- ${l}`).join('\n')}`)
+  }
+  return sections.join('\n')
+}
 
 export interface AIPartnerWidgetProps {
   open: boolean
@@ -104,6 +126,8 @@ export default function AIPartnerWidget({ open, onClose, onAction }: AIPartnerWi
   const [voiceMode, setVoiceMode] = useState(false)
   const [pendingAction, setPendingAction] = useState<AssistantAction | null>(null)
   const [browserNote, setBrowserNote] = useState<string | null>(null)
+  const [partnerContext, setPartnerContext] = useState<PartnerContext | null>(null)
+  const [greeted, setGreeted] = useState(false)
 
   const recognitionRef = useRef<VoiceRecognizer | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -126,6 +150,27 @@ export default function AIPartnerWidget({ open, onClose, onAction }: AIPartnerWi
       .then(d => { if (d?.settings) voiceSettingsRef.current = d.settings })
       .catch(() => {})
   }, [])
+
+  // Load memory + usage context when the widget opens for the first time
+  useEffect(() => {
+    if (!open || partnerContext !== null) return
+    fetch('/api/admin/ai-partner/context')
+      .then(r => r.ok ? r.json() : null)
+      .then((ctx: PartnerContext | null) => { setPartnerContext(ctx ?? { memoryLines: [], usageLines: [], memoryCount: 0 }) })
+      .catch(() => { setPartnerContext({ memoryLines: [], usageLines: [], memoryCount: 0 }) })
+  }, [open, partnerContext])
+
+  // Show a memory-aware greeting the first time the widget is opened
+  useEffect(() => {
+    if (!open || greeted || partnerContext === null) return
+    setGreeted(true)
+    const hasActivity = partnerContext.usageLines.length > 0
+    const activityHint = hasActivity
+      ? ` I can see some recent activity — ${partnerContext.usageLines[0]}.`
+      : ''
+    const greeting = `Hi, I'm your AI Partner.${activityHint} How can I help you today?`
+    setMessages([{ role: 'assistant', content: greeting }])
+  }, [open, greeted, partnerContext])
 
   const speakText = useCallback(async (text: string) => {
     if (!text.trim()) return
@@ -186,6 +231,8 @@ export default function AIPartnerWidget({ open, onClose, onAction }: AIPartnerWi
         .map((m: Message) => `${m.role === 'user' ? 'Operator' : 'Partner'}: ${m.content}`)
         .join('\n')
 
+      const systemPrompt = buildSystemPrompt(partnerContext)
+
       const res = await fetch('/api/admin/brain/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,7 +240,7 @@ export default function AIPartnerWidget({ open, onClose, onAction }: AIPartnerWi
           appId: '__admin_test__',
           appSecret: 'admin-test-secret',
           taskType: 'chat',
-          message: `${SYSTEM_PROMPT}\n\nConversation:\n${history}`,
+          message: `${systemPrompt}\n\nConversation:\n${history}`,
         }),
       })
       const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { output?: string; text?: string; error?: string }
@@ -221,7 +268,7 @@ export default function AIPartnerWidget({ open, onClose, onAction }: AIPartnerWi
     } finally {
       setSending(false)
     }
-  }, [messages, onAction, voiceMode, speakText])
+  }, [messages, onAction, voiceMode, speakText, partnerContext])
 
   // Keep startVoiceRef in sync with the current startVoice function
   // so speakText's onended handler can call it without stale closure
@@ -350,39 +397,44 @@ export default function AIPartnerWidget({ open, onClose, onAction }: AIPartnerWi
         {messages.length === 0 && (
           <div className="text-center py-6">
             <Bot className="mx-auto w-8 h-8 text-blue-400/40 mb-2" />
-            <p className="text-xs text-slate-500">Hi! I can navigate the dashboard, explain features, trigger actions, and speak with you.</p>
-            <div className="mt-3 space-y-1">
-              {[
-                'Go to Models',
-                'Check my budget',
-                'Generate an image of a futuristic city',
-              ].map(s => (
-                <button key={s} onClick={() => send(s)}
-                  className="block w-full text-left text-[11px] text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.04] transition-colors">
-                  {s}
-                </button>
-              ))}
-            </div>
-            {!SR && (
-              <p className="text-[10px] text-amber-400/70 mt-3">⚠ Speech recognition not available in this browser (Chrome/Edge/Safari required). Text mode only.</p>
-            )}
+            <p className="text-xs text-slate-500">Loading context…</p>
           </div>
         )}
         {messages.map((m: Message, i: number) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
-              m.role === 'user'
-                ? 'bg-blue-600/70 text-white'
-                : 'bg-white/[0.06] text-slate-300'
-            }`}>
-              {m.content}
-              {m.action && !requiresConfirmation(m.action) && (
-                <div className="mt-1.5 text-[10px] text-emerald-400/70 font-mono">
-                  ✓ {m.action.type}
-                </div>
-              )}
+          <React.Fragment key={i}>
+            <div className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
+                m.role === 'user'
+                  ? 'bg-blue-600/70 text-white'
+                  : 'bg-white/[0.06] text-slate-300'
+              }`}>
+                {m.content}
+                {m.action && !requiresConfirmation(m.action) && (
+                  <div className="mt-1.5 text-[10px] text-emerald-400/70 font-mono">
+                    ✓ {m.action.type}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+            {/* Show suggestion chips after the greeting (first assistant message) */}
+            {i === 0 && m.role === 'assistant' && messages.length === 1 && (
+              <div className="space-y-1 pl-1">
+                {[
+                  'Check my budget',
+                  'Go to Models',
+                  'What capabilities are available?',
+                ].map(s => (
+                  <button key={s} onClick={() => send(s)}
+                    className="block w-full text-left text-[11px] text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.04] transition-colors">
+                    {s}
+                  </button>
+                ))}
+                {!SR && (
+                  <p className="text-[10px] text-amber-400/70 mt-1 px-1">⚠ Voice requires Chrome/Edge/Safari.</p>
+                )}
+              </div>
+            )}
+          </React.Fragment>
         ))}
         {sending && (
           <div className="flex justify-start">
