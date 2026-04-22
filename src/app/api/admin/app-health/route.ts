@@ -64,20 +64,17 @@ export async function GET(request: NextRequest) {
     // Aggregate 7-day stats
     let requests7d = 0
     let success7d = 0
-    let errors7d = 0
-    const byDay: Record<string, { requests: number; success: number; errors: number }> = {}
+    const byDay: Record<string, { requests: number; success: number }> = {}
     const byCap: Record<string, number> = {}
 
     for (const r of rows7d) {
       requests7d += r.requestCount
       success7d += r.successCount
-      errors7d += r.errorCount
 
       const day = r.date.toISOString().slice(0, 10)
-      if (!byDay[day]) byDay[day] = { requests: 0, success: 0, errors: 0 }
+      if (!byDay[day]) byDay[day] = { requests: 0, success: 0 }
       byDay[day].requests += r.requestCount
       byDay[day].success += r.successCount
-      byDay[day].errors += r.errorCount
 
       byCap[r.capability] = (byCap[r.capability] ?? 0) + r.requestCount
     }

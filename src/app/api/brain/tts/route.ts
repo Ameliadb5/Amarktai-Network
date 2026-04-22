@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     let personaGender: string | undefined
     let personaAccent: string | undefined
     let personaSpeed: number | undefined
-    let personaApplied: Record<string, string> = {}
+    const personaApplied: Record<string, string> = {}
 
     if (meterAppSlug && typeof meterAppSlug === 'string') {
       try {
