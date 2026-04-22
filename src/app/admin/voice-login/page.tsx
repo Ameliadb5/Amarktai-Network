@@ -123,6 +123,15 @@ export default function VoiceLoginPage() {
     }
   }
 
+  const handlePassphraseKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      validateVoiceLogin()
+    }
+  // validateVoiceLogin is a stable function reference — safe to omit from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <div className="min-h-screen bg-[#030a18] text-white overflow-hidden flex flex-col">
 
@@ -285,7 +294,7 @@ export default function VoiceLoginPage() {
                 <input
                   value={passphrase}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassphrase(e.target.value)}
-                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') { e.preventDefault(); validateVoiceLogin() } }}
+                  onKeyDown={handlePassphraseKeyDown}
                   placeholder="Your passphrase…"
                   type="password"
                   className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-colors"

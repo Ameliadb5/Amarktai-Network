@@ -2,6 +2,13 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 
+/** Set the alpha value of an rgba() color string to a specific value */
+function withAlpha(rgba: string, alpha: number): string {
+  const m = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
+  if (!m) return rgba
+  return `rgba(${m[1]},${m[2]},${m[3]},${alpha})`
+}
+
 export type VoiceVisualMode = 'idle' | 'listening' | 'processing' | 'speaking' | 'success' | 'fallback'
 
 const STATE_LABEL: Record<VoiceVisualMode, string> = {
@@ -167,9 +174,9 @@ export default function VoiceAccessVisualizer({
           exit={{ opacity: 0, y: -6, scale: 0.92 }}
           transition={{ duration: 0.25 }}
           style={{
-            borderColor: strandColor.replace('0.9', '0.3').replace('0.95', '0.3').replace('0.45', '0.15').replace('0.85', '0.3'),
-            color: strandColor.replace('0.9', '1').replace('0.95', '1').replace('0.45', '0.6').replace('0.85', '1'),
-            backgroundColor: strandColor.replace('0.9', '0.08').replace('0.95', '0.08').replace('0.45', '0.04').replace('0.85', '0.08'),
+            borderColor: withAlpha(strandColor, 0.3),
+            color: withAlpha(strandColor, 1),
+            backgroundColor: withAlpha(strandColor, 0.08),
           }}
         >
           {STATE_LABEL[mode]}
