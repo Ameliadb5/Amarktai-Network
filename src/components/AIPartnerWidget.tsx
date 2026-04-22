@@ -117,6 +117,9 @@ export interface AIPartnerWidgetProps {
   onAction?: (action: AssistantAction) => void
 }
 
+/** Sentinel empty context used when the context fetch fails or returns nothing */
+const EMPTY_PARTNER_CONTEXT: PartnerContext = { memoryLines: [], usageLines: [], memoryCount: 0 }
+
 export default function AIPartnerWidget({ open, onClose, onAction }: AIPartnerWidgetProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -156,8 +159,8 @@ export default function AIPartnerWidget({ open, onClose, onAction }: AIPartnerWi
     if (!open || partnerContext !== null) return
     fetch('/api/admin/ai-partner/context')
       .then(r => r.ok ? r.json() : null)
-      .then((ctx: PartnerContext | null) => { setPartnerContext(ctx ?? { memoryLines: [], usageLines: [], memoryCount: 0 }) })
-      .catch(() => { setPartnerContext({ memoryLines: [], usageLines: [], memoryCount: 0 }) })
+      .then((ctx: PartnerContext | null) => { setPartnerContext(ctx ?? EMPTY_PARTNER_CONTEXT) })
+      .catch(() => { setPartnerContext(EMPTY_PARTNER_CONTEXT) })
   }, [open, partnerContext])
 
   // Show a memory-aware greeting the first time the widget is opened
