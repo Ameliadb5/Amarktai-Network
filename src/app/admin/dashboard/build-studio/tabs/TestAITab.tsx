@@ -57,6 +57,7 @@ interface ModelOption {
   category: string
   shortDescription?: string
   estimatedCostTier?: 'cheap' | 'medium' | 'expensive'
+  capabilities?: string[]
 }
 
 function encodeBase64Utf8(value: string): string {
