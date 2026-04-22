@@ -13,7 +13,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { timingSafeEqual } from 'crypto'
-import { getDefaultModelForProvider } from '@/lib/model-registry'
+import { getDefaultModelForProvider, MODEL_REGISTRY } from '@/lib/model-registry'
 import { decryptVaultKey } from '@/lib/crypto-vault'
 
 // ── Request / Response Contracts ─────────────────────────────────────────────
@@ -209,14 +209,41 @@ export async function getVaultApiKey(providerKey: string): Promise<string | null
 /**
  * OpenAI image generation models that require /v1/images/generations instead of /v1/chat/completions.
  * These models MUST NEVER be routed to the chat/completions endpoint.
+ * Only real, currently-valid OpenAI model IDs are included here.
  */
 export const OPENAI_IMAGE_MODELS = new Set([
-  'gpt-image-1.5',
   'gpt-image-1',
-  'gpt-image-1-mini',
   'dall-e-3',
   'dall-e-2',
 ])
+
+/**
+ * Together AI image generation model prefixes.
+ * Models matching these prefixes require /v1/images/generations, not /v1/chat/completions.
+ */
+const TOGETHER_IMAGE_MODEL_PREFIXES = [
+  'black-forest-labs/',
+  'stabilityai/stable-diffusion',
+  'stability-ai/',
+]
+
+function isTogetherImageModel(modelId: string): boolean {
+  return TOGETHER_IMAGE_MODEL_PREFIXES.some(prefix => modelId.startsWith(prefix))
+}
+
+/**
+ * Qwen Wanx model ID prefixes.
+ * Wanx models require the DashScope AIGC endpoint (/v1/services/aigc/) —
+ * NOT the compatible-mode /v1/chat/completions path.
+ * They must not be routed through callProvider's standard chat branch.
+ */
+const QWEN_WANX_MODEL_PREFIXES = [
+  'wanx',
+]
+
+function isQwenWanxModel(modelId: string): boolean {
+  return QWEN_WANX_MODEL_PREFIXES.some(prefix => modelId.startsWith(prefix))
+}
 
 /**
  * Call an AI provider via the single provider vault.
@@ -258,12 +285,42 @@ export async function callProvider(
     }
   }
 
-  const resolvedModel = model || vault.defaultModel || defaultModelFor(providerKey)
+  let resolvedModel: string
+  try {
+    resolvedModel = model || vault.defaultModel || defaultModelFor(providerKey)
+  } catch (err) {
+    return {
+      ok: false,
+      output: null,
+      error: err instanceof Error ? err.message : `No default model for provider "${providerKey}"`,
+      latencyMs: Date.now() - start,
+      model: model || 'unknown',
+      providerKey,
+    }
+  }
   const timeout = 30_000
+
+  // ── Phase 7: Strict execution guard ──────────────────────────────────────
+  // Reject calls to models that are explicitly disabled in the registry.
+  // A model being absent from the registry is allowed (e.g. vault-only custom
+  // models) — only explicitly disabled registry entries are blocked.
+  const registryEntry = MODEL_REGISTRY.find(
+    (m) => m.model_id === resolvedModel && m.provider === providerKey
+  )
+  if (registryEntry && !registryEntry.enabled) {
+    return {
+      ok: false,
+      output: null,
+      error: `Model "${resolvedModel}" is disabled and cannot be executed. Check the model registry.`,
+      latencyMs: Date.now() - start,
+      model: resolvedModel,
+      providerKey,
+    }
+  }
 
   try {
     switch (providerKey) {
-      // ── OpenAI-compatible: OpenAI, Groq, DeepSeek, OpenRouter, Together AI, xAI/Grok ──
+      // ── OpenAI-compatible: OpenAI, Groq, DeepSeek, OpenRouter, Together AI, xAI/Grok, Qwen ──
       case 'openai':
       case 'groq':
       case 'deepseek':
@@ -289,6 +346,42 @@ export async function callProvider(
         if (providerKey === 'openrouter') {
           headers['HTTP-Referer'] = 'https://amarktai.network'
           headers['X-Title'] = 'AmarktAI Network'
+        }
+        // ── Phase 5: Wanx guard ──────────────────────────────────────────
+        // Wanx image/video models require DashScope AIGC endpoint, NOT the
+        // compatible-mode chat/completions path. Return a clear error rather
+        // than silently routing to the wrong endpoint.
+        if (providerKey === 'qwen' && isQwenWanxModel(resolvedModel)) {
+          return {
+            ok: false,
+            output: null,
+            error: `Qwen Wanx model "${resolvedModel}" requires the DashScope AIGC endpoint which is not yet wired in callProvider. Use the specialist /api/brain/image or /api/brain/video-generate routes instead.`,
+            latencyMs: Date.now() - start,
+            model: resolvedModel,
+            providerKey,
+          }
+        }
+        // ── Phase 6: Together image routing ──────────────────────────────
+        // Together AI image-generation models (FLUX, Stable Diffusion) use
+        // /v1/images/generations, not /v1/chat/completions.
+        if (providerKey === 'together' && isTogetherImageModel(resolvedModel)) {
+          const imgRes = await fetch(`${base}/v1/images/generations`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: resolvedModel,
+              prompt: message,
+              n: 1,
+            }),
+            signal: AbortSignal.timeout(timeout),
+          })
+          if (!imgRes.ok) {
+            const errBody = await imgRes.json().catch(() => ({})) as { error?: { message?: string } }
+            return { ok: false, output: null, error: `Together Images API HTTP ${imgRes.status}: ${errBody?.error?.message ?? 'request failed'}`, latencyMs: Date.now() - start, model: resolvedModel, providerKey }
+          }
+          const imgData = await imgRes.json() as { data?: Array<{ url?: string; b64_json?: string }> }
+          const imageUrl = imgData?.data?.[0]?.url ?? imgData?.data?.[0]?.b64_json ?? null
+          return { ok: true, output: imageUrl, error: null, latencyMs: Date.now() - start, model: resolvedModel, providerKey }
         }
         // Image models require the images/generations endpoint, not chat/completions
         if (providerKey === 'openai' && OPENAI_IMAGE_MODELS.has(resolvedModel)) {

@@ -4,8 +4,8 @@ import { getVaultApiKey, OPENAI_IMAGE_MODELS } from '@/lib/brain';
 /**
  * POST /api/brain/image — Standard image generation
  *
- * Prefers GPT Image models (gpt-image-1.5 → gpt-image-1 → gpt-image-1-mini),
- * then falls back to DALL-E 3 → DALL-E 2, then Together AI FLUX.
+ * Tries GPT Image 1 (the real OpenAI image model), then falls back to
+ * DALL-E 3 → DALL-E 2, then Together AI FLUX.
  *
  * Returns a structured error with code=no_eligible_image_model when no
  * image-capable provider is configured — never silently falls back to text.
@@ -29,12 +29,10 @@ const DALLE2_SIZES = new Set<string>(['256x256', '512x512', '1024x1024']);
 /**
  * GPT Image family — the canonical OpenAI image-generation models.
  * These must NEVER be routed to the chat/completions endpoint.
- * Ordered: highest-capability first.
+ * Only real, currently-valid model IDs are listed here.
  */
 const GPT_IMAGE_MODELS_ORDERED = [
-  'gpt-image-1.5',
   'gpt-image-1',
-  'gpt-image-1-mini',
 ] as const;
 
 /** Together AI FLUX models tried in order for fallback image generation. */
@@ -208,7 +206,7 @@ export async function POST(request: NextRequest) {
         error:
           'No image generation provider is configured. ' +
           'Add an OpenAI API key (Admin → AI Providers) to enable GPT Image models. ' +
-          'Supported: gpt-image-1.5, gpt-image-1, gpt-image-1-mini, dall-e-3, Together AI FLUX.',
+          'Supported: gpt-image-1, dall-e-3, Together AI FLUX.',
         candidate_models: candidateModels,
         rejection_reasons: rejectionReasons,
         providers_checked: ['openai', 'together'],

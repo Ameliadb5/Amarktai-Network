@@ -176,8 +176,10 @@ describe('Model Registry', () => {
       }
     })
 
-    it('returns "unknown" for unknown provider', () => {
-      expect(getDefaultModelForProvider('nonexistent')).toBe('unknown')
+    it('throws for unknown provider', () => {
+      expect(() => getDefaultModelForProvider('nonexistent')).toThrow(
+        'No default model configured for provider "nonexistent"'
+      )
     })
   })
 

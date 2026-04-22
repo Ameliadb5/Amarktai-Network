@@ -192,7 +192,16 @@ function MemoryTab({ data }: { data: unknown }) {
         </div>
       )}
 
-      {total === 0 && <Placeholder icon={Database} message="No memory entries stored yet." />}
+      {total === 0 && (
+        <div className={`${CARD} p-6 text-center`}>
+          <Database className="mx-auto mb-3 h-7 w-7 text-white/20" />
+          <p className="text-sm text-white/50 mb-1">No memory entries yet</p>
+          <p className="text-xs text-white/30 max-w-sm mx-auto">
+            Memory is populated automatically after successful brain requests.
+            Run a test in <span className="text-blue-300/70">Workspace → Test AI</span> or send a message via an app agent, then return here.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -296,7 +305,15 @@ function LearningTab({ data }: { data: unknown }) {
         </div>
       )}
 
-      {isEmpty && <Placeholder icon={Brain} message="No learning insights yet." />}
+      {isEmpty && (
+        <div className={`${CARD} p-6 text-center`}>
+          <Brain className="mx-auto mb-3 h-7 w-7 text-white/20" />
+          <p className="text-sm text-white/50 mb-1">No learning insights yet</p>
+          <p className="text-xs text-white/30 max-w-sm mx-auto">
+            Learning data builds from real request outcomes. Make some requests via <span className="text-blue-300/70">Workspace → Test AI</span> or through your connected apps to build the learning record.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

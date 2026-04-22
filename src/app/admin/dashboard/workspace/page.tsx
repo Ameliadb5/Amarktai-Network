@@ -110,6 +110,14 @@ export default function WorkspacePage() {
         .slice(0, 5)
     : []
 
+  // Top providers by requests for the breakdown display
+  const topProviders = usage
+    ? Object.entries(usage.byProvider)
+        .filter(([, v]) => v.requests > 0)
+        .sort((a, b) => b[1].requests - a[1].requests)
+        .slice(0, 4)
+    : []
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-[#0a1226] to-[#050a17] p-6">
@@ -164,6 +172,18 @@ export default function WorkspacePage() {
                 <span key={cap} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-slate-400">
                   {cap.replace(/_/g, ' ')}: <span className="text-white">${(v.costCents / 100).toFixed(4)}</span>
                   {' · '}{v.requests} req
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Per-provider breakdown — only show when there is real data */}
+          {topProviders.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-1">
+              {topProviders.map(([prov, v]) => (
+                <span key={prov} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.03] border border-white/[0.05] text-slate-500">
+                  <span className="text-blue-300/80">{prov}</span>: {v.requests} req
+                  {v.costCents > 0 && <span className="ml-1 text-slate-400">(${(v.costCents / 100).toFixed(4)})</span>}
                 </span>
               ))}
             </div>

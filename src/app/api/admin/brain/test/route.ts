@@ -20,6 +20,7 @@ import { getAppSafetyConfig } from '@/lib/content-filter'
 import { syncProviderHealthFromDB } from '@/lib/sync-provider-health'
 import { recordUsage } from '@/lib/usage-meter'
 import { estimateCostUsd } from '@/lib/budget-tracker'
+import { saveMemory } from '@/lib/memory'
 
 /**
  * Estimate prompt tokens from message character count.
@@ -69,6 +70,13 @@ function computeCostCents(capability: string, model: string, tokens: number, suc
   const floor = CAPABILITY_FLOOR_CENTS[capability] ?? CAPABILITY_FLOOR_CENTS.default
   return Math.max(estimated, floor)
 }
+
+/** Max characters of output to include in auto-saved event memories. */
+const MEMORY_OUTPUT_SLICE = 200
+/** Importance weight for auto-saved brain test event memories (low, informational only). */
+const MEMORY_IMPORTANCE = 0.3
+/** TTL in days for auto-saved brain test event memories. */
+const MEMORY_TTL_DAYS = 30
 
 const testSchema = z.object({
   message: z.string().min(1).max(16_000),
@@ -646,6 +654,7 @@ export async function POST(request: NextRequest) {
   if (body.providerKey && !isSpecialist) {
     const result = await callProvider(body.providerKey, body.modelId ?? '', body.message)
     const latencyMs = Date.now() - start
+    const directCostCents = computeCostCents(body.taskType, result.model, estimateTokens(body.message), result.ok)
     await logBrainEvent({
       traceId, productId: null, appSlug: '__admin_test__', taskType: body.taskType,
       executionMode: 'direct', classificationJson: JSON.stringify({ capabilities }),
@@ -660,13 +669,26 @@ export async function POST(request: NextRequest) {
       model: result.model,
       success: result.ok,
       latencyMs,
-      costUsdCents: computeCostCents(body.taskType, result.model, estimateTokens(body.message), result.ok),
+      costUsdCents: directCostCents,
     })
+    if (result.ok && result.output) {
+      // Fire-and-forget: auto-save a lightweight event memory so the Intelligence
+      // Memory panel populates after real operator usage (never blocks the response).
+      saveMemory({
+        appSlug: usageAppSlug,
+        memoryType: 'event',
+        key: `brain_test_${traceId}`,
+        content: `[${body.taskType}] ${result.output.slice(0, MEMORY_OUTPUT_SLICE)} via ${body.providerKey}/${result.model}`,
+        importance: MEMORY_IMPORTANCE,
+        ttlDays: MEMORY_TTL_DAYS,
+      }).catch(() => { /* non-blocking */ })
+    }
     return NextResponse.json(
       {
         success: result.ok, executed: result.ok, traceId, output: result.output,
         capability: capabilities, routedProvider: body.providerKey, routedModel: result.model,
         executionMode: 'direct', confidenceScore: null, fallbackUsed: false, fallback_used: false,
+        costUsdCents: directCostCents,
         error: result.error ?? null, latencyMs, timestamp: new Date().toISOString(),
       },
       { status: result.ok ? 200 : 502 },
@@ -703,6 +725,7 @@ export async function POST(request: NextRequest) {
     errorMessage: orchResult.errors.length > 0 ? orchResult.errors.join('; ') : null,
     warningsJson: JSON.stringify(orchResult.warnings), latencyMs,
   })
+  const orchCostCents = computeCostCents(body.taskType, orchResult.routedModel ?? 'default', estimateTokens(body.message), success)
   await recordUsage({
     appSlug: usageAppSlug,
     capability: body.taskType,
@@ -710,8 +733,21 @@ export async function POST(request: NextRequest) {
     model: orchResult.routedModel ?? '',
     success,
     latencyMs,
-    costUsdCents: computeCostCents(body.taskType, orchResult.routedModel ?? 'default', estimateTokens(body.message), success),
+    costUsdCents: orchCostCents,
   })
+
+  if (success && orchResult.output) {
+    // Fire-and-forget: auto-save a lightweight event memory so the Intelligence
+    // Memory panel populates after real operator usage (never blocks the response).
+    saveMemory({
+      appSlug: usageAppSlug,
+      memoryType: 'event',
+      key: `brain_test_${traceId}`,
+      content: `[${body.taskType}] ${orchResult.output.slice(0, MEMORY_OUTPUT_SLICE)} via ${orchResult.routedProvider ?? 'unknown'}/${orchResult.routedModel ?? 'unknown'}`,
+      importance: MEMORY_IMPORTANCE,
+      ttlDays: MEMORY_TTL_DAYS,
+    }).catch(() => { /* non-blocking */ })
+  }
 
   return NextResponse.json(
     {
@@ -722,6 +758,7 @@ export async function POST(request: NextRequest) {
       validationUsed: orchResult.validationUsed, consensusUsed: orchResult.consensusUsed,
       fallbackUsed: orchResult.fallbackUsed, fallback_used: orchResult.fallbackUsed,
       warnings: orchResult.warnings, routingReason: orchResult.routingReason,
+      costUsdCents: orchCostCents,
       error: orchResult.errors[0] ?? null, latencyMs, timestamp: new Date().toISOString(),
     },
     { status: success ? 200 : 502 },
