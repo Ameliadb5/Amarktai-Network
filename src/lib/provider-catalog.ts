@@ -147,9 +147,11 @@ export const CANONICAL_PROVIDERS: readonly CanonicalProviderEntry[] = [
   {
     key: 'qwen',
     displayName: 'Qwen',
-    defaultBaseUrl: 'https://dashscope.aliyuncs.com',
+    // International DashScope compatible-mode endpoint (OpenAI-compatible API).
+    // This matches the base URL used by brain.ts and providers.ts at runtime.
+    defaultBaseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode',
     healthCheckSupported: true,
-    supportedCapabilityFamilies: ['chat', 'reasoning', 'code', 'vision', 'image_generation', 'video_generation', 'embeddings', 'voice_interaction'],
+    supportedCapabilityFamilies: ['chat', 'reasoning', 'code', 'vision', 'image_generation', 'video_generation', 'embeddings', 'voice_interaction', 'stt'],
     sortOrder: 9,
     launchRequired: false,
   },

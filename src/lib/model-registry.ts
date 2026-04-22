@@ -559,7 +559,8 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     context_window: 32_768,
     latency_tier: 'ultra_low',
     cost_tier: 'low',
-    enabled: true,
+    // Deprecated by Groq June 2024 — disabled to prevent 404 routing errors
+    enabled: false,
     health_status: 'configured',
     fallback_priority: 5,
     validator_eligible: false,
@@ -718,7 +719,8 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     context_window: 128_000,
     latency_tier: 'medium',
     cost_tier: 'high',
-    enabled: true,
+    // Deprecated by OpenAI — use o3-mini or o4-mini instead
+    enabled: false,
     health_status: 'configured',
     fallback_priority: 3,
     validator_eligible: false,
@@ -1517,7 +1519,8 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     context_window: 4_096,
     latency_tier: 'ultra_low',
     cost_tier: 'free',
-    enabled: true,
+    // Deprecated by TogetherAI — disabled to prevent 404 routing errors
+    enabled: false,
     health_status: 'configured',
     fallback_priority: 8,
     validator_eligible: false,
@@ -2805,8 +2808,8 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
   {
     provider: 'groq',
     provider_tier: 'backbone',
-    model_id: 'llama-3.2-1b-preview',
-    model_name: 'Llama 3.2 1B Preview (Groq)',
+    model_id: 'llama-3.2-1b',
+    model_name: 'Llama 3.2 1B (Groq)',
     family: 'Llama-3.2',
     primary_role: 'chat',
     secondary_roles: [],
@@ -2835,8 +2838,8 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
   {
     provider: 'groq',
     provider_tier: 'backbone',
-    model_id: 'llama-3.2-3b-preview',
-    model_name: 'Llama 3.2 3B Preview (Groq)',
+    model_id: 'llama-3.2-3b',
+    model_name: 'Llama 3.2 3B (Groq)',
     family: 'Llama-3.2',
     primary_role: 'chat',
     secondary_roles: ['multilingual'],
@@ -4445,7 +4448,8 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     context_window: 4096,
     latency_tier: 'high',
     cost_tier: 'premium',
-    enabled: true,
+    // Not a real OpenAI model ID — disabled to prevent 404 errors
+    enabled: false,
     health_status: 'configured',
     fallback_priority: 1,
     validator_eligible: false,
@@ -4477,7 +4481,8 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     context_window: 4096,
     latency_tier: 'medium',
     cost_tier: 'medium',
-    enabled: true,
+    // Not a real OpenAI model ID — disabled to prevent 404 errors
+    enabled: false,
     health_status: 'configured',
     fallback_priority: 2,
     validator_eligible: false,
@@ -4762,7 +4767,9 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     context_window: 10_000_000,
     latency_tier: 'medium',
     cost_tier: 'low',
-    enabled: true,
+    // qwen-long requires DashScope native API (not compatible-mode) with
+    // special multipart input format — unusable via current callProvider path
+    enabled: false,
     health_status: 'unconfigured',
     fallback_priority: 5,
     validator_eligible: false,
@@ -4852,7 +4859,8 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     context_window: 32_768,
     latency_tier: 'medium',
     cost_tier: 'medium',
-    enabled: true,
+    // Deprecated alias — replaced by qwen2.5-vl-72b-instruct
+    enabled: false,
     health_status: 'unconfigured',
     fallback_priority: 2,
     validator_eligible: false,
@@ -4882,7 +4890,8 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     context_window: 32_768,
     latency_tier: 'low',
     cost_tier: 'low',
-    enabled: true,
+    // Deprecated alias — replaced by qwen2.5-vl-7b-instruct
+    enabled: false,
     health_status: 'unconfigured',
     fallback_priority: 3,
     validator_eligible: false,
@@ -5248,7 +5257,7 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     supports_image_generation: false,
     supports_video_planning: false,
     supports_agent_planning: false,
-    context_window: 4096,
+    context_window: 32_768,
     latency_tier: 'medium',
     cost_tier: 'low',
     enabled: true,
@@ -5256,6 +5265,38 @@ export const MODEL_REGISTRY: readonly ModelEntry[] = [
     fallback_priority: 3,
     validator_eligible: false,
     specialist_domains: ['mathematics', 'stem', 'problem_solving', 'formal_reasoning'],
+    category: 'text',
+  },
+
+  // ── Qwen QwQ — flagship text reasoning model ─────────────────────────────
+  {
+    provider: 'qwen',
+    provider_tier: 'backbone',
+    model_id: 'qwq-32b',
+    model_name: 'QwQ 32B (Qwen Reasoning)',
+    family: 'QwQ',
+    primary_role: 'reasoning',
+    secondary_roles: ['chat', 'coding', 'multilingual', 'validation'],
+    supports_chat: true,
+    supports_reasoning: true,
+    supports_code: true,
+    supports_tool_use: false,
+    supports_multilingual: true,
+    supports_structured_output: false,
+    supports_embeddings: false,
+    supports_reranking: false,
+    supports_vision: false,
+    supports_image_generation: false,
+    supports_video_planning: false,
+    supports_agent_planning: false,
+    context_window: 32_768,
+    latency_tier: 'high',
+    cost_tier: 'medium',
+    enabled: true,
+    health_status: 'unconfigured',
+    fallback_priority: 2,
+    validator_eligible: true,
+    specialist_domains: ['reasoning', 'math', 'science', 'analysis', 'general', 'multilingual'],
     category: 'text',
   },
 
@@ -6348,6 +6389,7 @@ const DEFAULT_MODEL_MAP: Record<string, string> = {
   openrouter: 'openai/gpt-4o-mini',
   together: 'meta-llama/Llama-3-70b-chat-hf',
   grok: 'grok-2-latest',
+  qwen: 'qwen-plus',
   huggingface: 'meta-llama/Llama-3-8b-chat-hf',
   nvidia: 'nvidia/llama-3.1-nemotron-70b-instruct',
   gemini: 'gemini-1.5-flash',
@@ -6367,5 +6409,9 @@ const DEFAULT_MODEL_MAP: Record<string, string> = {
  * @returns The default model ID, or `'unknown'` for unrecognised providers.
  */
 export function getDefaultModelForProvider(providerKey: string): string {
-  return DEFAULT_MODEL_MAP[providerKey] ?? 'unknown';
+  const model = DEFAULT_MODEL_MAP[providerKey];
+  if (!model) {
+    throw new Error(`No default model configured for provider "${providerKey}". Add an entry to DEFAULT_MODEL_MAP.`);
+  }
+  return model;
 }

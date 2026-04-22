@@ -19,6 +19,30 @@ const CAPABILITIES = [
   'adult_image', 'app_builder',
 ]
 
+/**
+ * Maps UI capability names to the model capability flag that must be present
+ * for a model to appear in the dropdown for that capability.
+ * When a capability maps to null, all models are shown (no capability filter).
+ */
+const CAPABILITY_TO_MODEL_FLAG: Record<string, string | null> = {
+  chat:          'chat',
+  code:          'code',
+  reasoning:     'reasoning',
+  image:         'image_generation',
+  image_editing: 'image_generation',
+  video:         'video_generation',
+  video_planning:'video_planning',
+  tts:           'tts',
+  stt:           'stt',
+  vision:        'vision',
+  embeddings:    'embeddings',
+  reranking:     'reranking',
+  research:      'chat',
+  suggestive:    'image_generation',
+  adult_image:   'image_generation',
+  app_builder:   'chat',
+}
+
 /** Rough estimate: average English word is ~4 characters, ~1 token */
 const CHARS_PER_TOKEN_ESTIMATE = 4
 /** Conservative blended rate in USD per token across cheap→medium models */
@@ -119,7 +143,7 @@ export default function TestAITab() {
 
   const loadModels = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/models')
+      const res = await fetch('/api/admin/models?enabled=true')
       if (res.ok) {
         const data = await res.json().catch(() => ({ models: [] }))
         setModels(data.models ?? [])
@@ -140,9 +164,14 @@ export default function TestAITab() {
 
   useEffect(() => { loadProviders(); loadModels(); loadCapabilities() }, [loadProviders, loadModels, loadCapabilities])
 
-  const visibleModels = forceProvider === 'auto'
-    ? models
-    : models.filter((m) => m.provider === forceProvider)
+  const visibleModels = useMemo(() => {
+    const capFlag = CAPABILITY_TO_MODEL_FLAG[capability] ?? null
+    return models.filter((m) => {
+      const providerMatch = forceProvider === 'auto' || m.provider === forceProvider
+      const capMatch = capFlag === null || (m.capabilities ?? []).includes(capFlag)
+      return providerMatch && capMatch
+    })
+  }, [models, forceProvider, capability])
   const visibleModelKeys = useMemo(() => new Set(visibleModels.map((m) => `${m.provider}:${m.id}`)), [visibleModels])
 
   /** Pre-computed cost estimate for the current prompt, shown in the result panel. */
