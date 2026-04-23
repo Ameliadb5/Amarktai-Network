@@ -5,11 +5,15 @@
  *
  * Provider chain (in priority order):
  *   1. Replicate (wan-ai/wan2.1-t2v-480p, minimax/video-01)
- *   2. Together AI (black-forest-labs/FLUX.1-schnell-Free — video-capable models)
+ *   2. Together AI (black-forest-labs/FLUX.1-schnell-Free — short clip)
+ *   3. Qwen/DashScope Wan (wanx2.1-t2v-turbo, wanx2.1-t2v-plus — async AIGC endpoint)
  *
  * Hugging Face is NOT supported for video generation. The Inference API does not
  * provide a stable asynchronous video job endpoint for models like zeroscope.
  * Explicit requests with provider="huggingface" return a 400 with a clear error.
+ *
+ * Gemini Veo 2 is in the model registry but requires Vertex AI enterprise tier billing
+ * and is not callable from a standard Gemini API key — excluded from this route.
  *
  * When no video provider is configured, this route falls back to video_planning
  * mode — returning a script/storyboard instead of a generated video file.
@@ -17,8 +21,8 @@
  * Returns a jobId immediately. Poll GET /api/brain/video-generate/[jobId]
  * to check status and retrieve the result URL once complete.
  *
- * Capability truth: video_generation is AVAILABLE only when Replicate or
- * Together AI is configured and this route returns a real job.
+ * Capability truth: video_generation is AVAILABLE only when Replicate, Together AI,
+ * or Qwen/DashScope is configured and this route returns a real job.
  */
 
 import { NextResponse } from 'next/server';
@@ -49,7 +53,9 @@ const RequestSchema = z.object({
   // because the Hugging Face Inference API does not support async video generation.
   // It is kept in the enum so existing integrations that send 'huggingface' receive a clear
   // error message rather than a schema-validation failure.
-  provider: z.enum(['replicate', 'together', 'huggingface', 'auto']).optional().default('auto'),
+  // 'gemini' is listed for completeness but Veo 2 requires Vertex AI enterprise tier;
+  // callers who send 'gemini' receive a clear explanation rather than a schema error.
+  provider: z.enum(['replicate', 'together', 'qwen', 'huggingface', 'gemini', 'auto']).optional().default('auto'),
   model: z.string().optional(),
 });
 
@@ -134,9 +140,56 @@ async function createTogetherVideoJob(
 }
 
 /**
+ * Qwen/DashScope Wan text-to-video — async AIGC endpoint.
+ * Submits a job and returns immediately with a task_id as the providerJobId.
+ * The caller persists the task_id and polls /api/brain/video-generate/[jobId]
+ * which in turn polls the DashScope task endpoint.
+ */
+async function createQwenWanVideoJob(
+  prompt: string,
+  modelId: string,
+  apiKey: string,
+): Promise<{ providerJobId: string; status: string }> {
+  const res = await fetch(
+    'https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'X-DashScope-Async': 'enable',
+      },
+      body: JSON.stringify({
+        model: modelId,
+        input: { prompt },
+        parameters: { size: '1280*720' },
+      }),
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Qwen Wan job creation failed (${res.status}): ${errText}`);
+  }
+
+  interface QwenTaskResponse {
+    output?: { task_id?: string; task_status?: string };
+    request_id?: string;
+  }
+  const data = await res.json() as QwenTaskResponse;
+  const taskId = data?.output?.task_id;
+  if (!taskId) throw new Error('Qwen Wan: no task_id returned from submit response');
+
+  return { providerJobId: `qwen-wan:${taskId}`, status: 'processing' };
+}
+
+/**
  * Generate a video_planning fallback — returns a structured script/storyboard
- * via the text AI when no real video provider is available. This ensures the
- * caller always gets useful output rather than a bare 503 error.
+ * via any available text AI when no real video provider is available. This
+ * ensures the caller always gets useful output rather than a bare 503 error.
+ *
+ * Provider order: Groq (fast/cheap) → Gemini → OpenAI → Together → Qwen
  */
 async function generateVideoPlanningFallback(
   prompt: string,
@@ -144,16 +197,27 @@ async function generateVideoPlanningFallback(
   duration: number,
   _req: Request,
 ): Promise<{ script: string; note: string } | null> {
-  try {
-    const planningPrompt =
-      `Create a ${duration}-second ${style} video script/storyboard for: "${prompt}". ` +
-      `Structure the output as: Scene list, Shot descriptions, Narration/dialogue, Visual style notes.`;
-    const result = await callProvider('openai', 'gpt-4o-mini', planningPrompt, undefined);
-    if (result.output) {
-      return { script: result.output, note: 'Video generation provider unavailable — storyboard generated instead.' };
+  const planningPrompt =
+    `Create a ${duration}-second ${style} video script/storyboard for: "${prompt}". ` +
+    `Structure the output as: Scene list, Shot descriptions, Narration/dialogue, Visual style notes.`;
+
+  const PLANNING_PROVIDERS: Array<{ key: string; model: string }> = [
+    { key: 'groq',    model: 'llama-3.3-70b-versatile' },
+    { key: 'gemini',  model: 'gemini-2.0-flash' },
+    { key: 'openai',  model: 'gpt-4o-mini' },
+    { key: 'together', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo' },
+    { key: 'qwen',    model: 'qwen-plus' },
+  ];
+
+  for (const { key, model } of PLANNING_PROVIDERS) {
+    try {
+      const result = await callProvider(key, model, planningPrompt, undefined);
+      if (result.output) {
+        return { script: result.output, note: 'Video generation provider unavailable — storyboard generated instead.' };
+      }
+    } catch {
+      // Try the next provider
     }
-  } catch {
-    // Planning fallback is best-effort; never block the caller
   }
   return null;
 }
@@ -186,7 +250,21 @@ export async function POST(req: Request): Promise<NextResponse> {
         executed: false,
         error:
           'Video generation is not supported via Hugging Face in this configuration. ' +
-          'Use Replicate or Together AI for video generation.',
+          'Use Replicate, Together AI, or Qwen/DashScope (Wan) for video generation.',
+      },
+      { status: 400 },
+    );
+  }
+
+  // Gemini Veo 2 requires Vertex AI enterprise tier — not callable from a standard Gemini API key.
+  if (provider === 'gemini') {
+    return NextResponse.json(
+      {
+        capability: 'video_generation',
+        executed: false,
+        error:
+          'Gemini Veo 2 video generation requires Vertex AI enterprise tier billing and is not ' +
+          'available via the standard Gemini API key. Use Replicate, Together AI, or Qwen/DashScope (Wan) instead.',
       },
       { status: 400 },
     );
@@ -233,7 +311,30 @@ export async function POST(req: Request): Promise<NextResponse> {
         usedModel = togetherModel;
         initialStatus = result.status;
       } catch {
-        // Together AI failed — no more providers to try
+        // Together AI failed — try next provider
+      }
+    }
+  }
+
+  // Qwen/DashScope Wan text-to-video fallback
+  const QWEN_WAN_VIDEO_MODELS = [
+    { id: 'wanx2.1-t2v-turbo', name: 'Wan 2.1 T2V Turbo' },
+    { id: 'wanx2.1-t2v-plus',  name: 'Wan 2.1 T2V Plus' },
+  ] as const;
+  if (!providerJobId && (provider === 'auto' || provider === 'qwen')) {
+    const qwenKey = await getVaultApiKey('qwen');
+    if (qwenKey) {
+      const qwenModelId = model && QWEN_WAN_VIDEO_MODELS.find((m) => m.id === model)
+        ? model
+        : QWEN_WAN_VIDEO_MODELS[0].id;
+      try {
+        const result = await createQwenWanVideoJob(enhancedPrompt, qwenModelId, qwenKey);
+        providerJobId = result.providerJobId;
+        usedProvider = 'qwen';
+        usedModel = qwenModelId;
+        initialStatus = result.status;
+      } catch {
+        // Qwen Wan failed — fall through to planning fallback
       }
     }
   }
@@ -260,8 +361,8 @@ export async function POST(req: Request): Promise<NextResponse> {
         executed: false,
         error:
           'Video generation is not available: no video provider is configured. ' +
-          'Configure Replicate or Together AI in Admin → AI Providers to enable video generation. ' +
-          'Note: video generation is not supported via Gemini, OpenAI chat, or Hugging Face standard inference.',
+          'Configure Replicate, Together AI, or Qwen/DashScope (Wan) in Admin → AI Providers to enable video generation. ' +
+          'Note: Gemini Veo 2 requires Vertex AI enterprise tier and is not supported via the standard API key.',
       },
       { status: 503 },
     );

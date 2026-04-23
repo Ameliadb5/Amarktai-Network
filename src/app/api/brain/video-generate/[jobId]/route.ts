@@ -68,6 +68,53 @@ async function pollReplicateJob(
   };
 }
 
+async function pollQwenWanJob(
+  providerJobId: string,
+  apiKey: string,
+): Promise<{ status: string; resultUrl?: string; error?: string }> {
+  // providerJobId format: "qwen-wan:<task_id>"
+  const taskId = providerJobId.replace(/^qwen-wan:/, '');
+  if (!taskId) throw new Error('Invalid Qwen Wan providerJobId format');
+
+  const res = await fetch(
+    `https://dashscope-intl.aliyuncs.com/api/v1/tasks/${taskId}`,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Qwen Wan poll failed (${res.status}): ${errText}`);
+  }
+
+  interface QwenTaskResult {
+    output?: {
+      task_status?: string;
+      video_url?: string;
+      results?: Array<{ url?: string; video_url?: string }>;
+      message?: string;
+    };
+  }
+  const data = await res.json() as QwenTaskResult;
+  const taskStatus = data?.output?.task_status ?? 'RUNNING';
+
+  if (taskStatus === 'SUCCEEDED') {
+    // Result may be in video_url or results[0].url/video_url
+    const resultUrl =
+      data.output?.video_url ??
+      data.output?.results?.[0]?.video_url ??
+      data.output?.results?.[0]?.url;
+    return { status: 'succeeded', resultUrl };
+  }
+  if (taskStatus === 'FAILED') {
+    return { status: 'failed', error: data.output?.message ?? 'Qwen Wan video generation failed' };
+  }
+  // PENDING | RUNNING | SUSPENDED
+  return { status: 'processing' };
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ jobId: string }> },
@@ -118,6 +165,11 @@ export async function GET(
       } else {
         // Async Together jobs — mark as processing (no dedicated poll API available).
         updated = { status: 'processing' };
+      }
+    } else if (job.provider === 'qwen' && job.providerJobId) {
+      const apiKey = await getVaultApiKey('qwen');
+      if (apiKey) {
+        updated = await pollQwenWanJob(job.providerJobId, apiKey);
       }
     } else if (job.provider === 'huggingface') {
       // Hugging Face video generation is no longer supported. Any legacy jobs that
