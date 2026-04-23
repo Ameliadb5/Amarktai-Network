@@ -257,6 +257,124 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Provider fallback: Gemini Imagen 3.0 ───────────────────────────
+    // Imagen 3.0 enforces safety by default — suitable for suggestive (non-explicit) content.
+    const geminiKey = await getVaultApiKey('gemini');
+    if (geminiKey) {
+      try {
+        const imagenEndpoint =
+          `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(geminiKey)}`;
+        const imagenRes = await fetch(imagenEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instances: [{ prompt: finalPrompt }],
+            parameters: { sampleCount: 1, aspectRatio: '1:1' },
+          }),
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (imagenRes.ok) {
+          const imagenData = await imagenRes.json() as {
+            predictions?: Array<{ bytesBase64Encoded?: string; mimeType?: string }>
+          };
+          const b64 = imagenData?.predictions?.[0]?.bytesBase64Encoded;
+          const mime = imagenData?.predictions?.[0]?.mimeType ?? 'image/png';
+          if (b64) {
+            return NextResponse.json({
+              capability: 'suggestive_image_generation',
+              executed: true,
+              fallback_used: true,
+              imageBase64: `data:${mime};base64,${b64}`,
+              provider: 'gemini',
+              model: 'imagen-3.0-generate-002',
+              promptUsed: finalPrompt,
+              promptRewritten,
+              size,
+            });
+          }
+        } else {
+          const errBody = await imagenRes.json().catch(() => ({})) as { error?: { message?: string } };
+          console.warn(`[brain/suggestive-image] Gemini Imagen failed (${imagenRes.status}): ${errBody?.error?.message ?? ''}`);
+        }
+      } catch (gErr) {
+        console.warn('[brain/suggestive-image] Gemini Imagen error:', gErr instanceof Error ? gErr.message : gErr);
+      }
+    }
+
+    // ── Provider fallback: Qwen Wanx image generation (async) ─────────
+    const qwenKey = await getVaultApiKey('qwen');
+    if (qwenKey) {
+      const WANX_MODELS = [
+        { id: 'wanx2.1-t2i-turbo', label: 'Wanx 2.1 Turbo' },
+        { id: 'wanx-v1',           label: 'Wanx v1' },
+      ] as const;
+      const WANX_BASE = 'https://dashscope-intl.aliyuncs.com/api/v1';
+      const wanxSize = size.replace('x', '*');
+
+      for (const wanxModel of WANX_MODELS) {
+        try {
+          const submitRes = await fetch(
+            `${WANX_BASE}/services/aigc/text2image/image-synthesis`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${qwenKey}`,
+                'Content-Type': 'application/json',
+                'X-DashScope-Async': 'enable',
+              },
+              body: JSON.stringify({
+                model: wanxModel.id,
+                input: { prompt: finalPrompt },
+                parameters: { size: wanxSize, n: 1 },
+              }),
+              signal: AbortSignal.timeout(15_000),
+            },
+          );
+
+          if (!submitRes.ok) {
+            if (submitRes.status === 401 || submitRes.status === 403) break;
+            continue;
+          }
+
+          const submitData = await submitRes.json() as { output?: { task_id?: string } };
+          const taskId = submitData?.output?.task_id;
+          if (!taskId) continue;
+
+          const POLL_DEADLINE = Date.now() + 50_000;
+          let taskResult: { output?: { task_status?: string; results?: Array<{ url?: string }> } } = {};
+
+          while (Date.now() < POLL_DEADLINE) {
+            await new Promise(r => setTimeout(r, 2_000));
+            const pollRes = await fetch(`${WANX_BASE}/tasks/${taskId}`, {
+              headers: { Authorization: `Bearer ${qwenKey}` },
+              signal: AbortSignal.timeout(10_000),
+            }).catch(() => null);
+            if (!pollRes?.ok) continue;
+            taskResult = await pollRes.json().catch(() => ({})) as typeof taskResult;
+            const status = taskResult?.output?.task_status;
+            if (status === 'SUCCEEDED' || status === 'FAILED') break;
+          }
+
+          const resultUrl = taskResult?.output?.results?.[0]?.url;
+          if (resultUrl) {
+            return NextResponse.json({
+              capability: 'suggestive_image_generation',
+              executed: true,
+              fallback_used: true,
+              imageUrl: resultUrl,
+              provider: 'qwen',
+              model: wanxModel.id,
+              promptUsed: finalPrompt,
+              promptRewritten,
+              size,
+            });
+          }
+        } catch (qErr) {
+          console.warn(`[brain/suggestive-image] Qwen ${wanxModel.id} error:`, qErr instanceof Error ? qErr.message : qErr);
+        }
+      }
+    }
+
     // ── No provider available ───────────────────────────────────────────
     return NextResponse.json(
       {
@@ -264,8 +382,9 @@ export async function POST(request: NextRequest) {
         executed: false,
         error:
           'No image generation provider is configured. ' +
-          'Add an API key via Admin → AI Providers. Supported: OpenAI (DALL-E 3), Together AI (FLUX/SDXL), HuggingFace (SDXL).',
-        providers_checked: ['openai', 'together', 'huggingface'],
+          'Add an API key via Admin → AI Providers. ' +
+          'Supported: OpenAI (DALL-E 3), Together AI (FLUX/SDXL), HuggingFace (SDXL), Gemini (Imagen 3.0), Qwen/DashScope (Wanx).',
+        providers_checked: ['openai', 'together', 'huggingface', 'gemini', 'qwen'],
       },
       { status: 503 },
     );

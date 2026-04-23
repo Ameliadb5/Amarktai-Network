@@ -95,7 +95,7 @@ const CAPABILITY_MAP: Record<CapabilityClass, CapabilityRequirement> = {
   embeddings: {
     anyCapabilityFlag: ['supports_embeddings'],
     label: 'text embeddings',
-    suggestedProviders: ['openai', 'huggingface', 'nvidia'],
+    suggestedProviders: ['openai', 'qwen', 'gemini', 'huggingface'],
   },
   reranking: {
     anyCapabilityFlag: ['supports_reranking'],
@@ -154,7 +154,7 @@ const CAPABILITY_MAP: Record<CapabilityClass, CapabilityRequirement> = {
     anyCapabilityFlag: ['supports_stt', 'supports_voice_interaction'],
     anyRole: ['voice_interaction'],
     label: 'voice / speech input (STT)',
-    suggestedProviders: ['groq', 'openai', 'gemini', 'huggingface'],
+    suggestedProviders: ['groq', 'openai', 'gemini', 'qwen', 'huggingface'],
   },
   voice_output: {
     anyCapabilityFlag: ['supports_tts'],
