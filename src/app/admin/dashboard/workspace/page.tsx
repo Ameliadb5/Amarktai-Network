@@ -69,26 +69,35 @@ export default function WorkspacePage() {
         setPartnerOpen(false)
         return
       }
-      // Navigate to dashboard section
+      // Navigate to dashboard section — only real production routes
       const routes: Record<string, string> = {
         apps: '/admin/dashboard/apps',
-        brain: '/admin/dashboard/brain',
+        brain: '/admin/dashboard/intelligence',
+        intelligence: '/admin/dashboard/intelligence',
         artifacts: '/admin/dashboard/artifacts',
-        budget: '/admin/dashboard/system',
+        budget: '/admin/dashboard/operations',
+        operations: '/admin/dashboard/operations',
         onboarding: '/admin/dashboard/onboarding',
-        healing: '/admin/dashboard/healing',
         events: '/admin/dashboard/events',
-        providers: '/admin/dashboard/providers',
+        providers: '/admin/dashboard/operations',
+        models: '/admin/dashboard/models',
       }
       if (routes[section]) router.push(routes[section])
     } else if (action.type === 'show_artifacts') {
       router.push('/admin/dashboard/artifacts')
     } else if (action.type === 'check_budget') {
-      router.push('/admin/dashboard/system')
+      router.push('/admin/dashboard/operations')
     } else if (action.type === 'start_onboarding') {
       router.push('/admin/dashboard/onboarding')
+    } else if (action.type === 'generate_image') {
+      // Switch to images tab — operator executes the generation there with the given prompt
+      setActive('images')
+      setPartnerOpen(false)
+    } else if (action.type === 'run_test') {
+      // Switch to test-ai tab — operator runs the test there
+      setActive('test-ai')
+      setPartnerOpen(false)
     }
-    // generate_image and run_test: handled by widget confirmation, no navigation needed here
   }, [router, setActive, setPartnerOpen])
 
   const loadUsage = useCallback(() => {

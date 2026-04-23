@@ -183,9 +183,89 @@ export interface MusicStudioSummary {
   providersUsed: string[]
 }
 
-// ── In-memory artifact store (production: replace with DB) ───────────────────
+// ── DB-backed artifact persistence ────────────────────────────────────────────
+// Uses the platform's Artifact model (type='music') instead of an in-memory Map.
+// Falls back gracefully to empty results if the DB is unavailable.
 
-const artifactStore = new Map<string, MusicArtifact>()
+async function saveMusicArtifactToDB(artifact: MusicArtifact): Promise<void> {
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    await prisma.artifact.create({
+      data: {
+        id: artifact.id,
+        appSlug: artifact.appSlug,
+        type: 'music',
+        subType: artifact.artifactType,
+        title: artifact.title,
+        description: `${artifact.genre} • ${artifact.vocalStyle} • ${artifact.theme}`,
+        provider: artifact.musicProvider,
+        model: artifact.lyricsModel,
+        storageDriver: 'url',
+        storagePath: '',
+        storageUrl: artifact.audioUrl ?? '',
+        mimeType: artifact.audioMimeType ?? '',
+        fileSizeBytes: 0,
+        previewable: true,
+        downloadable: !!artifact.audioUrl,
+        status: artifact.artifactType === 'generated_audio' ? 'completed' : 'completed',
+        metadata: JSON.stringify({
+          genre: artifact.genre,
+          vocalStyle: artifact.vocalStyle,
+          theme: artifact.theme,
+          durationSeconds: artifact.durationSeconds,
+          bpm: artifact.bpm,
+          lyrics: artifact.lyrics,
+          structure: artifact.structure,
+          coverArtUrl: artifact.coverArtUrl,
+          coverArtModel: artifact.coverArtModel,
+          artifactType: artifact.artifactType,
+          tags: artifact.tags,
+          generatedAt: artifact.generatedAt,
+        }),
+      },
+    })
+  } catch {
+    // DB write failure is non-fatal — log only, do not throw
+  }
+}
+
+async function loadMusicArtifactsFromDB(appSlug?: string, limit = 50): Promise<MusicArtifact[]> {
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const rows = await prisma.artifact.findMany({
+      where: { type: 'music', ...(appSlug ? { appSlug } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    })
+    return rows.map((row): MusicArtifact => {
+      let meta: Record<string, unknown> = {}
+      try { meta = JSON.parse(row.metadata) as Record<string, unknown> } catch { /* ignore */ }
+      return {
+        id: row.id,
+        appSlug: row.appSlug,
+        title: row.title,
+        genre: (meta.genre as MusicGenre) ?? 'pop',
+        vocalStyle: (meta.vocalStyle as VocalStyle) ?? 'female_lead',
+        theme: (meta.theme as string) ?? '',
+        durationSeconds: (meta.durationSeconds as number) ?? 180,
+        bpm: (meta.bpm as number) ?? 100,
+        audioUrl: row.storageUrl || null,
+        audioMimeType: (row.mimeType as 'audio/mpeg' | 'audio/wav' | 'audio/ogg') || null,
+        artifactType: (meta.artifactType as 'generated_audio' | 'blueprint_only') ?? 'blueprint_only',
+        lyrics: (meta.lyrics as string) ?? '',
+        structure: (meta.structure as SongStructure) ?? { sections: [] },
+        coverArtUrl: (meta.coverArtUrl as string) ?? null,
+        musicProvider: row.provider,
+        lyricsModel: row.model,
+        coverArtModel: (meta.coverArtModel as string) ?? null,
+        generatedAt: row.createdAt.toISOString(),
+        tags: (meta.tags as string[]) ?? [],
+      }
+    })
+  } catch {
+    return []
+  }
+}
 
 // ── Genre display names ───────────────────────────────────────────────────────
 
@@ -665,6 +745,8 @@ export async function createMusic(
   }
 
   artifactStore.set(artifact.id, artifact)
+  // Persist to DB for production durability
+  await saveMusicArtifactToDB(artifact)
 
   return {
     artifact,
@@ -687,11 +769,30 @@ export async function generateLyrics(
 }
 
 // ── Artifact Accessors ────────────────────────────────────────────────────────
+// These are now async wrappers over DB reads with an in-memory cache for
+// artifacts created in the current server process lifetime.
+
+const artifactStore = new Map<string, MusicArtifact>()
 
 export function getMusicArtifact(id: string): MusicArtifact | undefined {
   return artifactStore.get(id)
 }
 
+export async function getMusicArtifactAsync(id: string): Promise<MusicArtifact | undefined> {
+  if (artifactStore.has(id)) return artifactStore.get(id)
+  const rows = await loadMusicArtifactsFromDB(undefined, 100)
+  return rows.find((a) => a.id === id)
+}
+
+export async function getMusicArtifactsByAppAsync(appSlug: string, limit = 20): Promise<MusicArtifact[]> {
+  return loadMusicArtifactsFromDB(appSlug, limit)
+}
+
+export async function getAllMusicArtifactsAsync(limit = 50): Promise<MusicArtifact[]> {
+  return loadMusicArtifactsFromDB(undefined, limit)
+}
+
+/** @deprecated Use getMusicArtifactsByAppAsync — falls back to in-process cache only */
 export function getMusicArtifactsByApp(appSlug: string, limit = 20): MusicArtifact[] {
   return Array.from(artifactStore.values())
     .filter((a) => a.appSlug === appSlug)
@@ -699,6 +800,7 @@ export function getMusicArtifactsByApp(appSlug: string, limit = 20): MusicArtifa
     .slice(0, limit)
 }
 
+/** @deprecated Use getAllMusicArtifactsAsync — falls back to in-process cache only */
 export function getAllMusicArtifacts(limit = 50): MusicArtifact[] {
   return Array.from(artifactStore.values())
     .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
@@ -762,6 +864,28 @@ export function getMusicStudioStatus(): MusicStudioStatus {
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 
+export async function getMusicStudioSummaryAsync(): Promise<MusicStudioSummary> {
+  const all = await loadMusicArtifactsFromDB(undefined, 1000)
+  const byGenre: Record<string, number> = {}
+  const byAppSlug: Record<string, number> = {}
+  const providers = new Set<string>()
+
+  for (const a of all) {
+    byGenre[a.genre] = (byGenre[a.genre] ?? 0) + 1
+    byAppSlug[a.appSlug] = (byAppSlug[a.appSlug] ?? 0) + 1
+    if (a.musicProvider !== 'blueprint_only') providers.add(a.musicProvider)
+  }
+
+  return {
+    totalCreated: all.length,
+    byGenre,
+    byAppSlug,
+    lastCreatedAt: all[0]?.generatedAt ?? null,
+    providersUsed: Array.from(providers),
+  }
+}
+
+/** @deprecated Use getMusicStudioSummaryAsync */
 export function getMusicStudioSummary(): MusicStudioSummary {
   const all = Array.from(artifactStore.values())
   const byGenre: Record<string, number> = {}

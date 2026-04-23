@@ -53,14 +53,39 @@ function getSpeechRecognitionConstructor(): (new () => VoiceRecognizer) | null {
 /** Parse a structured action block out of an assistant reply.
  *  The AI is instructed to include a JSON block like:
  *  ACTION:{"type":"navigate_to","payload":{"section":"models"}}
+ *
+ *  Uses a robust multi-pass strategy:
+ *  1. Scan for the ACTION: marker and extract everything from the first { to
+ *     the last balanced }, handling nested objects correctly.
+ *  2. Falls back to a simple regex as a last resort.
  */
 function parseAction(text: string): { clean: string; action: AssistantAction | null } {
-  const match = text.match(/ACTION:\s*(\{[^}]+\})/i)
-  if (!match) return { clean: text, action: null }
+  // Find the ACTION: marker (case-insensitive)
+  const markerIdx = text.search(/ACTION\s*:/i)
+  if (markerIdx === -1) return { clean: text, action: null }
+
+  // Find the opening brace after the marker
+  const braceStart = text.indexOf('{', markerIdx)
+  if (braceStart === -1) return { clean: text, action: null }
+
+  // Walk forward balancing braces to find the closing brace
+  let depth = 0
+  let braceEnd = -1
+  for (let i = braceStart; i < text.length; i++) {
+    if (text[i] === '{') depth++
+    else if (text[i] === '}') {
+      depth--
+      if (depth === 0) { braceEnd = i; break }
+    }
+  }
+  if (braceEnd === -1) return { clean: text, action: null }
+
+  const jsonStr = text.slice(braceStart, braceEnd + 1)
   try {
-    const action = JSON.parse(match[1]) as AssistantAction
+    const action = JSON.parse(jsonStr) as AssistantAction
     if (!action.type) return { clean: text, action: null }
-    const clean = text.replace(match[0], '').replace(/\n{3,}/g, '\n\n').trim()
+    const markerText = text.slice(markerIdx, braceEnd + 1)
+    const clean = text.replace(markerText, '').replace(/\n{3,}/g, '\n\n').trim()
     return { clean, action }
   } catch {
     return { clean: text, action: null }
@@ -77,16 +102,16 @@ const BASE_SYSTEM_PROMPT = `You are the Amarktai Network AI Partner — a capabl
 You can answer questions, explain features, AND trigger real dashboard actions.
 
 Available actions you can dispatch (include at the END of your reply if appropriate):
-- ACTION:{"type":"navigate_to","payload":{"section":"models"}}  — valid sections: models, apps, voice, brain, artifacts, budget, onboarding, workspace, healing, events, providers
+- ACTION:{"type":"navigate_to","payload":{"section":"models"}}  — valid sections: models, apps, voice, intelligence, artifacts, budget, operations, onboarding, workspace, events
 - ACTION:{"type":"show_artifacts"}
 - ACTION:{"type":"check_budget"}
 - ACTION:{"type":"start_onboarding"}
-- ACTION:{"type":"generate_image","payload":{"prompt":"<description>"}}  — will ask for confirmation
-- ACTION:{"type":"run_test","payload":{"capability":"chat","prompt":"Hello"}}  — will ask for confirmation
+- ACTION:{"type":"generate_image","payload":{"prompt":"<description>"}}  — opens the Images tab; operator reviews before sending
+- ACTION:{"type":"run_test","payload":{"capability":"chat","prompt":"Hello"}}  — opens the Test AI tab; operator reviews before sending
 
 Rules:
 - Only include an ACTION block when the operator explicitly asks for an action or you are certain it is appropriate.
-- Destructive/expensive actions (generate_image, run_test) will always ask for operator confirmation before executing.
+- generate_image and run_test open the relevant workspace tab so the operator can review and execute.
 - Be concise and direct. Avoid unnecessary explanation.
 - When context or memory is provided below, reference it naturally in your replies to feel memory-aware.`
 
@@ -411,12 +436,12 @@ export default function AIPartnerWidget({ open, onClose, onAction }: AIPartnerWi
       {pendingAction && (
         <div className="mx-3 mt-2 rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2">
           <p className="text-[11px] text-amber-300 mb-2">
-            Action requires confirmation: <span className="font-mono font-medium">{pendingAction.type}</span>
+            Confirm action: <span className="font-mono font-medium">{pendingAction.type}</span>
             {pendingAction.payload?.prompt && <span className="text-slate-400"> — &ldquo;{pendingAction.payload.prompt}&rdquo;</span>}
           </p>
           <div className="flex gap-2">
             <button onClick={confirmAction} className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors">
-              Confirm
+              Open tab
             </button>
             <button onClick={() => setPendingAction(null)} className="text-[10px] px-2 py-1 rounded-lg bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08] transition-colors">
               Cancel

@@ -3,11 +3,11 @@ import { getSession } from '@/lib/session'
 import {
   createMusic,
   generateLyrics,
-  getMusicArtifact,
-  getMusicArtifactsByApp,
-  getAllMusicArtifacts,
+  getMusicArtifactAsync,
+  getMusicArtifactsByAppAsync,
+  getAllMusicArtifactsAsync,
   getMusicStudioStatus,
-  getMusicStudioSummary,
+  getMusicStudioSummaryAsync,
   AVAILABLE_GENRES,
   AVAILABLE_VOCAL_STYLES,
   type MusicCreationRequest,
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (searchParams.has('summary')) {
-    return NextResponse.json({ summary: getMusicStudioSummary() })
+    return NextResponse.json({ summary: await getMusicStudioSummaryAsync() })
   }
 
   if (searchParams.has('genres')) {
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (id) {
-    const artifact = getMusicArtifact(id)
+    const artifact = await getMusicArtifactAsync(id)
     if (!artifact) {
       return NextResponse.json({ error: `Artifact not found: ${id}` }, { status: 404 })
     }
@@ -61,8 +61,8 @@ export async function GET(request: NextRequest) {
   }
 
   const artifacts = appSlug
-    ? getMusicArtifactsByApp(appSlug, limit)
-    : getAllMusicArtifacts(limit)
+    ? await getMusicArtifactsByAppAsync(appSlug, limit)
+    : await getAllMusicArtifactsAsync(limit)
 
   return NextResponse.json({
     artifacts,

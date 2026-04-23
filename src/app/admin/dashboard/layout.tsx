@@ -5,7 +5,7 @@ import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  Menu, X, User, LayoutDashboard, AppWindow, Sparkles, Film, Brain, Server,
+  Menu, X, User, LayoutDashboard, AppWindow, Sparkles, Brain, Server,
   Bot, Cpu, Archive, Plug, ClipboardList, Bell, Rocket,
 } from 'lucide-react'
 
@@ -34,23 +34,22 @@ const NAV_GROUPS: Array<{
   {
     label: 'Intelligence',
     items: [
-      { href: '/admin/dashboard/brain',        label: 'Brain',        icon: Brain },
-      { href: '/admin/dashboard/intelligence', label: 'Intelligence', icon: Cpu },
+      { href: '/admin/dashboard/intelligence', label: 'Intelligence', icon: Brain },
+      { href: '/admin/dashboard/models',       label: 'Models',       icon: Cpu },
     ],
   },
   {
     label: 'Output',
     items: [
-      { href: '/admin/dashboard/media-hub', label: 'Media',     icon: Film },
       { href: '/admin/dashboard/artifacts', label: 'Artifacts', icon: Archive },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { href: '/admin/dashboard/jobs',   label: 'Jobs',   icon: ClipboardList },
-      { href: '/admin/dashboard/alerts', label: 'Alerts', icon: Bell },
-      { href: '/admin/dashboard/system', label: 'System', icon: Server },
+      { href: '/admin/dashboard/operations', label: 'Operations', icon: Server },
+      { href: '/admin/dashboard/jobs',       label: 'Jobs',       icon: ClipboardList },
+      { href: '/admin/dashboard/alerts',     label: 'Alerts',     icon: Bell },
     ],
   },
 ]

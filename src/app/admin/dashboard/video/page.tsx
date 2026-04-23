@@ -37,6 +37,8 @@ export default function VideoDashboardPage() {
   const [videoJobId, setVideoJobId] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [videoStatus, setVideoStatus] = useState<string | null>(null)
+  const [planningScript, setPlanningScript] = useState<string | null>(null)
+  const [planningNote, setPlanningNote] = useState<string | null>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -87,6 +89,8 @@ export default function VideoDashboardPage() {
     setVideoUrl(null)
     setVideoJobId(null)
     setVideoStatus('submitting')
+    setPlanningScript(null)
+    setPlanningNote(null)
 
     try {
       const res = await fetch('/api/brain/video-generate', {
@@ -98,6 +102,15 @@ export default function VideoDashboardPage() {
 
       if (!res.ok || data.error) {
         throw new Error(data.error ?? 'Video generation request failed')
+      }
+
+      // Planning fallback — no real video provider configured
+      if (data.capability === 'video_planning' || data.fallbackMode === 'video_planning') {
+        setPlanningScript(data.script ?? null)
+        setPlanningNote(data.note ?? 'No video provider configured — storyboard generated instead.')
+        setVideoStatus('planning_only')
+        setCreating(false)
+        return
       }
 
       if (data.videoJobId) {
@@ -194,7 +207,7 @@ export default function VideoDashboardPage() {
             {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
             {creating ? 'Generating…' : 'Generate Video'}
           </button>
-          {videoStatus && (
+          {videoStatus && videoStatus !== 'planning_only' && (
             <span className="text-xs text-slate-400 flex items-center gap-1.5">
               {videoStatus === 'completed' ? <CheckCircle className="w-3 h-3 text-emerald-400" /> :
                videoStatus === 'failed' ? <XCircle className="w-3 h-3 text-red-400" /> :
@@ -208,6 +221,19 @@ export default function VideoDashboardPage() {
         {createError && (
           <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-500/5 border border-red-500/20 text-red-300 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {createError}
+          </div>
+        )}
+
+        {/* Planning-only fallback — explicit label so operator knows no real video was generated */}
+        {planningScript && (
+          <div className="space-y-3 p-4 rounded-xl bg-amber-400/5 border border-amber-400/20">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <p className="text-sm font-medium text-amber-300">Planning Output — No Video Generated</p>
+            </div>
+            {planningNote && <p className="text-xs text-amber-200/70">{planningNote}</p>}
+            <pre className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto bg-white/[0.02] rounded-lg p-3 border border-white/[0.06]">{planningScript}</pre>
+            <p className="text-[10px] text-slate-600">To generate real video, configure a Replicate or Together AI API key in Operations → Providers.</p>
           </div>
         )}
 

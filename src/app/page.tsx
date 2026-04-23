@@ -5,7 +5,6 @@ import { motion } from 'framer-motion'
 import { ArrowRight, Brain, Cpu, ImageIcon, Mic, Video, Music, Code2, Workflow, Layers, Shield, Sparkles } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
-import LivingCore from '@/components/LivingCore'
 import NetworkPulseBackground from '@/components/visual/NetworkPulseBackground'
 
 const capabilities = [
@@ -68,8 +67,20 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-          <div className="relative aspect-square w-full max-w-[560px] justify-self-center">
-            <LivingCore className="absolute inset-0" />
+          <div className="grid grid-cols-2 gap-3 justify-self-center w-full max-w-[480px]">
+            {[
+              { icon: ImageIcon, label: 'Image Generation', color: 'text-pink-400' },
+              { icon: Mic, label: 'Voice & TTS', color: 'text-cyan-400' },
+              { icon: Video, label: 'Video Pipeline', color: 'text-violet-400' },
+              { icon: Music, label: 'Music Studio', color: 'text-amber-400' },
+              { icon: Code2, label: 'Code Intelligence', color: 'text-blue-400' },
+              { icon: Workflow, label: 'Workflows', color: 'text-emerald-400' },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.03] p-4 flex items-center gap-3">
+                <item.icon className={`h-5 w-5 shrink-0 ${item.color}`} />
+                <span className="text-sm text-slate-300">{item.label}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>

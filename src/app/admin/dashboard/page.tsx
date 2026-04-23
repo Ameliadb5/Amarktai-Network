@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, AppWindow, Brain, Film, Server, Sparkles, RefreshCw } from 'lucide-react'
+import { ArrowRight, AppWindow, Brain, Server, Sparkles, Archive, RefreshCw } from 'lucide-react'
 
 interface OverviewData {
   metrics?: {
@@ -21,9 +21,9 @@ interface OverviewData {
 const sections = [
   { href: '/admin/dashboard/apps', label: 'Apps', icon: AppWindow, desc: 'Manage connected apps and agent assignments.' },
   { href: '/admin/dashboard/workspace', label: 'Workspace', icon: Sparkles, desc: 'Main operator work area for creation and testing.' },
-  { href: '/admin/dashboard/media-hub', label: 'Media', icon: Film, desc: 'Image, voice, video, and music command surface.' },
-  { href: '/admin/dashboard/brain', label: 'Brain', icon: Brain, desc: 'Intelligence orchestration and memory controls.' },
-  { href: '/admin/dashboard/system', label: 'System', icon: Server, desc: 'Operational, security, and access settings.' },
+  { href: '/admin/dashboard/intelligence', label: 'Intelligence', icon: Brain, desc: 'Routing, memory, learning, and capability layers.' },
+  { href: '/admin/dashboard/artifacts', label: 'Artifacts', icon: Archive, desc: 'All generated outputs — images, audio, video, code.' },
+  { href: '/admin/dashboard/operations', label: 'Operations', icon: Server, desc: 'Providers, models, budgets, and health monitoring.' },
 ]
 
 export default function DashboardOverview() {

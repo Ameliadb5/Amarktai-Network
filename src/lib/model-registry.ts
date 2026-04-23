@@ -6306,7 +6306,7 @@ export function getModelsForDomain(domain: string): ModelEntry[] {
 }
 
 /** Model category type for filtering. */
-export type ModelCategory = 'text' | 'image' | 'video' | 'voice' | 'code' | 'multimodal';
+export type ModelCategory = 'text' | 'image' | 'video' | 'voice' | 'code' | 'multimodal' | 'music' | 'moderation' | 'embeddings';
 
 /** Returns all models in a given category. */
 export function getModelsByCategory(category: ModelCategory): ModelEntry[] {
@@ -6315,7 +6315,7 @@ export function getModelsByCategory(category: ModelCategory): ModelEntry[] {
 
 /** Returns a summary count of models per category. */
 export function getCategorySummary(): Record<ModelCategory, number> {
-  const cats: ModelCategory[] = ['text', 'image', 'video', 'voice', 'code', 'multimodal'];
+  const cats: ModelCategory[] = ['text', 'image', 'video', 'voice', 'code', 'multimodal', 'music', 'moderation', 'embeddings'];
   const summary = {} as Record<ModelCategory, number>;
   for (const c of cats) {
     summary[c] = MODEL_REGISTRY.filter((m) => m.category === c).length;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Layers, RefreshCw, AlertCircle, Search, Image, Video, Mic, Code, MessageSquare, Sparkles } from 'lucide-react'
+import { Layers, RefreshCw, AlertCircle, Search, Image, Video, Mic, Code, MessageSquare, Sparkles, Music, ShieldCheck, Database } from 'lucide-react'
 
 interface ModelEntry {
   id: string
@@ -24,6 +24,9 @@ interface CategorySummary {
   voice: number
   code: number
   multimodal: number
+  music: number
+  moderation: number
+  embeddings: number
 }
 
 const fadeUp = {
@@ -55,6 +58,9 @@ const CATEGORY_TABS = [
   { key: 'voice', label: 'Voice', icon: Mic },
   { key: 'code', label: 'Code', icon: Code },
   { key: 'multimodal', label: 'Multimodal', icon: Sparkles },
+  { key: 'music', label: 'Music', icon: Music },
+  { key: 'moderation', label: 'Moderation', icon: ShieldCheck },
+  { key: 'embeddings', label: 'Embeddings', icon: Database },
 ] as const
 
 export default function ModelsPage() {
