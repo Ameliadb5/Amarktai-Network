@@ -259,9 +259,9 @@ export async function POST(req: Request): Promise<NextResponse> {
         capability: 'video_generation',
         executed: false,
         error:
-          'Video generation failed: unsupported model or provider. ' +
-          'Hugging Face does not support video generation via API. ' +
-          'Configure Replicate or Together AI to enable video generation.',
+          'Video generation is not available: no video provider is configured. ' +
+          'Configure Replicate or Together AI in Admin → AI Providers to enable video generation. ' +
+          'Note: video generation is not supported via Gemini, OpenAI chat, or Hugging Face standard inference.',
       },
       { status: 503 },
     );

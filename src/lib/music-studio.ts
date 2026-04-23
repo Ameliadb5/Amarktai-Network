@@ -20,6 +20,7 @@
  */
 
 import { randomUUID } from 'crypto'
+import { getVaultApiKey } from '@/lib/brain'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -468,13 +469,16 @@ export type MusicProvider = 'suno' | 'udio' | 'musicgen_replicate' | 'blueprint_
 /**
  * Attempt to generate audio via a configured music provider.
  * Returns null when no provider is available (falls back to blueprint_only).
+ *
+ * Key resolution order: DB vault (set via Admin → AI Providers UI) first,
+ * then raw environment variable fallback (for local dev / CI).
  */
 async function generateAudio(
   request: MusicCreationRequest,
   lyrics: LyricsResult,
 ): Promise<{ audioUrl: string; mimeType: 'audio/mpeg' | 'audio/wav' | 'audio/ogg'; provider: MusicProvider } | null> {
-  // Suno API (via SUNO_API_KEY env var + proxy endpoint)
-  const sunoKey = process.env.SUNO_API_KEY?.trim()
+  // Suno API — resolve key from vault first, then env fallback
+  const sunoKey = (await getVaultApiKey('suno').catch(() => null)) ?? process.env.SUNO_API_KEY?.trim() ?? null
   if (sunoKey) {
     try {
       const res = await fetch('https://studio-api.suno.ai/api/generate/v2/', {
@@ -498,8 +502,8 @@ async function generateAudio(
     } catch { /* fall through */ }
   }
 
-  // Replicate MusicGen (via REPLICATE_API_TOKEN env var)
-  const replicateKey = process.env.REPLICATE_API_TOKEN?.trim()
+  // Replicate MusicGen — resolve key from vault first, then env fallback
+  const replicateKey = (await getVaultApiKey('replicate').catch(() => null)) ?? process.env.REPLICATE_API_TOKEN?.trim() ?? null
   if (replicateKey) {
     try {
       // Fire-and-poll approach for Replicate
@@ -552,7 +556,8 @@ async function generateCoverArt(
   lyrics: LyricsResult,
   request: MusicCreationRequest,
 ): Promise<{ url: string; model: string } | null> {
-  const openAiKey = process.env.OPENAI_API_KEY?.trim()
+  // Resolve OpenAI key: DB vault first, then environment variable fallback
+  const openAiKey = (await getVaultApiKey('openai').catch(() => null)) ?? process.env.OPENAI_API_KEY?.trim() ?? null
   if (!openAiKey) return null
 
   try {
@@ -588,41 +593,69 @@ async function generateCoverArt(
 
 /**
  * Generate lyrics by calling the platform's internal chat API.
+ *
+ * Provider resolution order:
+ * 1. OpenAI key from DB vault (set via Admin → AI Providers UI)
+ * 2. OPENAI_API_KEY environment variable fallback (local dev / CI)
+ * 3. Groq fallback via vault → env (cheap, fast, supports long output)
+ * 4. Template fallback when no key is available anywhere
  */
 async function generateLyricsViaChat(
   request: MusicCreationRequest,
 ): Promise<{ lyrics: string; model: string }> {
-  const openAiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!openAiKey) {
-    // Return a well-structured template when no AI key is available
-    return {
-      lyrics: buildFallbackLyrics(request),
-      model: 'template',
-    }
+  // Try OpenAI first (vault → env)
+  const openAiKey = (await getVaultApiKey('openai').catch(() => null)) ?? process.env.OPENAI_API_KEY?.trim() ?? null
+  if (openAiKey) {
+    const prompt = buildLyricsPrompt(request)
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openAiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 1500,
+          temperature: 0.85,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json() as { choices: Array<{ message: { content: string } }>; model: string }
+        const content = data?.choices?.[0]?.message?.content ?? ''
+        return { lyrics: content, model: data.model ?? 'gpt-4o' }
+      }
+    } catch { /* fall through to Groq */ }
   }
 
-  const prompt = buildLyricsPrompt(request)
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${openAiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1500,
-        temperature: 0.85,
-      }),
-    })
-    if (res.ok) {
-      const data = await res.json() as { choices: Array<{ message: { content: string } }>; model: string }
-      const content = data?.choices?.[0]?.message?.content ?? ''
-      return { lyrics: content, model: data.model ?? 'gpt-4o' }
-    }
-  } catch { /* fall through */ }
+  // Groq fallback (vault → env) — fast and cost-effective for text generation
+  const groqKey = (await getVaultApiKey('groq').catch(() => null)) ?? process.env.GROQ_API_KEY?.trim() ?? null
+  if (groqKey) {
+    const prompt = buildLyricsPrompt(request)
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${groqKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 1500,
+          temperature: 0.85,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json() as { choices: Array<{ message: { content: string } }>; model: string }
+        const content = data?.choices?.[0]?.message?.content ?? ''
+        return { lyrics: content, model: data.model ?? 'llama-3.3-70b-versatile' }
+      }
+    } catch { /* fall through to template */ }
+  }
 
+  // Template fallback — no AI key available anywhere
   return { lyrics: buildFallbackLyrics(request), model: 'template' }
 }
 
@@ -861,6 +894,62 @@ export function getMusicStudioStatus(): MusicStudioStatus {
         ? `Lyrics, audio (${audioProvider}), and cover art generation available.`
         : 'Lyrics and cover art available. Set SUNO_API_KEY or REPLICATE_API_TOKEN for audio generation.'
       : 'Set at least one AI provider key (OPENAI_API_KEY, GROQ_API_KEY, or TOGETHER_API_KEY) to enable music studio.',
+  }
+}
+
+/**
+ * Vault-aware variant of getMusicStudioStatus.
+ * Checks the DB vault (Admin → AI Providers) first, then environment variable
+ * fallbacks. Use this from API routes where async is available.
+ */
+export async function getMusicStudioStatusAsync(): Promise<MusicStudioStatus & { available: boolean; audioProviderConfigured: boolean; lyricsProviderConfigured: boolean; coverArtProviderConfigured: boolean; configuredProviders: string[]; note: string }> {
+  const resolveKey = async (vaultKey: string, envVar: string): Promise<boolean> => {
+    const vaultVal = await getVaultApiKey(vaultKey).catch(() => null)
+    return Boolean(vaultVal) || Boolean(process.env[envVar]?.trim())
+  }
+
+  const [hasOpenAi, hasGroq, hasTogether, hasSuno, hasReplicate] = await Promise.all([
+    resolveKey('openai', 'OPENAI_API_KEY'),
+    resolveKey('groq', 'GROQ_API_KEY'),
+    resolveKey('together', 'TOGETHER_API_KEY'),
+    getVaultApiKey('suno').catch(() => null).then(k => Boolean(k) || Boolean(process.env.SUNO_API_KEY?.trim())),
+    getVaultApiKey('replicate').catch(() => null).then(k => Boolean(k) || Boolean(process.env.REPLICATE_API_TOKEN?.trim())),
+  ])
+
+  const hasChatKey = hasOpenAi || hasGroq || hasTogether
+  const hasImageKey = hasOpenAi
+
+  const audioProvider: MusicProvider | null = hasSuno
+    ? 'suno'
+    : hasReplicate
+    ? 'musicgen_replicate'
+    : null
+
+  const configuredProviders: string[] = []
+  if (hasOpenAi) configuredProviders.push('openai')
+  if (hasGroq) configuredProviders.push('groq')
+  if (hasTogether) configuredProviders.push('together')
+  if (hasSuno) configuredProviders.push('suno')
+  if (hasReplicate) configuredProviders.push('replicate')
+
+  const note = hasChatKey
+    ? audioProvider
+      ? `Lyrics, audio (${audioProvider}), and cover art generation available.`
+      : 'Lyrics and cover art available. Configure SUNO_API_KEY or Replicate in Admin → AI Providers for audio generation.'
+    : 'Configure at least one AI provider (OpenAI, Groq, or Together AI) in Admin → AI Providers to enable Music Studio.'
+
+  return {
+    lyricsGeneration: hasChatKey ? 'available' : 'needs_key',
+    audioGeneration: audioProvider ? 'available' : 'needs_key',
+    coverArtGeneration: hasImageKey ? 'available' : 'needs_key',
+    audioProvider,
+    message: note,
+    available: hasChatKey,
+    audioProviderConfigured: Boolean(audioProvider),
+    lyricsProviderConfigured: hasChatKey,
+    coverArtProviderConfigured: hasImageKey,
+    configuredProviders,
+    note,
   }
 }
 

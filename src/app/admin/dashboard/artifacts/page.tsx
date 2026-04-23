@@ -51,6 +51,7 @@ export default function ArtifactsPage() {
   const [error, setError] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<string>('')
   const [appFilter, setAppFilter] = useState<string>('')
+  const [storageWarning, setStorageWarning] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,9 +62,10 @@ export default function ArtifactsPage() {
       if (appFilter) params.set('appSlug', appFilter)
       params.set('limit', '50')
 
-      const [listRes, countsRes] = await Promise.all([
+      const [listRes, countsRes, storageRes] = await Promise.all([
         fetch(`/api/admin/artifacts?${params}`),
         fetch('/api/admin/artifacts?counts=true'),
+        fetch('/api/admin/artifacts?storage-info=true'),
       ])
 
       if (listRes.ok) {
@@ -74,6 +76,10 @@ export default function ArtifactsPage() {
       if (countsRes.ok) {
         const data = await countsRes.json()
         setCounts(data.counts ?? {})
+      }
+      if (storageRes.ok) {
+        const data = await storageRes.json() as { ephemeral?: boolean; warning?: string | null }
+        setStorageWarning(data.ephemeral ? (data.warning ?? null) : null)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
@@ -128,6 +134,19 @@ export default function ArtifactsPage() {
           </button>
         </div>
       </motion.div>
+
+      {/* Storage persistence warning — shown when local file storage is active */}
+      {storageWarning && (
+        <motion.div variants={fadeUp} initial="hidden" animate="show">
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-400">Ephemeral Storage — Files Will Be Lost on Redeploy</p>
+              <p className="text-xs text-slate-400 mt-1">{storageWarning}</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Type Counts */}
       <motion.div variants={fadeUp} initial="hidden" animate="show">
