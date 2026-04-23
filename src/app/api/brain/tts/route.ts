@@ -190,7 +190,8 @@ export async function POST(request: NextRequest) {
       provider = 'huggingface';
     } else {
       // Auto: OpenAI is the golden-path baseline. Groq is used as fallback when
-      // OpenAI is not configured. Gemini and HuggingFace are last-resort options.
+      // Auto-select: prefer OpenAI (highest quality), then Groq (fastest/cheapest),
+      // then Gemini (multimodal), then HuggingFace (free fallback).
       if (openaiKey) {
         provider = 'openai';
       } else if (groqKey) {

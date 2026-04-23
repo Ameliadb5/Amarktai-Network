@@ -4,8 +4,11 @@ import { getVaultApiKey, OPENAI_IMAGE_MODELS } from '@/lib/brain';
 /**
  * POST /api/brain/image — Standard image generation
  *
- * Tries GPT Image 1 (the real OpenAI image model), then falls back to
- * DALL-E 3 → DALL-E 2, then Together AI FLUX.
+ * Provider chain (first configured key that succeeds wins):
+ *   1. OpenAI — gpt-image-1 → dall-e-3 → dall-e-2
+ *   2. Together AI — FLUX.1-schnell-Free → FLUX.1-schnell
+ *   3. Gemini — imagen-3.0-generate-002 (Gemini API Prediction endpoint)
+ *   4. Qwen/DashScope — wanx2.1-t2i-turbo → wanx-v1 (async AIGC endpoint with polling)
  *
  * Returns a structured error with code=no_eligible_image_model when no
  * image-capable provider is configured — never silently falls back to text.
@@ -192,11 +195,136 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Provider 3: Gemini — Imagen 3.0 (Prediction API) ──────────────
+    // Available to Gemini API keys that have Imagen access enabled.
+    // The endpoint uses the same API key as chat but the `:predict` action.
+    // Access may be gated by account tier — fails gracefully when denied.
+    const geminiKey = await getVaultApiKey('gemini');
+    if (geminiKey) {
+      try {
+        const imagenEndpoint =
+          `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(geminiKey)}`;
+        const imagenRes = await fetch(imagenEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instances: [{ prompt: prompt.trim() }],
+            parameters: { sampleCount: 1, aspectRatio: '1:1' },
+          }),
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (imagenRes.ok) {
+          const imagenData = await imagenRes.json() as {
+            predictions?: Array<{ bytesBase64Encoded?: string; mimeType?: string }>
+          };
+          const b64 = imagenData?.predictions?.[0]?.bytesBase64Encoded;
+          const mime = imagenData?.predictions?.[0]?.mimeType ?? 'image/png';
+          if (b64) {
+            return NextResponse.json({
+              executed: true,
+              imageBase64: `data:${mime};base64,${b64}`,
+              provider: 'gemini',
+              model: 'imagen-3.0-generate-002',
+              size: '1024x1024',
+            });
+          }
+        } else {
+          const errBody = await imagenRes.json().catch(() => ({})) as { error?: { message?: string; code?: number } };
+          console.warn(`[brain/image] Gemini Imagen failed (${imagenRes.status}): ${errBody?.error?.message ?? 'unknown'}`);
+          // 403 = account not enabled for Imagen; keep going to next provider
+        }
+      } catch (gErr) {
+        console.warn('[brain/image] Gemini Imagen error:', gErr instanceof Error ? gErr.message : gErr);
+      }
+    }
+
+    // ── Provider 4: Qwen/DashScope — Wanx image generation (async) ────
+    // Uses the DashScope International AIGC text-to-image endpoint.
+    // Polls until the job succeeds or the deadline is reached.
+    const qwenKey = await getVaultApiKey('qwen');
+    if (qwenKey) {
+      const WANX_MODELS = [
+        { id: 'wanx2.1-t2i-turbo', label: 'Wanx 2.1 Turbo' },
+        { id: 'wanx-v1',           label: 'Wanx v1' },
+      ] as const;
+      const WANX_BASE = 'https://dashscope-intl.aliyuncs.com/api/v1';
+      // Parse size string to Wanx format (e.g. '1024x1024' → '1024*1024')
+      const wanxSize = resolvedSize.replace('x', '*');
+
+      for (const wanxModel of WANX_MODELS) {
+        try {
+          // Step 1: submit async task
+          const submitRes = await fetch(`${WANX_BASE}/services/aigc/text2image/image-synthesis`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${qwenKey}`,
+              'Content-Type': 'application/json',
+              'X-DashScope-Async': 'enable',
+            },
+            body: JSON.stringify({
+              model: wanxModel.id,
+              input: { prompt: prompt.trim() },
+              parameters: { size: wanxSize, n: 1 },
+            }),
+            signal: AbortSignal.timeout(15_000),
+          });
+
+          if (!submitRes.ok) {
+            const errText = await submitRes.text().catch(() => '');
+            console.warn(`[brain/image] Qwen ${wanxModel.id} submit failed (${submitRes.status}): ${errText.slice(0, 200)}`);
+            // 401/403 = key issue — no point trying next model
+            if (submitRes.status === 401 || submitRes.status === 403) break;
+            continue;
+          }
+
+          const submitData = await submitRes.json() as { output?: { task_id?: string; task_status?: string } };
+          const taskId = submitData?.output?.task_id;
+          if (!taskId) {
+            console.warn('[brain/image] Qwen Wanx: no task_id in submit response');
+            continue;
+          }
+
+          // Step 2: poll until succeeded or deadline
+          const POLL_INTERVAL_MS = 2_000;
+          const POLL_DEADLINE = Date.now() + 50_000; // leave buffer before 60s overall timeout
+
+          let taskResult: { output?: { task_status?: string; results?: Array<{ url?: string }> } } = {};
+          while (Date.now() < POLL_DEADLINE) {
+            await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+            const pollRes = await fetch(`${WANX_BASE}/tasks/${taskId}`, {
+              headers: { Authorization: `Bearer ${qwenKey}` },
+              signal: AbortSignal.timeout(10_000),
+            }).catch(() => null);
+            if (!pollRes?.ok) continue;
+            taskResult = await pollRes.json().catch(() => ({})) as typeof taskResult;
+            const status = taskResult?.output?.task_status;
+            if (status === 'SUCCEEDED' || status === 'FAILED') break;
+          }
+
+          const resultUrl = taskResult?.output?.results?.[0]?.url;
+          if (resultUrl) {
+            return NextResponse.json({
+              executed: true,
+              imageUrl: resultUrl,
+              provider: 'qwen',
+              model: wanxModel.id,
+              size: resolvedSize,
+            });
+          }
+          // Task failed or timed out — try next Wanx model
+        } catch (qErr) {
+          console.warn(`[brain/image] Qwen ${wanxModel.id} error:`, qErr instanceof Error ? qErr.message : qErr);
+        }
+      }
+    }
+
     // ── No provider available — structured failure, never falls back to text ──
     const candidateModels = [...GPT_IMAGE_MODELS_ORDERED, 'dall-e-3', 'dall-e-2'];
     const rejectionReasons: string[] = [];
     if (!openaiKey) rejectionReasons.push('openai: no API key configured');
     if (!togetherKey) rejectionReasons.push('together: no API key configured');
+    if (!geminiKey) rejectionReasons.push('gemini: no API key configured (Imagen 3.0)');
+    if (!qwenKey) rejectionReasons.push('qwen: no API key configured (Wanx image generation)');
 
     return NextResponse.json(
       {
@@ -205,11 +333,11 @@ export async function POST(request: NextRequest) {
         code: 'no_eligible_image_model',
         error:
           'No image generation provider is configured. ' +
-          'Add an OpenAI API key (Admin → AI Providers) to enable GPT Image models. ' +
-          'Supported: gpt-image-1, dall-e-3, Together AI FLUX.',
+          'Configure at least one of: OpenAI (gpt-image-1/dall-e-3), Together AI (FLUX), ' +
+          'Gemini (Imagen 3.0), or Qwen/DashScope (Wanx) in Admin → AI Providers.',
         candidate_models: candidateModels,
         rejection_reasons: rejectionReasons,
-        providers_checked: ['openai', 'together'],
+        providers_checked: ['openai', 'together', 'gemini', 'qwen'],
       },
       { status: 503 },
     );

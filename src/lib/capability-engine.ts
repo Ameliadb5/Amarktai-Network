@@ -95,7 +95,7 @@ const CAPABILITY_MAP: Record<CapabilityClass, CapabilityRequirement> = {
   embeddings: {
     anyCapabilityFlag: ['supports_embeddings'],
     label: 'text embeddings',
-    suggestedProviders: ['openai', 'huggingface', 'nvidia'],
+    suggestedProviders: ['openai', 'qwen', 'gemini', 'huggingface'],
   },
   reranking: {
     anyCapabilityFlag: ['supports_reranking'],
@@ -130,7 +130,7 @@ const CAPABILITY_MAP: Record<CapabilityClass, CapabilityRequirement> = {
   image_generation: {
     anyCapabilityFlag: ['supports_image_generation'],
     label: 'image generation',
-    suggestedProviders: ['openai', 'huggingface'],
+    suggestedProviders: ['openai', 'together', 'gemini', 'qwen', 'huggingface'],
   },
   image_editing: {
     anyCapabilityFlag: ['supports_image_generation'],
@@ -140,20 +140,21 @@ const CAPABILITY_MAP: Record<CapabilityClass, CapabilityRequirement> = {
   video_planning: {
     anyCapabilityFlag: ['supports_video_planning'],
     label: 'video planning / storyboarding',
-    suggestedProviders: ['gemini', 'openai', 'deepseek'],
+    suggestedProviders: ['gemini', 'groq', 'openai', 'deepseek'],
   },
   video_generation: {
     anyCapabilityFlag: ['supports_video_generation'],
     label: 'video generation',
     // Hugging Face is NOT a valid video generation provider (no async job API).
-    // Use Replicate or Together AI for real video generation.
-    suggestedProviders: ['replicate', 'together'],
+    // Gemini Veo 2 requires Vertex AI enterprise tier — not available via standard API key.
+    // Use Replicate, Together AI, or Qwen/DashScope (Wan) for real video generation.
+    suggestedProviders: ['replicate', 'together', 'qwen'],
   },
   voice_input: {
     anyCapabilityFlag: ['supports_stt', 'supports_voice_interaction'],
     anyRole: ['voice_interaction'],
     label: 'voice / speech input (STT)',
-    suggestedProviders: ['groq', 'openai', 'gemini', 'huggingface'],
+    suggestedProviders: ['groq', 'openai', 'gemini', 'qwen', 'huggingface'],
   },
   voice_output: {
     anyCapabilityFlag: ['supports_tts'],
@@ -199,7 +200,7 @@ const CAPABILITY_MAP: Record<CapabilityClass, CapabilityRequirement> = {
   suggestive_image_generation: {
     anyCapabilityFlag: ['supports_image_generation'],
     label: 'suggestive image generation (non-explicit)',
-    suggestedProviders: ['openai', 'huggingface'],
+    suggestedProviders: ['openai', 'together', 'qwen', 'huggingface'],
   },
   suggestive_video_planning: {
     anyCapabilityFlag: ['supports_video_planning'],

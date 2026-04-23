@@ -1,17 +1,27 @@
 'use client'
 
 import Link from 'next/link'
-import { Brain, GitBranch, ShieldCheck, Database, Bot, ArrowRight } from 'lucide-react'
+import {
+  Brain,
+  GitBranch,
+  Database,
+  Bot,
+  ShieldCheck,
+  Layers,
+  ArrowRight,
+  BarChart3,
+} from 'lucide-react'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import NetworkPulseBackground from '@/components/visual/NetworkPulseBackground'
 
 const pillars = [
-  { icon: Brain, title: 'Intelligence Core', desc: 'One central decision engine orchestrates all app requests.' },
-  { icon: GitBranch, title: 'Provider Orchestration', desc: 'Adaptive routing and fallback across providers and models.' },
-  { icon: Database, title: 'Persistent Memory', desc: 'Cross-app memory and knowledge continuity for compound intelligence.' },
-  { icon: Bot, title: 'App Agents', desc: 'Dedicated agents per app with scoped capabilities and rules.' },
-  { icon: ShieldCheck, title: 'Operator Governance', desc: 'Budgets, controls, policy layers, and auditable execution.' },
+  { icon: Brain, title: 'Intelligence Core', desc: 'A central execution brain that classifies tasks and orchestrates decision paths.' },
+  { icon: GitBranch, title: 'Provider Orchestration', desc: 'Adaptive provider/model selection with fallback and capability matching.' },
+  { icon: Database, title: 'Memory & Context', desc: 'Shared retrieval and memory layers that can persist useful operational context.' },
+  { icon: Bot, title: 'App Agent Runtime', desc: 'Dedicated app agents with scoped behavior, capabilities, and learning flows.' },
+  { icon: ShieldCheck, title: 'Governance Layer', desc: 'Budgets, policies, and readiness checks built into system operations.' },
+  { icon: Layers, title: 'Unified Surfaces', desc: 'Website, API, and dashboard all map to one underlying operating model.' },
 ]
 
 export default function AboutPage() {
@@ -19,13 +29,14 @@ export default function AboutPage() {
     <div className="min-h-screen bg-[#030712] text-white">
       <Header />
 
-      <section className="relative overflow-hidden px-4 pb-20 pt-36 sm:px-6 lg:px-8">
-        <NetworkPulseBackground className="opacity-70" />
-        <div className="relative z-10 mx-auto max-w-5xl text-center">
+      <section className="relative overflow-hidden px-4 pb-16 pt-32 sm:px-6 lg:px-8">
+        <NetworkPulseBackground className="opacity-75" />
+        <div className="relative z-10 mx-auto max-w-6xl">
           <p className="text-label text-cyan-300">Architecture</p>
-          <h1 className="text-display mt-4">Amarktai Network is the intelligence system behind multiple products.</h1>
-          <p className="mx-auto mt-6 max-w-3xl text-lg text-slate-300">
-            The platform is engineered as a command network: one super-brain, many app surfaces, controlled capabilities, and operator-level observability.
+          <h1 className="text-display mt-4 max-w-5xl">Amarktai Network is an AI orchestration infrastructure layer for real product ecosystems.</h1>
+          <p className="mt-6 max-w-4xl text-lg text-slate-300">
+            It is not a single assistant app. It is a routing and operations system that coordinates models, providers,
+            tools, and outputs across multiple application surfaces.
           </p>
         </div>
       </section>
@@ -42,12 +53,32 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl rounded-3xl border border-white/10 bg-white/5 p-10 text-center">
-          <h2 className="text-headline">Designed for high-signal operators.</h2>
-          <p className="mt-4 text-slate-300">Amarktai Network exists for teams building serious AI products with serious reliability, control, and velocity requirements.</p>
-          <div className="mt-8 flex justify-center gap-3">
-            <Link href="/apps" className="btn-ghost">View Ecosystem</Link>
+      <section className="px-4 pb-20 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-7">
+            <h2 className="text-title">Operational model</h2>
+            <ul className="mt-4 space-y-2 text-sm text-slate-300">
+              <li>• App sends task through one gateway.</li>
+              <li>• Router evaluates capability + provider + economics.</li>
+              <li>• Execution returns output, artifacts, and trace telemetry.</li>
+              <li>• Operators inspect readiness, events, and costs in dashboard.</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-7">
+            <h2 className="text-title flex items-center gap-2"><BarChart3 className="h-5 w-5 text-cyan-300" /> Why teams adopt it</h2>
+            <ul className="mt-4 space-y-2 text-sm text-slate-300">
+              <li>• Avoid vendor lock to one model/provider.</li>
+              <li>• Keep one operator console for many app surfaces.</li>
+              <li>• Build multimodal capabilities with controlled complexity.</li>
+              <li>• Move from experimental prompts to production AI operations.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mx-auto mt-10 max-w-6xl rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1226] to-[#040916] p-8 text-center">
+          <h2 className="text-headline">Built for high-signal operators, builders, and integration teams.</h2>
+          <div className="mt-7 flex justify-center gap-3">
+            <Link href="/apps" className="btn-ghost">View Capability Surfaces</Link>
             <Link href="/contact" className="btn-primary">Request Access <ArrowRight className="h-4 w-4" /></Link>
           </div>
         </div>

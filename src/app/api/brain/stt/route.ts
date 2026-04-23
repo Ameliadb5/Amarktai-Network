@@ -66,9 +66,10 @@ export async function POST(request: NextRequest) {
     const openaiKey = await getVaultApiKey('openai');
     const geminiKey = await getVaultApiKey('gemini');
     const hfKey    = await getVaultApiKey('huggingface');
+    const qwenKey  = await getVaultApiKey('qwen');
 
     // Determine provider
-    let provider: 'groq' | 'openai' | 'gemini' | 'huggingface';
+    let provider: 'groq' | 'openai' | 'gemini' | 'huggingface' | 'qwen';
     if (requestedProvider === 'groq') {
       if (!groqKey) {
         return unavailable('provider_not_configured', 'Groq STT requested but no Groq API key is configured. Add it via Admin → AI Providers.', 503, 'groq');
@@ -89,21 +90,28 @@ export async function POST(request: NextRequest) {
         return unavailable('provider_not_configured', 'Hugging Face STT requested but no Hugging Face API key is configured. Add it via Admin → AI Providers.', 503, 'huggingface');
       }
       provider = 'huggingface';
+    } else if (requestedProvider === 'qwen') {
+      if (!qwenKey) {
+        return unavailable('provider_not_configured', 'Qwen STT requested but no Qwen/DashScope API key is configured. Add it via Admin → AI Providers.', 503, 'qwen');
+      }
+      provider = 'qwen';
     } else {
       // Auto: OpenAI is the golden-path baseline. Groq is used as fallback when
-      // OpenAI is not configured. Gemini and Hugging Face are last-resort options.
+      // OpenAI is not configured. Gemini, Qwen, and Hugging Face are last-resort options.
       if (openaiKey) {
         provider = 'openai';
       } else if (groqKey) {
         provider = 'groq';
       } else if (geminiKey) {
         provider = 'gemini';
+      } else if (qwenKey) {
+        provider = 'qwen';
       } else if (hfKey) {
         provider = 'huggingface';
       } else {
         return unavailable(
           'all_providers_unavailable',
-          'Voice input is currently unavailable: no STT provider is configured. Add an API key via Admin → AI Providers (OpenAI, Groq, Gemini, or Hugging Face).',
+          'Voice input is currently unavailable: no STT provider is configured. Add an API key via Admin → AI Providers (OpenAI, Groq, Gemini, Qwen, or Hugging Face).',
           503,
         );
       }
@@ -111,7 +119,7 @@ export async function POST(request: NextRequest) {
 
     // Select model
     const model = requestedModel
-      ?? (provider === 'groq' ? 'whisper-large-v3' : provider === 'gemini' ? 'gemini-2.0-flash-live-001' : provider === 'huggingface' ? 'openai/whisper-large-v3' : 'whisper-1');
+      ?? (provider === 'groq' ? 'whisper-large-v3' : provider === 'gemini' ? 'gemini-2.0-flash-live-001' : provider === 'qwen' ? 'qwen-audio-turbo' : provider === 'huggingface' ? 'openai/whisper-large-v3' : 'whisper-1');
 
     if (provider === 'groq') {
       // Groq STT via OpenAI-compatible endpoint
@@ -215,6 +223,63 @@ export async function POST(request: NextRequest) {
         provider: 'huggingface',
         executed: true,
         fallback_used: true,
+        capability: 'voice_input',
+      });
+    }
+
+    if (provider === 'qwen') {
+      // Qwen Audio (qwen-audio-turbo / qwen-audio-chat) via DashScope compatible-mode.
+      // The model accepts audio inline_data as base64 in the messages content array.
+      const audioBytes = Buffer.from(await file.arrayBuffer());
+      const audioBase64 = audioBytes.toString('base64');
+      const mimeType = (file as File).type || 'audio/webm';
+      const transcribeInstruction = language
+        ? `Transcribe this audio accurately. The spoken language is ${language}. Output only the transcribed text.`
+        : 'Transcribe this audio accurately. Output only the transcribed text.';
+
+      const response = await fetch(
+        'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${qwenKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'audio_url',
+                    audio_url: { url: `data:${mimeType};base64,${audioBase64}` },
+                  },
+                  { type: 'text', text: transcribeInstruction },
+                ],
+              },
+            ],
+          }),
+          signal: AbortSignal.timeout(30_000),
+        },
+      );
+
+      if (!response.ok) {
+        const err = await response.text();
+        return unavailable('transcription_failed', `Qwen Audio transcription failed: ${err}`, response.status, 'qwen');
+      }
+
+      const result = await response.json() as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const transcript = result?.choices?.[0]?.message?.content ?? '';
+      return NextResponse.json({
+        transcript,
+        model,
+        language,
+        provider: 'qwen',
+        executed: true,
+        fallback_used: false,
         capability: 'voice_input',
       });
     }

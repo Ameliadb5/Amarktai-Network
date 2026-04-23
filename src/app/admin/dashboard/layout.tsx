@@ -5,56 +5,55 @@ import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  Menu, X, User, LayoutDashboard, AppWindow, Sparkles, Brain, Server,
-  Bot, Cpu, Archive, Plug, ClipboardList, Bell, Rocket,
+  Menu,
+  X,
+  User,
+  LayoutDashboard,
+  Sparkles,
+  AppWindow,
+  Bot,
+  Cpu,
+  Brain,
+  Server,
+  Archive,
+  Activity,
 } from 'lucide-react'
-
-// ── Nav structure ─────────────────────────────────────────────────────────────
-// Grouped for clean sidebar. Groups without a label get no divider.
 
 const NAV_GROUPS: Array<{
   label?: string
   items: Array<{ href: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }>
 }> = [
   {
+    label: 'Control Room',
     items: [
-      { href: '/admin/dashboard',           label: 'Overview',     icon: LayoutDashboard },
-      { href: '/admin/dashboard/workspace', label: 'Workspace',    icon: Sparkles },
+      { href: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard },
+      { href: '/admin/dashboard/workspace', label: 'Workspace', icon: Sparkles },
     ],
   },
   {
-    label: 'Apps',
+    label: 'Build Surfaces',
     items: [
-      { href: '/admin/dashboard/apps',        label: 'Apps',        icon: AppWindow },
-      { href: '/admin/dashboard/app-agents',  label: 'App Agents',  icon: Bot },
-      { href: '/admin/dashboard/onboarding',  label: 'Connect App', icon: Rocket },
-      { href: '/admin/dashboard/integrations', label: 'Integrations', icon: Plug },
+      { href: '/admin/dashboard/apps', label: 'Apps', icon: AppWindow },
+      { href: '/admin/dashboard/app-agents', label: 'App Agents', icon: Bot },
     ],
   },
   {
     label: 'Intelligence',
     items: [
-      { href: '/admin/dashboard/intelligence', label: 'Intelligence', icon: Brain },
-      { href: '/admin/dashboard/models',       label: 'Models',       icon: Cpu },
-    ],
-  },
-  {
-    label: 'Output',
-    items: [
-      { href: '/admin/dashboard/artifacts', label: 'Artifacts', icon: Archive },
+      { href: '/admin/dashboard/intelligence', label: 'Memory & Routing', icon: Brain },
+      { href: '/admin/dashboard/models', label: 'Model Registry', icon: Cpu },
     ],
   },
   {
     label: 'Operations',
     items: [
       { href: '/admin/dashboard/operations', label: 'Operations', icon: Server },
-      { href: '/admin/dashboard/jobs',       label: 'Jobs',       icon: ClipboardList },
-      { href: '/admin/dashboard/alerts',     label: 'Alerts',     icon: Bell },
+      { href: '/admin/dashboard/artifacts', label: 'Artifacts', icon: Archive },
+      { href: '/admin/dashboard/events', label: 'Events', icon: Activity },
     ],
   },
 ]
 
-// Flat list for breadcrumb label lookup
 const ALL_NAV_ITEMS = NAV_GROUPS.flatMap(g => g.items)
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -77,7 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 px-2 py-1 text-xs font-bold text-white">AN</div>
           <div>
             <p className="text-sm font-bold text-white">Amarktai Network</p>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Operator Command</p>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Operator Console</p>
           </div>
         </Link>
       </div>

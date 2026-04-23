@@ -39,9 +39,22 @@ const fadeUp = {
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' as const } },
 }
 
-const GENRE_PRESETS = [
-  'Pop', 'Rock', 'Gospel', 'Amapiano', 'EDM', 'Hip-Hop', 'R&B', 'Jazz',
-  'Classical', 'Cinematic', 'Lo-Fi', 'Afrobeats', 'Country', 'Reggae',
+// Genre preset IDs must match backend MusicGenre enum values exactly
+const GENRE_PRESETS: Array<{ id: string; label: string }> = [
+  { id: 'pop', label: 'Pop' },
+  { id: 'rock', label: 'Rock' },
+  { id: 'gospel', label: 'Gospel' },
+  { id: 'amapiano', label: 'Amapiano' },
+  { id: 'edm', label: 'EDM' },
+  { id: 'hip_hop', label: 'Hip-Hop' },
+  { id: 'rnb', label: 'R&B' },
+  { id: 'jazz', label: 'Jazz' },
+  { id: 'classical', label: 'Classical' },
+  { id: 'cinematic', label: 'Cinematic' },
+  { id: 'lofi', label: 'Lo-Fi' },
+  { id: 'afrobeats', label: 'Afrobeats' },
+  { id: 'country', label: 'Country' },
+  { id: 'reggae', label: 'Reggae' },
 ]
 
 const MOOD_PRESETS = [
@@ -49,9 +62,17 @@ const MOOD_PRESETS = [
   'Inspirational', 'Nostalgic', 'Aggressive', 'Peaceful',
 ]
 
-const VOCAL_STYLES = [
-  'male_vocal', 'female_vocal', 'duet', 'choir', 'instrumental',
-  'whisper', 'rap', 'spoken_word',
+// Vocal styles that match the backend VocalStyle enum in music-studio.ts
+const VOCAL_STYLES: Array<{ id: string; label: string }> = [
+  { id: 'female_lead', label: 'Female Lead' },
+  { id: 'male_lead', label: 'Male Lead' },
+  { id: 'choir', label: 'Choir' },
+  { id: 'rap', label: 'Rap' },
+  { id: 'spoken_word', label: 'Spoken Word' },
+  { id: 'a_cappella', label: 'A Cappella' },
+  { id: 'harmonized', label: 'Harmonized' },
+  { id: 'falsetto', label: 'Falsetto' },
+  { id: 'instrumental_only', label: 'Instrumental Only' },
 ]
 
 export default function MusicStudioPage() {
@@ -61,11 +82,11 @@ export default function MusicStudioPage() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Form state
+  // Form state — genre/vocalStyle use backend enum IDs, not display names
   const [theme, setTheme] = useState('')
-  const [genre, setGenre] = useState('Pop')
+  const [genre, setGenre] = useState('pop')
   const [mood, setMood] = useState('Uplifting')
-  const [vocalStyle, setVocalStyle] = useState('female_vocal')
+  const [vocalStyle, setVocalStyle] = useState('female_lead')
   const [durationSeconds, setDurationSeconds] = useState(180)
   const [includeLyrics, setIncludeLyrics] = useState(true)
   const [appSlug, setAppSlug] = useState('platform')
@@ -108,7 +129,7 @@ export default function MusicStudioPage() {
           request: {
             theme: theme.trim(),
             genre,
-            mood,
+            productionNotes: mood ? `Mood: ${mood}` : undefined,
             vocalStyle,
             durationSeconds,
             includeLyrics,
@@ -215,7 +236,7 @@ export default function MusicStudioPage() {
                 onChange={e => setGenre(e.target.value)}
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500/50"
               >
-                {GENRE_PRESETS.map(g => <option key={g} value={g}>{g}</option>)}
+                {GENRE_PRESETS.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
               </select>
             </div>
 
@@ -238,7 +259,7 @@ export default function MusicStudioPage() {
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500/50"
               >
                 {VOCAL_STYLES.map(v => (
-                  <option key={v} value={v}>{v.replace(/_/g, ' ')}</option>
+                  <option key={v.id} value={v.id}>{v.label}</option>
                 ))}
               </select>
             </div>

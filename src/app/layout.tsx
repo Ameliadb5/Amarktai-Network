@@ -18,9 +18,9 @@ const geistMono = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'Amarktai Network — Intelligence Layer for Connected Apps',
-  description: "Amarktai Network is the intelligence layer powering a growing ecosystem of connected apps. Multi-model AI orchestration, adaptive execution, and shared context — so every connected app operates at its maximum potential.",
-  keywords: ['AI operations', 'AI orchestration', 'multi-model AI', 'Amarktai Network', 'connected apps', 'AI monitoring', 'shared intelligence', 'AI execution layer'],
+  title: 'Amarktai Network — Multi-Provider AI Operating System',
+  description: 'Amarktai Network is a multi-provider AI orchestration platform with routing intelligence, operator controls, and production-ready capability surfaces for real applications.',
+  keywords: ['AI orchestration', 'multi-provider AI', 'AI operating system', 'Amarktai Network', 'model routing', 'AI operator console', 'artifact workflows'],
   authors: [{ name: 'Amarktai Network' }],
   robots: 'index, follow',
 }

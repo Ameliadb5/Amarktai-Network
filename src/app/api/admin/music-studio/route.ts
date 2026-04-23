@@ -6,7 +6,7 @@ import {
   getMusicArtifactAsync,
   getMusicArtifactsByAppAsync,
   getAllMusicArtifactsAsync,
-  getMusicStudioStatus,
+  getMusicStudioStatusAsync,
   getMusicStudioSummaryAsync,
   AVAILABLE_GENRES,
   AVAILABLE_VOCAL_STYLES,
@@ -20,7 +20,7 @@ import {
  *   id       - get a single artifact by ID
  *   appSlug  - filter artifacts by app
  *   summary  - return summary stats only
- *   status   - return music studio status
+ *   status   - return music studio status (vault-aware async check)
  *   genres   - return available genres
  *   styles   - return available vocal styles
  *   limit    - max results (default 20)
@@ -37,7 +37,8 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10) || 20, 100)
 
   if (searchParams.has('status')) {
-    return NextResponse.json({ status: getMusicStudioStatus() })
+    // Use vault-aware async check so keys configured via Admin UI are discovered
+    return NextResponse.json({ status: await getMusicStudioStatusAsync() })
   }
 
   if (searchParams.has('summary')) {
@@ -64,10 +65,12 @@ export async function GET(request: NextRequest) {
     ? await getMusicArtifactsByAppAsync(appSlug, limit)
     : await getAllMusicArtifactsAsync(limit)
 
+  // Use vault-aware async status for the artifact listing response too
+  const status = await getMusicStudioStatusAsync()
   return NextResponse.json({
     artifacts,
     count: artifacts.length,
-    status: getMusicStudioStatus(),
+    status,
   })
 }
 

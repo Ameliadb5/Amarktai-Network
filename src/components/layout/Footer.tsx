@@ -4,17 +4,18 @@ const columns = [
   {
     heading: 'Platform',
     links: [
-      { href: '/', label: 'Home' },
-      { href: '/apps', label: 'Ecosystem' },
+      { href: '/', label: 'Platform' },
       { href: '/about', label: 'Architecture' },
+      { href: '/apps', label: 'Capabilities' },
+      { href: '/docs', label: 'API Reference' },
     ],
   },
   {
-    heading: 'Access',
+    heading: 'Operator',
     links: [
+      { href: '/admin/login', label: 'Dashboard Login' },
       { href: '/contact', label: 'Request Access' },
-      { href: '/admin/login', label: 'Operator Login' },
-      { href: '/voice-access', label: 'Voice Access Preview' },
+      { href: '/apps', label: 'Builder & Agent Surfaces' },
     ],
   },
   {
@@ -34,7 +35,7 @@ export default function Footer() {
           <div className="md:col-span-5">
             <p className="text-lg font-bold text-white">Amarktai Network</p>
             <p className="mt-3 max-w-sm text-sm text-slate-400">
-              The operator-grade AI operating system for app creation, orchestration, automation, and multimodal production.
+              Multi-provider AI orchestration for real products: one routing brain, one capability engine, one operator console.
             </p>
           </div>
 
@@ -55,7 +56,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-10 border-t border-white/10 pt-5 text-xs text-slate-500">
-          © {new Date().getFullYear()} Amarktai Network. All rights reserved.
+          © {new Date().getFullYear()} Amarktai Network. Operator-grade AI infrastructure.
         </div>
       </div>
     </footer>

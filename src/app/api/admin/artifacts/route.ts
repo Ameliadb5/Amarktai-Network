@@ -45,6 +45,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ counts })
   }
 
+  // Storage driver info — used by the UI to warn about ephemeral local storage
+  if (searchParams.has('storage-info')) {
+    const driver = process.env.STORAGE_DRIVER ?? 'local'
+    return NextResponse.json({
+      storageDriver: driver,
+      ephemeral: driver === 'local',
+      warning:
+        driver === 'local'
+          ? 'Artifacts are stored on the local filesystem (.storage/ directory). ' +
+            'This storage is ephemeral — files will be lost on redeploy or container restart. ' +
+            'Configure STORAGE_DRIVER=s3 or STORAGE_DRIVER=r2 with appropriate credentials for persistent storage.'
+          : null,
+    })
+  }
+
   // List with filters
   const result = await listArtifacts({
     appSlug: searchParams.get('appSlug') ?? undefined,
