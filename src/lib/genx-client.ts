@@ -227,7 +227,7 @@ function normaliseBaseUrl(raw: string): string | null {
     .replace(/\/v1\/?$/, '')
     .replace(/\/api\/?$/, '')
     .replace(/\/$/, '')
-  return clean ? `${url.origin}${clean}` : url.origin
+  return `${url.origin}${clean}`
 }
 
 /** Attempt a single probe request; return true when the endpoint is alive. */

@@ -229,9 +229,9 @@ export async function POST(req: NextRequest) {
         generateNotTested = false
         break
       } else if (res.status === 404) {
-        generateError = `generate endpoint not found at ${url}`
+        generateError = `generate endpoint not found at ${url} (last attempted path)`
       } else {
-        generateError = httpStatusToError(res.status)
+        generateError = `${httpStatusToError(res.status)} (last attempted: ${url})`
       }
     } catch (err) {
       generateError = err instanceof Error ? err.message : 'generate request failed'

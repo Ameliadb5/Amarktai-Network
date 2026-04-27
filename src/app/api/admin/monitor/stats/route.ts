@@ -60,7 +60,7 @@ export async function GET() {
       aiUsageByProvider[key] = (aiUsageByProvider[key] ?? 0) + r._count.id
     }
     const totalAiRequestsThisMonth = Object.values(aiUsageByProvider).reduce(
-      (sum: number, n: number) => sum + n, 0
+      (sum, n) => sum + n, 0
     )
 
     // Storage summary

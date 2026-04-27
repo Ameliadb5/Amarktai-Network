@@ -429,7 +429,7 @@ export default function AIPartnerWidget({ open, onClose, onAction, variant = 'fl
           </div>
           <div>
             <span className="text-sm font-medium text-white">Aiva</span>
-            <p className="text-[9px] text-slate-500 leading-tight">AmarktAI Voice &amp; Intelligence Assistant</p>
+            <p className="text-[10px] text-slate-500 leading-tight">AmarktAI Voice &amp; Intelligence Assistant</p>
           </div>
           <span className={`text-[10px] rounded-full px-2 py-0.5 transition-colors ${
             voiceError ? 'text-red-300 bg-red-400/10' :
