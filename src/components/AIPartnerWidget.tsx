@@ -98,7 +98,7 @@ function requiresConfirmation(action: AssistantAction): boolean {
 }
 
 /** Base system prompt — the memory context block is appended dynamically per-session */
-const BASE_SYSTEM_PROMPT = `You are the Amarktai Network AI Partner — a capable operator assistant embedded in the admin dashboard.
+const BASE_SYSTEM_PROMPT = `You are Aiva — AmarktAI Voice & Intelligence Assistant — a capable operator assistant embedded in the Amarktai Network admin dashboard.
 You can answer questions, explain features, AND trigger real dashboard actions.
 
 Available actions you can dispatch (include at the END of your reply if appropriate):
@@ -202,7 +202,7 @@ export default function AIPartnerWidget({ open, onClose, onAction, variant = 'fl
     const activityHint = hasActivity
       ? ` I can see some recent activity — ${partnerContext.usageLines[0]}.`
       : ''
-    const greeting = `Hi, I'm your AI Partner.${activityHint} How can I help you today?`
+    const greeting = `Hi, I'm Aiva — your AmarktAI assistant.${activityHint} How can I help you today?`
     setMessages([{ role: 'assistant', content: greeting }])
   }, [open, greeted, partnerContext])
 
@@ -367,7 +367,7 @@ export default function AIPartnerWidget({ open, onClose, onAction, variant = 'fl
         return
       }
       if (ttsUnconfigured) {
-        setBrowserNote('Voice (TTS) provider not configured. Configure a TTS-capable provider in Settings to enable Voice Buddy.')
+        setBrowserNote('Voice (TTS) provider not configured. Configure a TTS-capable provider in Settings to enable Aiva Voice Mode.')
         return
       }
       setVoiceError(null)
@@ -427,7 +427,7 @@ export default function AIPartnerWidget({ open, onClose, onAction, variant = 'fl
               <Bot className="w-3.5 h-3.5 text-white" />
             </motion.div>
           </div>
-          <span className="text-sm font-medium text-white">AI Partner</span>
+          <span className="text-sm font-medium text-white">Aiva</span>
           <span className={`text-[10px] rounded-full px-2 py-0.5 transition-colors ${
             voiceError ? 'text-red-300 bg-red-400/10' :
             speaking ? 'text-cyan-300 bg-cyan-400/10' :

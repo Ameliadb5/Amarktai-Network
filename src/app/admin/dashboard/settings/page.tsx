@@ -259,11 +259,23 @@ function AIEngineSection({ config, onSaved }: { config: AIEngineConfig; onSaved:
               </Field>
 
               {testResult && (
-                <TestResultBanner result={testResult} extra={
-                  testResult.success
-                    ? `${testResult.modelCount} models · ${testResult.latencyMs}ms`
-                    : undefined
-                } />
+                <div className="space-y-2">
+                  <TestResultBanner result={testResult} extra={
+                    testResult.success
+                      ? `${testResult.modelCount as number} models · ${testResult.latencyMs as number}ms`
+                      : (testResult.catalogError as string | undefined) ?? (testResult.chatError as string | undefined)
+                  } />
+                  {(testResult.catalogOk !== undefined || testResult.chatOk !== undefined) && (
+                    <div className="flex gap-3 text-xs">
+                      <span className={(testResult.catalogOk as boolean) ? 'text-emerald-400' : 'text-red-400'}>
+                        {(testResult.catalogOk as boolean) ? '✓' : '✗'} Catalog{testResult.catalogError ? `: ${testResult.catalogError as string}` : ''}
+                      </span>
+                      <span className={(testResult.chatOk as boolean) ? 'text-emerald-400' : 'text-red-400'}>
+                        {(testResult.chatOk as boolean) ? '✓' : '✗'} Chat{testResult.chatError ? `: ${testResult.chatError as string}` : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="flex items-center gap-2 pt-1">
@@ -632,6 +644,8 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
   const [mode, setMode] = useState(config.mode || 'disabled')
   const [specialistEndpoint, setSpecialistEndpoint] = useState(config.specialistEndpoint)
   const [specialistKey, setSpecialistKey] = useState('')
+  const [specialistModel, setSpecialistModel] = useState('')
+  const [testPrompt, setTestPrompt] = useState('a tasteful topless portrait, artistic lighting')
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -674,7 +688,13 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
       const res = await fetch('/api/admin/settings/test-adult', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode, endpoint: specialistEndpoint, apiKey: specialistKey }),
+        body: JSON.stringify({
+          mode,
+          endpoint: specialistEndpoint,
+          apiKey: specialistKey,
+          model: specialistModel || undefined,
+          testPrompt: testPrompt || undefined,
+        }),
       })
       setTestResult(await res.json())
     } finally {
@@ -690,28 +710,45 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
     <motion.div variants={fadeUp}>
       <SectionCard
         icon={<ShieldCheck className="h-5 w-5 text-violet-400" />}
-        title="Adult Content Mode"
+        title="Adult Creative Mode"
         badge={badge}
         open={open}
         onToggle={() => setOpen(v => !v)}
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            Adult content generation is off by default. Enable only after verifying compliance with applicable content policies.
+            Adult Creative Mode allows generation of adult content via a specialist provider. Disabled by default.
+            Must be enabled explicitly and requires a separate specialist provider with a passing test.
           </p>
 
           {open && (
             <div className="space-y-3">
+              {/* Allowed / blocked rules */}
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-1">
+                  <p className="text-[10px] uppercase tracking-widest text-emerald-400 font-semibold mb-1.5">Allowed</p>
+                  {['Adult content', 'Topless', 'Lingerie (thongs, g-strings)', 'Suggestive / erotic visuals', 'Nudity without genitals'].map(item => (
+                    <p key={item} className="text-xs text-emerald-300 flex items-start gap-1.5"><span className="mt-px">✓</span>{item}</p>
+                  ))}
+                </div>
+                <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 space-y-1">
+                  <p className="text-[10px] uppercase tracking-widest text-red-400 font-semibold mb-1.5">Always Blocked</p>
+                  {['Genitals (male or female)', 'Explicit sex acts', 'Minors or age ambiguity', 'Real-person deepfakes', 'Non-consensual content', 'Sexual violence', 'Illegal content'].map(item => (
+                    <p key={item} className="text-xs text-red-300 flex items-start gap-1.5"><span className="mt-px">✗</span>{item}</p>
+                  ))}
+                </div>
+              </div>
+
               <Field label="Mode">
                 <select value={mode} onChange={e => setMode(e.target.value)} className={inputCls}>
                   <option value="disabled">Disabled (default)</option>
-                  <option value="specialist">Specialist provider</option>
+                  <option value="specialist">Specialist provider only</option>
                 </select>
               </Field>
 
               {mode === 'specialist' && (
                 <>
-                  <Field label="Specialist Endpoint">
+                  <Field label="Provider Endpoint">
                     <input
                       type="url"
                       value={specialistEndpoint}
@@ -719,8 +756,9 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
                       placeholder="https://your-adult-provider.com/v1/generate"
                       className={inputCls}
                     />
+                    <p className="text-[10px] text-slate-600 mt-1">Together AI, HuggingFace endpoint, or custom</p>
                   </Field>
-                  <Field label="Specialist API Key">
+                  <Field label="API Key">
                     <div className="relative">
                       <input
                         type={showKey ? 'text' : 'password'}
@@ -736,6 +774,25 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
                     </div>
                     {config.hasSpecialistKey && <p className="text-[10px] text-slate-600 mt-1">Leave blank to keep existing key</p>}
                   </Field>
+                  <Field label="Model (optional)">
+                    <input
+                      type="text"
+                      value={specialistModel}
+                      onChange={e => setSpecialistModel(e.target.value)}
+                      placeholder="e.g. stable-diffusion-xl-base-1.0"
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Test Prompt">
+                    <input
+                      type="text"
+                      value={testPrompt}
+                      onChange={e => setTestPrompt(e.target.value)}
+                      placeholder="a tasteful topless portrait, artistic lighting"
+                      className={inputCls}
+                    />
+                    <p className="text-[10px] text-slate-600 mt-1">Used only during connection test — not saved</p>
+                  </Field>
                 </>
               )}
 
@@ -750,9 +807,9 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
                   {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                   Save
                 </button>
-                <button onClick={test} disabled={testing} className={btnSecondary}>
+                <button onClick={test} disabled={testing || mode === 'disabled'} className={btnSecondary}>
                   {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TestTube2 className="h-3.5 w-3.5" />}
-                  Test
+                  Test provider
                 </button>
                 {saveMsg && (
                   <span className={`text-xs ${saveMsg.startsWith('Error') ? 'text-red-400' : 'text-emerald-400'}`}>
