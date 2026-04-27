@@ -1011,3 +1011,84 @@ model WorkspaceSession {
   @@index([traceId])
   @@map("workspace_sessions")
 }
+
+// ════════════════════════════════════════════════════════════════════════════════
+// PHASE 3 — Workspace Cockpit, GitHub, AI Diff, Deploy, Monitor
+// ════════════════════════════════════════════════════════════════════════════════
+
+/// Per-app deployment and repo configuration (Phase 3D).
+model AppDeployConfig {
+  id             String   @id @default(uuid())
+  appSlug        String   @unique @map("app_slug")
+  repoOwner      String   @default("") @map("repo_owner")
+  repoName       String   @default("") @map("repo_name")
+  repoUrl        String   @default("") @map("repo_url")
+  repoBranch     String   @default("main") @map("repo_branch")
+  subdomain      String   @default("") // e.g. myapp.amarktai.com
+  deployPath     String   @default("") @map("deploy_path") // e.g. /var/www/apps/myapp
+  serviceName    String   @default("") @map("service_name") // e.g. amarktai-myapp
+  agentId        String   @default("") @map("agent_id")
+  capabilities   String   @default("[]") // JSON string[]
+  modelPolicy    String   @default("balanced") @map("model_policy")
+  deployMethod   String   @default("github_actions") @map("deploy_method") // direct_vps | github_actions | manual
+  deployStatus   String   @default("not_deployed") @map("deploy_status") // not_deployed | deploying | live | failed
+  monitorStatus  String   @default("unknown") @map("monitor_status")   // unknown | healthy | degraded | down
+  lastDeployedAt DateTime? @map("last_deployed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  deployLogs AppDeployLog[]
+
+  @@map("app_deploy_configs")
+}
+
+/// Direct-VPS deployment log row (Phase 3E).
+model AppDeployLog {
+  id           String   @id @default(uuid())
+  appSlug      String   @map("app_slug")
+  deployConfig AppDeployConfig @relation(fields: [appSlug], references: [appSlug], onDelete: Cascade)
+  triggeredBy  String   @default("admin") @map("triggered_by") // admin | github_actions | api
+  deployMethod String   @default("direct_vps") @map("deploy_method")
+  webdockSlug  String   @default("") @map("webdock_slug")
+  branch       String   @default("main")
+  commitSha    String   @default("") @map("commit_sha")
+  steps        String   @default("[]") @map("steps") // JSON DeployStep[]
+  status       String   @default("pending") // pending | running | success | failed
+  errorMessage String   @default("") @map("error_message")
+  logOutput    String   @default("") @map("log_output") // combined stdout/stderr of steps
+  startedAt    DateTime @default(now()) @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  durationMs   Int?     @map("duration_ms")
+
+  @@index([appSlug])
+  @@index([startedAt])
+  @@map("app_deploy_logs")
+}
+
+/// AI-generated code changeset saved as a workspace artifact (Phase 3C).
+model WorkspaceChangeset {
+  id              String   @id @default(uuid())
+  traceId         String   @map("trace_id")
+  repoFullName    String   @default("") @map("repo_full_name")
+  branch          String   @default("main")
+  instruction     String   @default("") // original user instruction
+  summary         String   @default("") // AI summary of changes
+  unifiedDiff     String   @default("") @map("unified_diff") // full unified diff text
+  filesChanged    String   @default("[]") @map("files_changed") // JSON: [{path, oldContent, newContent}]
+  riskNotes       String   @default("") @map("risk_notes") // AI risk summary
+  verifyCommands  String   @default("[]") @map("verify_commands") // JSON string[]
+  status          String   @default("draft") // draft | approved | applied | committed | rejected
+  artifactId      String?  @map("artifact_id") // linked artifact if saved
+  appliedAt       DateTime? @map("applied_at")
+  committedAt     DateTime? @map("committed_at")
+  commitSha       String?  @map("commit_sha")
+  resolvedModel   String   @default("") @map("resolved_model")
+  latencyMs       Int?     @map("latency_ms")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([repoFullName])
+  @@index([status])
+  @@index([createdAt])
+  @@map("workspace_changesets")
+}

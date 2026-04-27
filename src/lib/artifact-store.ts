@@ -25,6 +25,9 @@ export type ArtifactType =
   | 'document'
   | 'report'
   | 'transcript'
+  | 'diff'        // Phase 3C: AI-generated code diff / changeset
+  | 'changeset'   // Phase 3C: approved and applied changeset with file patches
+  | 'deploy_log'  // Phase 3E: direct VPS deploy log
 
 export type ArtifactStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'expired'
 

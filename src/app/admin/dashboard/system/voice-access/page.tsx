@@ -1,9 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { ArrowRight, Mic, Save, Volume2, Loader2, CheckCircle } from 'lucide-react'
-import VoiceAccessVisualizer, { VoiceVisualMode } from '@/components/voice/VoiceAccessVisualizer'
+/**
+ * PHASE 3I: Voice access settings removed. Redirected to main Settings.
+ */
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+export default function VoiceAccessSettingsRedirect() {
+  const router = useRouter()
+  useEffect(() => { router.replace('/admin/dashboard/settings') }, [router])
+  return (
+    <div className="flex items-center justify-center py-32 text-sm text-slate-400">
+      Redirecting to Settings…
+    </div>
+  )
+}
 
 type VoiceBehavior = 'talk_only' | 'talk_execute'
 

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 
-/** Voice access is not exposed in the current product surface. Redirect to access page. */
+/** Voice access route removed in Phase 3I. Redirect to home. */
 export default function VoiceAccessPage() {
-  redirect('/contact')
+  redirect('/')
 }

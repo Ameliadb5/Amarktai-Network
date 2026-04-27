@@ -1,11 +1,21 @@
 'use client'
 
-import React, { useMemo, useState, useRef, useCallback } from 'react'
+/**
+ * Voice login is DISABLED. This page now redirects to standard login.
+ * PHASE 3I: dead voice-login route removed.
+ */
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, Loader2, ShieldCheck, MicOff, AlertTriangle, Shield } from 'lucide-react'
-import VoiceAccessVisualizer, { VoiceVisualMode } from '@/components/voice/VoiceAccessVisualizer'
+
+export default function VoiceLoginRedirect() {
+  const router = useRouter()
+  useEffect(() => { router.replace('/admin/login') }, [router])
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#030712] text-sm text-slate-400">
+      Redirecting to standard login…
+    </div>
+  )
+}
 
 interface VoiceRecognizer {
   lang: string

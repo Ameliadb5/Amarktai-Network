@@ -1,9 +1,20 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, Mic, ShieldCheck, Waves } from 'lucide-react'
-import VoiceAccessVisualizer, { VoiceVisualMode } from '@/components/voice/VoiceAccessVisualizer'
+/**
+ * PHASE 3I: Voice enrollment removed. Redirected to main Settings.
+ */
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+export default function VoiceEnrollmentRedirect() {
+  const router = useRouter()
+  useEffect(() => { router.replace('/admin/dashboard/settings') }, [router])
+  return (
+    <div className="flex items-center justify-center py-32 text-sm text-slate-400">
+      Redirecting to Settings…
+    </div>
+  )
+}
 
 const steps = [
   { title: 'Device Permission', note: 'Confirm microphone availability and secure device binding.' },
