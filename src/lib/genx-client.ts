@@ -148,8 +148,6 @@ export interface GenXStatus {
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
-const GENX_API_URL  = process.env.GENX_API_URL  ?? ''
-const GENX_API_KEY  = process.env.GENX_API_KEY  ?? ''
 const GENX_TIMEOUT  = 60_000 // 60 s
 
 /**
@@ -160,27 +158,70 @@ const GENX_TIMEOUT  = 60_000 // 60 s
 export const GENX_ADULT_CONTENT_SUPPORTED =
   process.env.GENX_ADULT_CONTENT_SUPPORTED === 'true'
 
-function isConfigured(): boolean {
-  return !!GENX_API_URL
+/**
+ * Resolve the active GenX API URL and key.
+ * Priority: DB (IntegrationConfig key='genx') > environment variables.
+ * This allows the admin to configure GenX via the Settings UI without
+ * redeploying.
+ */
+async function resolveGenXConfig(): Promise<{ apiUrl: string; apiKey: string }> {
+  let apiUrl = process.env.GENX_API_URL ?? ''
+  let apiKey = process.env.GENX_API_KEY ?? ''
+
+  try {
+    // Lazy import to avoid circular dependency — prisma is safe to import here
+    const { prisma } = await import('@/lib/prisma')
+    const { decryptVaultKey } = await import('@/lib/crypto-vault')
+    const row = await prisma.integrationConfig.findUnique({ where: { key: 'genx' } })
+    if (row?.apiUrl) apiUrl = row.apiUrl
+    if (row?.apiKey) {
+      const decrypted = decryptVaultKey(row.apiKey)
+      if (decrypted) apiKey = decrypted
+    }
+  } catch {
+    // DB unavailable — fall through to env vars
+  }
+
+  return { apiUrl, apiKey }
 }
 
-function buildHeaders(): Record<string, string> {
+/** @deprecated Use resolveGenXConfig() for async config resolution. Kept for backwards-compat reference. */
+function _isConfiguredSync(): boolean {
+  return !!process.env.GENX_API_URL
+}
+void _isConfiguredSync
+
+async function buildHeaders(): Promise<Record<string, string>> {
+  const { apiKey } = await resolveGenXConfig()
   const h: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (GENX_API_KEY) h['Authorization'] = `Bearer ${GENX_API_KEY}`
+  if (apiKey) h['Authorization'] = `Bearer ${apiKey}`
   return h
 }
 
 // ── Status ────────────────────────────────────────────────────────────────────
 
 export function getGenXStatus(): GenXStatus {
-  if (!GENX_API_URL) {
+  const envUrl = process.env.GENX_API_URL ?? ''
+  if (!envUrl) {
     return {
       available: false,
       apiUrl: null,
       error: 'GENX_API_URL not configured',
     }
   }
-  return { available: true, apiUrl: GENX_API_URL, error: null }
+  return { available: true, apiUrl: envUrl, error: null }
+}
+
+/**
+ * Async version of getGenXStatus that also checks the DB-stored config.
+ * Used by routes that need accurate status including DB-saved settings.
+ */
+export async function getGenXStatusAsync(): Promise<GenXStatus> {
+  const { apiUrl } = await resolveGenXConfig()
+  if (!apiUrl) {
+    return { available: false, apiUrl: null, error: 'GenX not configured (GENX_API_URL not set and no DB config)' }
+  }
+  return { available: true, apiUrl, error: null }
 }
 
 // ── Model Catalog ─────────────────────────────────────────────────────────────
@@ -192,14 +233,15 @@ const MODEL_CACHE_TTL_MS = 5 * 60 * 1000
 
 /** Fetch the GenX model catalog. Returns empty array when GenX is unavailable. */
 export async function listGenXModels(): Promise<GenXModel[]> {
-  if (!isConfigured()) return []
+  const { apiUrl } = await resolveGenXConfig()
+  if (!apiUrl) return []
 
   const now = Date.now()
   if (_modelCache && now - _modelCacheAge < MODEL_CACHE_TTL_MS) return _modelCache
 
   try {
-    const res = await fetch(`${GENX_API_URL}/api/v1/models`, {
-      headers: buildHeaders(),
+    const res = await fetch(`${apiUrl}/api/v1/models`, {
+      headers: await buildHeaders(),
       signal: AbortSignal.timeout(GENX_TIMEOUT),
     })
     if (!res.ok) return _modelCache ?? []
@@ -309,7 +351,8 @@ function resolveDefaultByOperation(operationType: GenXOperationType): string {
 export async function callGenXChat(request: GenXChatRequest): Promise<GenXCallResult> {
   const start = Date.now()
 
-  if (!isConfigured()) {
+  const { apiUrl } = await resolveGenXConfig()
+  if (!apiUrl) {
     return {
       success: false, output: null, model: request.model,
       usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
@@ -318,9 +361,9 @@ export async function callGenXChat(request: GenXChatRequest): Promise<GenXCallRe
   }
 
   try {
-    const res = await fetch(`${GENX_API_URL}/v1/chat/completions`, {
+    const res = await fetch(`${apiUrl}/v1/chat/completions`, {
       method: 'POST',
-      headers: buildHeaders(),
+      headers: await buildHeaders(),
       body: JSON.stringify(request),
       signal: AbortSignal.timeout(GENX_TIMEOUT),
     })
@@ -369,7 +412,8 @@ export async function callGenXChat(request: GenXChatRequest): Promise<GenXCallRe
 export async function callGenXMedia(request: GenXMediaRequest): Promise<GenXMediaResult> {
   const start = Date.now()
 
-  if (!isConfigured()) {
+  const { apiUrl } = await resolveGenXConfig()
+  if (!apiUrl) {
     return {
       success: false, url: null, jobId: null, status: 'failed',
       model: request.model, latencyMs: 0,
@@ -378,9 +422,9 @@ export async function callGenXMedia(request: GenXMediaRequest): Promise<GenXMedi
   }
 
   try {
-    const res = await fetch(`${GENX_API_URL}/api/v1/generate`, {
+    const res = await fetch(`${apiUrl}/api/v1/generate`, {
       method: 'POST',
-      headers: buildHeaders(),
+      headers: await buildHeaders(),
       body: JSON.stringify(request),
       signal: AbortSignal.timeout(GENX_TIMEOUT),
     })
@@ -422,11 +466,12 @@ export async function callGenXMedia(request: GenXMediaRequest): Promise<GenXMedi
  * Poll GenX /api/v1/jobs/:id for async job status.
  */
 export async function getGenXJobStatus(jobId: string): Promise<GenXJobStatus | null> {
-  if (!isConfigured()) return null
+  const { apiUrl } = await resolveGenXConfig()
+  if (!apiUrl) return null
 
   try {
-    const res = await fetch(`${GENX_API_URL}/api/v1/jobs/${encodeURIComponent(jobId)}`, {
-      headers: buildHeaders(),
+    const res = await fetch(`${apiUrl}/api/v1/jobs/${encodeURIComponent(jobId)}`, {
+      headers: await buildHeaders(),
       signal: AbortSignal.timeout(GENX_TIMEOUT),
     })
     if (!res.ok) return null
