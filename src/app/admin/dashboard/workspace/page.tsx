@@ -72,6 +72,7 @@ export default function WorkspacePage() {
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [loadingUsage, setLoadingUsage] = useState(false)
   const [partnerOpen, setPartnerOpen] = useState(false)
+  const [genxLabel, setGenxLabel] = useState<string>('GenX')
 
   const handleAction = useCallback((action: AssistantAction) => {
     if (action.type === 'navigate_to') {
@@ -101,11 +102,21 @@ export default function WorkspacePage() {
 
   const loadUsage = useCallback(() => {
     setLoadingUsage(true)
-    fetch('/api/admin/usage?appSlug=workspace&days=30')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { setUsage(d?.usage ?? null) })
-      .catch(() => { setUsage(null) })
-      .finally(() => { setLoadingUsage(false) })
+    Promise.all([
+      fetch('/api/admin/usage?appSlug=workspace&days=30')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { setUsage(d?.usage ?? null) })
+        .catch(() => { setUsage(null) }),
+      fetch('/api/admin/genx/status')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!d) return
+          if (d.available) setGenxLabel(`Online · ${d.modelCount} models`)
+          else if (d.configured) setGenxLabel('Configured — unreachable')
+          else setGenxLabel('Not configured')
+        })
+        .catch(() => {}),
+    ]).finally(() => { setLoadingUsage(false) })
   }, [])
 
   useEffect(() => { loadUsage() }, [loadUsage])
@@ -147,7 +158,7 @@ export default function WorkspacePage() {
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryCard label="Requests (30d)" value={usage?.totalRequests ?? 0} />
-          <SummaryCard label="GenX" value="Default AI layer" highlight />
+          <SummaryCard label="GenX" value={genxLabel} highlight />
           <SummaryCard label="Top capability" value={topCapabilities[0] ? normalizeCapabilityName(topCapabilities[0][0]) : '—'} />
         </div>
 

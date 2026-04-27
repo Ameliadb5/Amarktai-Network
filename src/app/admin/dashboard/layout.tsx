@@ -45,7 +45,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/admin/login')
   }, [router])
 
-  const isActive = (href: string) => pathname.startsWith(href)
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + '/')
 
   const sidebar = (
     <div className="flex h-full flex-col">

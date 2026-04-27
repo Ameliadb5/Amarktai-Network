@@ -273,7 +273,7 @@ export default function GenXModelsPage() {
           <p className="text-xs text-slate-500">
             <span className="text-slate-400 font-medium">Fallback providers</span> (OpenAI, Groq, Anthropic, Gemini, etc.) are only used when GenX is unavailable or returns an error.
             Configure them in{' '}
-            <a href="/admin/dashboard/settings" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2">Settings → Integrations</a>.
+            <a href="/admin/dashboard/settings" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2">Settings</a>.
           </p>
         </div>
       </motion.div>

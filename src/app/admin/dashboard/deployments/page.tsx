@@ -85,12 +85,14 @@ export default function DeploymentsPage() {
             }))
           : []
         setRepos(list)
-        if (list.length > 0 && !selectedRepo) setSelectedRepo(list[0].fullName)
+        // Only pre-fill repo selection when nothing is selected yet
+        if (list.length > 0) {
+          setSelectedRepo(prev => prev || list[0].fullName)
+        }
       }
     } finally {
       setLoadingStatus(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadRuns = useCallback(async (repo?: string, workflow?: string) => {
