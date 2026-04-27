@@ -48,3 +48,22 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+/** DELETE /api/admin/github — remove GitHub integration */
+export async function DELETE() {
+  const session = await getSession()
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    await prisma.gitHubConfig.deleteMany()
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Failed to remove GitHub config' },
+      { status: 500 },
+    )
+  }
+}

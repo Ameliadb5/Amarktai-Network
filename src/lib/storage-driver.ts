@@ -3,9 +3,10 @@
  * @description Pluggable storage abstraction for the AmarktAI Network.
  *
  * Supports:
- *   - 'local' — file system storage (default, no dependencies)
- *   - 's3'    — S3-compatible object storage (AWS S3, MinIO, etc.)
- *   - 'r2'    — Cloudflare R2 (S3-compatible API)
+ *   - 'local'     — file system storage in the project directory (development only)
+ *   - 'local_vps' — file system storage at a configurable VPS path (persistent across redeploys)
+ *   - 's3'        — S3-compatible object storage (AWS S3, MinIO, etc.)
+ *   - 'r2'        — Cloudflare R2 (S3-compatible API)
  *
  * The active driver is selected via STORAGE_DRIVER env var (default: 'local').
  * Business logic never references a specific cloud vendor — only this interface.
@@ -42,6 +43,15 @@ export interface StorageDriver {
 // ── Local File System Driver ─────────────────────────────────────────────────
 
 const LOCAL_BASE_DIR = process.env.STORAGE_LOCAL_DIR ?? path.join(process.cwd(), '.storage')
+
+/**
+ * VPS-persistent local storage base directory.
+ * Stored outside the project tree so git clean / redeploy does not delete artifacts.
+ * Configurable via STORAGE_VPS_DIR env var.
+ * Default: /var/www/amarktai/storage/artifacts
+ */
+const LOCAL_VPS_BASE_DIR =
+  process.env.STORAGE_VPS_DIR ?? '/var/www/amarktai/storage/artifacts'
 
 class LocalStorageDriver implements StorageDriver {
   name = 'local'
@@ -96,7 +106,76 @@ class LocalStorageDriver implements StorageDriver {
   }
 }
 
+// ── VPS-Persistent Local Storage Driver ──────────────────────────────────────
+
+/**
+ * Stores artifacts at a configurable path outside the project directory.
+ * Default: /var/www/amarktai/storage/artifacts
+ * Configured via STORAGE_VPS_DIR env var.
+ *
+ * Unlike the 'local' driver, files here survive git clean, redeployments,
+ * and Docker container rebuilds — as long as the VPS volume is mounted
+ * at the same path.
+ */
+class LocalVpsStorageDriver implements StorageDriver {
+  name = 'local_vps'
+
+  private baseDir: string
+
+  constructor() {
+    this.baseDir = LOCAL_VPS_BASE_DIR
+  }
+
+  private resolvePath(key: string): string {
+    const sanitized = key.replace(/\.\./g, '').replace(/^\/+/, '')
+    const resolved = path.resolve(this.baseDir, sanitized)
+    if (!resolved.startsWith(path.resolve(this.baseDir))) {
+      throw new Error('Path traversal detected')
+    }
+    return resolved
+  }
+
+  async put(key: string, data: Buffer, _contentType: string): Promise<StoragePutResult> {
+    const filePath = this.resolvePath(key)
+    await fs.mkdir(path.dirname(filePath), { recursive: true })
+    await fs.writeFile(filePath, data)
+    const url = `/api/artifacts/file/${encodeURIComponent(key)}`
+    return { url, path: key, sizeBytes: data.length }
+  }
+
+  async get(key: string): Promise<Buffer | null> {
+    try {
+      return await fs.readFile(this.resolvePath(key))
+    } catch {
+      return null
+    }
+  }
+
+  async delete(key: string): Promise<boolean> {
+    try {
+      await fs.unlink(this.resolvePath(key))
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async exists(key: string): Promise<boolean> {
+    try {
+      await fs.access(this.resolvePath(key))
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async getUrl(key: string): Promise<string> {
+    return `/api/artifacts/file/${encodeURIComponent(key)}`
+  }
+}
+
 // ── S3-Compatible Driver (stub — ready for Phase 3 full implementation) ──────
+
 
 class S3StorageDriver implements StorageDriver {
   name = 's3'
@@ -191,6 +270,9 @@ export function getStorageDriver(): StorageDriver {
     case 'r2':
       _cachedDriver = new R2StorageDriver()
       break
+    case 'local_vps':
+      _cachedDriver = new LocalVpsStorageDriver()
+      break
     default:
       _cachedDriver = new LocalStorageDriver()
   }
@@ -206,6 +288,7 @@ export function getStorageStatus(): {
   configured: boolean
   basePath: string
   note: string
+  persistent: boolean
 } {
   const driverName = (process.env.STORAGE_DRIVER ?? 'local').toLowerCase()
 
@@ -216,6 +299,7 @@ export function getStorageStatus(): {
       configured,
       basePath: process.env.S3_BUCKET ?? '',
       note: configured ? 'S3 storage configured' : 'S3 credentials not set — falling back to local',
+      persistent: configured,
     }
   }
 
@@ -226,6 +310,17 @@ export function getStorageStatus(): {
       configured,
       basePath: process.env.R2_PUBLIC_URL ?? '',
       note: configured ? 'Cloudflare R2 configured' : 'R2 not configured — falling back to local',
+      persistent: configured,
+    }
+  }
+
+  if (driverName === 'local_vps') {
+    return {
+      driver: 'local_vps',
+      configured: true,
+      basePath: LOCAL_VPS_BASE_DIR,
+      note: `VPS-persistent local storage at ${LOCAL_VPS_BASE_DIR}. Set STORAGE_VPS_DIR to override the path.`,
+      persistent: true,
     }
   }
 
@@ -233,6 +328,8 @@ export function getStorageStatus(): {
     driver: 'local',
     configured: true,
     basePath: LOCAL_BASE_DIR,
-    note: 'Local file storage active. Set STORAGE_DRIVER=s3 or STORAGE_DRIVER=r2 for cloud storage.',
+    note: 'Local file storage (ephemeral — artifacts lost on redeploy). Use local_vps, s3 or r2 for persistent storage.',
+    persistent: false,
   }
 }
+

@@ -112,11 +112,11 @@ export default function GenXModelsPage() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Zap className="h-6 w-6 text-cyan-400" />
-                <h1 className="text-2xl font-bold text-white">GenX Models</h1>
+                <h1 className="text-2xl font-bold text-white">AI Engine</h1>
               </div>
               <p className="text-sm text-slate-400">
-                GenX is the primary AI execution layer. All tasks route through GenX by default.
-                Direct provider routing is only used as fallback when GenX is unavailable.
+                All tasks route through the primary AI engine by default.
+                Fallback providers are only used when the primary engine is unavailable.
               </p>
             </div>
             <button
@@ -136,7 +136,7 @@ export default function GenXModelsPage() {
         <motion.div variants={fadeUp}>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatusCard
-              label="GenX Status"
+              label="AI Engine Status"
               value={status.available ? 'Online' : status.configured ? 'Unreachable' : 'Not configured'}
               icon={status.available ? CheckCircle : AlertCircle}
               color={status.available ? 'text-emerald-400' : 'text-amber-400'}

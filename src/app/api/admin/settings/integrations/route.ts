@@ -130,12 +130,14 @@ export async function GET() {
     },
     storage: {
       driver: storageDriver,
+      localVpsPath: storageNotes.localVpsPath || process.env.STORAGE_VPS_DIR || '/var/www/amarktai/storage/artifacts',
       bucket: storageNotes.bucket || process.env.S3_BUCKET || '',
       region: storageNotes.region || process.env.S3_REGION || '',
       endpoint: storageNotes.endpoint || process.env.S3_ENDPOINT || '',
       accessKey: storageNotes.accessKey ? maskKey(storageNotes.accessKey) : (process.env.AWS_ACCESS_KEY_ID ? maskKey(process.env.AWS_ACCESS_KEY_ID) : ''),
       r2PublicUrl: storageNotes.r2PublicUrl || process.env.R2_PUBLIC_URL || '',
-      configured: storageDriver !== 'local' ? !!(storageNotes.bucket || process.env.S3_BUCKET) : true,
+      configured: storageDriver === 'local_vps' ? true : storageDriver !== 'local' ? !!(storageNotes.bucket || process.env.S3_BUCKET) : true,
+      persistent: storageDriver === 'local_vps' || storageDriver === 's3' || storageDriver === 'r2',
       source: storageRow ? 'database' : 'env',
     },
     adult: {
@@ -159,7 +161,8 @@ const patchSchema = z.object({
     defaultOwner: z.string().optional(),
   }).optional(),
   storage: z.object({
-    driver: z.enum(['local', 's3', 'r2']).optional(),
+    driver: z.enum(['local', 'local_vps', 's3', 'r2']).optional(),
+    localVpsPath: z.string().optional(),
     bucket: z.string().optional(),
     region: z.string().optional(),
     endpoint: z.string().optional(),
@@ -271,6 +274,7 @@ export async function PATCH(req: NextRequest) {
     try { notes = JSON.parse(existing?.notes ?? '{}') } catch { /* ignore */ }
 
     if (data.storage.driver !== undefined) notes.driver = data.storage.driver
+    if (data.storage.localVpsPath !== undefined) notes.localVpsPath = data.storage.localVpsPath
     if (data.storage.bucket !== undefined) notes.bucket = data.storage.bucket
     if (data.storage.region !== undefined) notes.region = data.storage.region
     if (data.storage.endpoint !== undefined) notes.endpoint = data.storage.endpoint

@@ -74,15 +74,27 @@ export async function POST(req: NextRequest) {
   if (!secretKey) secretKey = process.env.AWS_SECRET_ACCESS_KEY ?? ''
   if (!r2PublicUrl) r2PublicUrl = process.env.R2_PUBLIC_URL ?? ''
 
-  // ── Local ──
+  // ── Local (ephemeral) ──
   if (driver === 'local') {
     const status = getStorageStatus()
     return NextResponse.json({
       success: true,
       driver: 'local',
       persistent: false,
-      warning: 'Local file storage is ephemeral — artifacts will be lost on redeploy. Configure S3 or R2 for persistent storage.',
+      warning: 'Local file storage is ephemeral — artifacts will be lost on redeploy. Use local_vps, S3 or R2 for persistent storage.',
       basePath: status.basePath,
+    })
+  }
+
+  // ── Local VPS (persistent) ──
+  if (driver === 'local_vps') {
+    const status = getStorageStatus()
+    return NextResponse.json({
+      success: true,
+      driver: 'local_vps',
+      persistent: true,
+      basePath: status.basePath,
+      note: `Artifacts are stored at ${status.basePath} on the VPS. Ensure this path is outside the deployment directory and backed up.`,
     })
   }
 

@@ -24,7 +24,7 @@ const NAV_GROUPS: Array<{
     items: [
       { href: '/admin/dashboard/workspace',   label: 'Workspace',      icon: Sparkles  },
       { href: '/admin/dashboard/apps',         label: 'Apps & Agents',  icon: AppWindow },
-      { href: '/admin/dashboard/genx-models',  label: 'GenX Models',    icon: Zap       },
+      { href: '/admin/dashboard/genx-models',  label: 'AI Engine',      icon: Zap       },
       { href: '/admin/dashboard/artifacts',    label: 'Artifacts',      icon: Archive   },
       { href: '/admin/dashboard/deployments',  label: 'Deployments',    icon: Rocket    },
       { href: '/admin/dashboard/settings',     label: 'Settings',       icon: Settings2 },
