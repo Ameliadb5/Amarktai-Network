@@ -185,11 +185,6 @@ async function resolveGenXConfig(): Promise<{ apiUrl: string; apiKey: string }> 
   return { apiUrl, apiKey }
 }
 
-/** @deprecated Use resolveGenXConfig() for async config resolution. Kept for backwards-compat reference. */
-function _isConfiguredSync(): boolean {
-  return !!process.env.GENX_API_URL
-}
-void _isConfiguredSync
 
 async function buildHeaders(): Promise<Record<string, string>> {
   const { apiKey } = await resolveGenXConfig()

@@ -107,13 +107,29 @@ export async function POST(req: NextRequest) {
     // Use AWS Signature V4 for a HEAD bucket request to verify connectivity
     const effectiveRegion = region || (driver === 'r2' ? 'auto' : 'us-east-1')
 
+    // Validate custom endpoint to prevent SSRF when provided
+    if (endpoint) {
+      let parsedEndpoint: URL
+      try {
+        parsedEndpoint = new URL(endpoint)
+      } catch {
+        return NextResponse.json({ success: false, driver, bucket, error: 'Invalid S3 endpoint URL' })
+      }
+      if (parsedEndpoint.protocol !== 'https:' && parsedEndpoint.protocol !== 'http:') {
+        return NextResponse.json({ success: false, driver, bucket, error: 'S3 endpoint must use http or https' })
+      }
+      const epHost = parsedEndpoint.hostname.toLowerCase()
+      if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(epHost) && process.env.NODE_ENV === 'production') {
+        return NextResponse.json({ success: false, driver, bucket, error: 'Private or loopback endpoint URLs are not allowed' })
+      }
+    }
+
     // Minimal S3 API connectivity test using STS GetCallerIdentity-style HEAD check
     // We construct a signed URL and check that the service responds at all
     const serviceUrl = endpoint
       ? `${endpoint}/${bucket}`
       : `https://${bucket}.s3.${effectiveRegion}.amazonaws.com`
 
-    // We use the X-Amz-Security-Token is not needed for basic PAT creds
     // This HEAD request will tell us if the bucket exists and the credentials are valid
     const now = new Date()
     const date = now.toISOString().slice(0, 10).replace(/-/g, '')

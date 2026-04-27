@@ -148,12 +148,27 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Validate endpoint URL to prevent SSRF
+    let parsedEndpoint: URL
+    try {
+      parsedEndpoint = new URL(endpoint)
+    } catch {
+      return NextResponse.json({ mode: 'specialist', supported: false, status: 'invalid', message: 'Invalid endpoint URL' })
+    }
+    if (parsedEndpoint.protocol !== 'https:' && parsedEndpoint.protocol !== 'http:') {
+      return NextResponse.json({ mode: 'specialist', supported: false, status: 'invalid', message: 'Endpoint must use http or https' })
+    }
+    const endpointHost = parsedEndpoint.hostname.toLowerCase()
+    if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(endpointHost) && process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ mode: 'specialist', supported: false, status: 'invalid', message: 'Private or loopback URLs are not allowed' })
+    }
+
     const start = Date.now()
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
 
-      const res = await fetch(endpoint, {
+      const res = await fetch(parsedEndpoint.href, {
         headers,
         signal: AbortSignal.timeout(10_000),
       })

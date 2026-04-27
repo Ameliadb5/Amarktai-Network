@@ -152,7 +152,7 @@ export async function GET() {
 const patchSchema = z.object({
   genx: z.object({
     apiKey: z.string().optional(),
-    apiUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+    apiUrl: z.string().refine(v => !v || /^https?:\/\/.+/.test(v), { message: 'Must be a valid URL or empty' }).optional(),
   }).optional(),
   github: z.object({
     token: z.string().optional(),

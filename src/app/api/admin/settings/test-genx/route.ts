@@ -52,18 +52,31 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // Mask URL to origin for response
-  let maskedUrl = apiUrl
+  // Validate URL to prevent SSRF — must be http or https and not a private IP range
+  let parsedUrl: URL
   try {
-    maskedUrl = new URL(apiUrl).origin
-  } catch { /* keep original if parsing fails */ }
+    parsedUrl = new URL(apiUrl)
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid URL', modelCount: 0 })
+  }
+  if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+    return NextResponse.json({ success: false, error: 'URL must use http or https', modelCount: 0 })
+  }
+  // Reject obvious private/loopback ranges (localhost, 127.x, 10.x, 192.168.x, 169.254.x)
+  const hostname = parsedUrl.hostname.toLowerCase()
+  if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(hostname) && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ success: false, error: 'Private or loopback URLs are not allowed', modelCount: 0 })
+  }
+
+  // Mask URL to origin for response
+  const maskedUrl = parsedUrl.origin
 
   const start = Date.now()
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
 
-    const res = await fetch(`${apiUrl}/api/v1/models`, {
+    const res = await fetch(`${parsedUrl.origin}${parsedUrl.pathname.replace(/\/?$/, '')}/api/v1/models`, {
       headers,
       signal: AbortSignal.timeout(15_000),
     })
