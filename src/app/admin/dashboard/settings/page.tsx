@@ -254,7 +254,7 @@ function AIEngineSection({ config, onSaved }: { config: AIEngineConfig; onSaved:
                     autoComplete="new-password"
                     value={apiKey}
                     onChange={e => setApiKey(e.target.value)}
-                    placeholder={config.maskedKey ? `Current: ${config.maskedKey}` : 'sk-…'}
+                    placeholder={config.maskedKey ? `Current: ${config.maskedKey}` : 'gnxk_…'}
                     className={`${inputCls} pr-10`}
                   />
                   <button type="button" onClick={() => setShowKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
@@ -286,6 +286,11 @@ function AIEngineSection({ config, onSaved }: { config: AIEngineConfig; onSaved:
                   <p className="text-[10px] text-slate-600 mt-1">
                     Default: {DEFAULT_AI_ENGINE_URL}. Enter the base URL only — any /api/v1/models or path suffixes will be stripped automatically.
                   </p>
+                  {(() => { try { return new URL(apiUrl).hostname === 'genx.sh' } catch { return false } })() && (
+                    <p className="text-[10px] text-amber-400 mt-1">
+                      ⚠ Use <strong>https://query.genx.sh</strong> (the API endpoint), not https://genx.sh (the dashboard — returns HTML, not JSON).
+                    </p>
+                  )}
                 </Field>
               )}
 

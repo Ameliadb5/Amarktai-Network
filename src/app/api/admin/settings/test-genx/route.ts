@@ -26,6 +26,9 @@ import { decryptVaultKey } from '@/lib/crypto-vault'
  * Normalise a GenX base URL:
  *   - Remove trailing slashes
  *   - Strip well-known path suffixes (/api/v1/models, /api/v1, /api)
+ *   - Auto-correct the dashboard hostname (genx.sh) to the API hostname
+ *     (query.genx.sh) — entering the sign-up URL instead of the API URL
+ *     would otherwise return HTML and cause JSON parse errors.
  *   - Return just the origin (no path), so callers can safely append /api/v1/models
  */
 function normaliseBaseUrl(raw: string): string {
@@ -34,6 +37,11 @@ function normaliseBaseUrl(raw: string): string {
     url = new URL(raw)
   } catch {
     return raw
+  }
+
+  // Redirect dashboard hostname to the API hostname
+  if (url.hostname === 'genx.sh') {
+    url.hostname = 'query.genx.sh'
   }
 
   // Strip known endpoint suffixes from the path

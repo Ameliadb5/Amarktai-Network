@@ -215,11 +215,19 @@ async function resolveGenXConfig(): Promise<{ apiUrl: string; apiKey: string }> 
 /**
  * Normalise a raw URL to a clean base URL (no trailing slash, no
  * well-known path suffixes).  Returns null when the URL is invalid.
+ *
+ * Also auto-corrects the GenX dashboard hostname (genx.sh) to the
+ * API hostname (query.genx.sh) so that accidentally entering the
+ * sign-up/dashboard URL does not cause HTML responses.
  */
 function normaliseBaseUrl(raw: string): string | null {
   if (!raw) return null
   let url: URL
   try { url = new URL(raw) } catch { return null }
+  // Redirect dashboard hostname to the API hostname
+  if (url.hostname === 'genx.sh') {
+    url.hostname = 'query.genx.sh'
+  }
   const clean = url.pathname
     .replace(/\/api\/v1\/models\/?$/, '')
     .replace(/\/v1\/models\/?$/, '')
