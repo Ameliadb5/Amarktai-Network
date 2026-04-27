@@ -113,6 +113,12 @@ export async function GET() {
   try { adultNotes = JSON.parse(adultRow?.notes ?? '{}') } catch { /* ignore */ }
   const adultMode = adultNotes.mode || 'disabled'
 
+  // ── Aiva ──
+  const AIVA_KEY = 'aiva_config'
+  const aivaRow = await getIntegrationConfig(AIVA_KEY).catch(() => null)
+  let aivaNotes: Record<string, unknown> = {}
+  try { aivaNotes = JSON.parse(aivaRow?.notes ?? '{}') } catch { /* ignore */ }
+
   return NextResponse.json({
     genx: {
       configured: genxConfigured,
@@ -140,9 +146,20 @@ export async function GET() {
     },
     adult: {
       mode: adultMode,
+      providerType: adultNotes.providerType || 'together',
       specialistEndpoint: adultNotes.specialistEndpoint || '',
       hasSpecialistKey: !!(adultNotes.specialistKey),
       maskedSpecialistKey: adultNotes.specialistKey ? maskKey(adultNotes.specialistKey) : '',
+      providerModel: adultNotes.providerModel || '',
+      lastTestStatus: adultNotes.lastTestStatus || null,
+    },
+    aiva: {
+      typedEnabled:          aivaNotes.typedEnabled          !== undefined ? Boolean(aivaNotes.typedEnabled)          : true,
+      voiceEnabled:          aivaNotes.voiceEnabled          !== undefined ? Boolean(aivaNotes.voiceEnabled)          : false,
+      sttProvider:           String(aivaNotes.sttProvider    || 'auto'),
+      ttsProvider:           String(aivaNotes.ttsProvider    || 'auto'),
+      preferredVoiceModel:   String(aivaNotes.preferredVoiceModel || ''),
+      continuousConversation: aivaNotes.continuousConversation !== undefined ? Boolean(aivaNotes.continuousConversation) : false,
     },
   })
 }
@@ -169,11 +186,21 @@ const patchSchema = z.object({
   }).optional(),
   adult: z.object({
     mode: z.enum(['specialist', 'disabled']).optional(),
+    providerType: z.enum(['together', 'huggingface', 'xai', 'custom']).optional(),
     specialistEndpoint: z.string().optional(),
     specialistKey: z.string().optional(),
+    providerModel: z.string().optional(),
   }).optional(),
   webdock: z.object({
     apiKey: z.string().optional(),
+  }).optional(),
+  aiva: z.object({
+    typedEnabled: z.boolean().optional(),
+    voiceEnabled: z.boolean().optional(),
+    sttProvider: z.string().optional(),
+    ttsProvider: z.string().optional(),
+    preferredVoiceModel: z.string().optional(),
+    continuousConversation: z.boolean().optional(),
   }).optional(),
 })
 
@@ -297,7 +324,9 @@ export async function PATCH(req: NextRequest) {
     try { notes = JSON.parse(existing?.notes ?? '{}') } catch { /* ignore */ }
 
     if (data.adult.mode !== undefined) notes.mode = data.adult.mode
+    if (data.adult.providerType !== undefined) notes.providerType = data.adult.providerType
     if (data.adult.specialistEndpoint !== undefined) notes.specialistEndpoint = data.adult.specialistEndpoint
+    if (data.adult.providerModel !== undefined) notes.providerModel = data.adult.providerModel
 
     const adultKey = data.adult.specialistKey || undefined
 
@@ -318,6 +347,29 @@ export async function PATCH(req: NextRequest) {
         key: 'webdock',
         displayName: 'Webdock',
         apiKey: data.webdock.apiKey,
+      }),
+    )
+  }
+
+  // ── Save Aiva ──
+  if (data.aiva) {
+    const AIVA_KEY = 'aiva_config'
+    const existing = await getIntegrationConfig(AIVA_KEY)
+    let notes: Record<string, unknown> = {}
+    try { notes = JSON.parse(existing?.notes ?? '{}') } catch { /* ignore */ }
+
+    if (data.aiva.typedEnabled !== undefined)          notes.typedEnabled          = data.aiva.typedEnabled
+    if (data.aiva.voiceEnabled !== undefined)          notes.voiceEnabled          = data.aiva.voiceEnabled
+    if (data.aiva.sttProvider !== undefined)           notes.sttProvider           = data.aiva.sttProvider
+    if (data.aiva.ttsProvider !== undefined)           notes.ttsProvider           = data.aiva.ttsProvider
+    if (data.aiva.preferredVoiceModel !== undefined)   notes.preferredVoiceModel   = data.aiva.preferredVoiceModel
+    if (data.aiva.continuousConversation !== undefined) notes.continuousConversation = data.aiva.continuousConversation
+
+    ops.push(
+      upsertIntegrationConfig({
+        key: AIVA_KEY,
+        displayName: 'Aiva Config',
+        notes: JSON.stringify(notes),
       }),
     )
   }

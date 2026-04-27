@@ -75,7 +75,7 @@ export default function WorkspacePage() {
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [loadingUsage, setLoadingUsage] = useState(false)
   const [partnerOpen, setPartnerOpen] = useState(false)
-  const [genxLabel, setGenxLabel] = useState<string>('GenX')
+  const [genxLabel, setGenxLabel] = useState<string>('AI Engine')
 
   const handleAction = useCallback((action: AssistantAction) => {
     if (action.type === 'navigate_to') {
@@ -154,7 +154,7 @@ export default function WorkspacePage() {
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs transition-all ${partnerOpen ? 'border-blue-400/40 bg-blue-400/10 text-blue-300' : 'border-white/10 bg-white/5 text-slate-400 hover:text-white'}`}
             >
               {partnerOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-              AI Buddy
+              Aiva
             </button>
           </div>
         </div>

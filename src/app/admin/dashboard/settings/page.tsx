@@ -6,7 +6,7 @@ import {
   Settings2, Cpu, FolderGit2, RefreshCw, CheckCircle, AlertCircle,
   ShieldCheck, Key, HardDrive, Loader2,
   Eye, EyeOff, Save, TestTube2, XCircle, ChevronDown, ChevronRight,
-  Server,
+  Server, Mic, Bot,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -40,9 +40,21 @@ interface StorageConfig {
 
 interface AdultConfig {
   mode: string
+  providerType: string
   specialistEndpoint: string
   hasSpecialistKey: boolean
   maskedSpecialistKey: string
+  providerModel: string
+  lastTestStatus: string | null
+}
+
+interface AivaConfig {
+  typedEnabled: boolean
+  voiceEnabled: boolean
+  sttProvider: string
+  ttsProvider: string
+  preferredVoiceModel: string
+  continuousConversation: boolean
 }
 
 interface ProviderRecord {
@@ -61,6 +73,7 @@ interface IntegrationsData {
   github: GitHubConfig
   storage: StorageConfig
   adult: AdultConfig
+  aiva: AivaConfig
 }
 
 interface TestResult {
@@ -143,6 +156,7 @@ export default function SettingsPage() {
       ) : data ? (
         <>
           <AIEngineSection config={data.genx} onSaved={load} />
+          <AivaSection config={data.aiva} onSaved={load} />
           <GitHubSection config={data.github} onSaved={load} />
           <WebdockSection />
           <StorageSection config={data.storage} onSaved={load} />
@@ -156,11 +170,14 @@ export default function SettingsPage() {
 
 // ── AI Engine Section ─────────────────────────────────────────────────────────
 
+const DEFAULT_AI_ENGINE_URL = 'https://query.genx.sh'
+
 function AIEngineSection({ config, onSaved }: { config: AIEngineConfig; onSaved: () => void }) {
   const [open, setOpen] = useState(!config.configured)
   const [apiKey, setApiKey] = useState('')
-  const [apiUrl, setApiUrl] = useState(config.apiUrl)
   const [showKey, setShowKey] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [apiUrl, setApiUrl] = useState(config.apiUrl || DEFAULT_AI_ENGINE_URL)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
@@ -219,28 +236,17 @@ function AIEngineSection({ config, onSaved }: { config: AIEngineConfig; onSaved:
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            The primary AI execution layer. Workspace tasks, image generation, TTS, and code assistance route through the AI Engine by default, with automatic fallback to configured providers when unavailable.
+            The primary AI execution layer. Enter only your API key — the default endpoint is pre-configured. Workspace tasks, image generation, TTS, and code assistance route through the AI Engine automatically.
           </p>
 
           {config.configured && !open && (
             <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-              {config.apiUrl && <span className="font-mono bg-white/5 px-2 py-1 rounded">{config.apiUrl}</span>}
               {config.maskedKey && <span className="font-mono bg-white/5 px-2 py-1 rounded">{config.maskedKey}</span>}
             </div>
           )}
 
           {open && (
             <div className="space-y-3">
-              <Field label="API Base URL">
-                <input
-                  type="url"
-                  value={apiUrl}
-                  onChange={e => setApiUrl(e.target.value)}
-                  placeholder="https://query.genx.sh"
-                  className={inputCls}
-                />
-              </Field>
-
               <Field label="API Key">
                 <div className="relative">
                   <input
@@ -258,12 +264,60 @@ function AIEngineSection({ config, onSaved }: { config: AIEngineConfig; onSaved:
                 {config.maskedKey && <p className="text-[10px] text-slate-600 mt-1">Leave blank to keep existing key</p>}
               </Field>
 
+              {/* Advanced base URL — collapsed by default */}
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(v => !v)}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                {showAdvanced ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                Advanced: Base URL override
+              </button>
+
+              {showAdvanced && (
+                <Field label="API Base URL">
+                  <input
+                    type="url"
+                    value={apiUrl}
+                    onChange={e => setApiUrl(e.target.value)}
+                    placeholder={DEFAULT_AI_ENGINE_URL}
+                    className={inputCls}
+                  />
+                  <p className="text-[10px] text-slate-600 mt-1">
+                    Default: {DEFAULT_AI_ENGINE_URL}. Enter the base URL only — any /api/v1/models or path suffixes will be stripped automatically.
+                  </p>
+                </Field>
+              )}
+
               {testResult && (
-                <TestResultBanner result={testResult} extra={
-                  testResult.success
-                    ? `${testResult.modelCount} models · ${testResult.latencyMs}ms`
-                    : undefined
-                } />
+                <div className="space-y-2">
+                  <TestResultBanner result={testResult} extra={
+                    testResult.success
+                      ? `${testResult.modelCount as number} models · ${testResult.latencyMs as number}ms`
+                      : (testResult.catalogError as string | undefined) ?? (testResult.chatError as string | undefined)
+                  } />
+                  {(testResult.catalogOk !== undefined || testResult.chatOk !== undefined) && (
+                    <div className="flex flex-wrap gap-3 text-xs">
+                      <span className={(testResult.catalogOk as boolean) ? 'text-emerald-400' : 'text-red-400'}>
+                        {(testResult.catalogOk as boolean) ? '✓' : '✗'} Catalog{testResult.catalogError ? `: ${testResult.catalogError as string}` : ''}
+                      </span>
+                      <span className={(testResult.chatOk as boolean) ? 'text-emerald-400' : 'text-red-400'}>
+                        {(testResult.chatOk as boolean) ? '✓' : '✗'} Chat{testResult.chatError ? `: ${testResult.chatError as string}` : ''}
+                      </span>
+                      {testResult.generateOk !== undefined || testResult.generateNotTested ? (
+                        <span className={
+                          testResult.generateNotTested
+                            ? 'text-slate-500'
+                            : (testResult.generateOk as boolean) ? 'text-emerald-400' : 'text-red-400'
+                        }>
+                          {testResult.generateNotTested
+                            ? '— Generate (dry-run not supported)'
+                            : ((testResult.generateOk as boolean) ? '✓' : '✗') + ' Generate' + (testResult.generateError ? `: ${testResult.generateError as string}` : '')}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="flex items-center gap-2 pt-1">
@@ -274,6 +328,199 @@ function AIEngineSection({ config, onSaved }: { config: AIEngineConfig; onSaved:
                 <button onClick={test} disabled={testing} className={btnSecondary}>
                   {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TestTube2 className="h-3.5 w-3.5" />}
                   Test connection
+                </button>
+                {saveMsg && (
+                  <span className={`text-xs ${saveMsg.startsWith('Error') ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {saveMsg}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+    </motion.div>
+  )
+}
+
+// ── Aiva Section ──────────────────────────────────────────────────────────────
+
+const STT_PROVIDERS = [
+  { value: 'auto',       label: 'Auto (AI Engine default)' },
+  { value: 'genx',       label: 'AI Engine built-in STT' },
+  { value: 'openai',     label: 'OpenAI Whisper' },
+  { value: 'deepgram',   label: 'Deepgram Nova' },
+  { value: 'groq',       label: 'Groq Whisper' },
+  { value: 'browser',    label: 'Browser Web Speech API' },
+]
+
+const TTS_PROVIDERS = [
+  { value: 'auto',       label: 'Auto (AI Engine default)' },
+  { value: 'genx',       label: 'AI Engine built-in TTS' },
+  { value: 'openai',     label: 'OpenAI TTS' },
+  { value: 'deepgram',   label: 'Deepgram Aura' },
+  { value: 'elevenlabs', label: 'ElevenLabs' },
+  { value: 'grok',       label: 'xAI Grok TTS' },
+]
+
+const VOICE_MODELS = [
+  { value: '',                  label: 'Auto (provider default)' },
+  { value: 'aura-2',            label: 'Deepgram Aura 2' },
+  { value: 'grok-tts',          label: 'xAI Grok TTS' },
+  { value: 'genxlm-voice-v1',   label: 'AI Engine Voice v1' },
+  { value: 'tts-1',             label: 'OpenAI TTS-1' },
+  { value: 'tts-1-hd',          label: 'OpenAI TTS-1 HD' },
+]
+
+function AivaSection({ config, onSaved }: { config: AivaConfig; onSaved: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [typedEnabled, setTypedEnabled] = useState(config.typedEnabled ?? true)
+  const [voiceEnabled, setVoiceEnabled] = useState(config.voiceEnabled ?? false)
+  const [sttProvider, setSttProvider] = useState(config.sttProvider || 'auto')
+  const [ttsProvider, setTtsProvider] = useState(config.ttsProvider || 'auto')
+  const [preferredVoiceModel, setPreferredVoiceModel] = useState(config.preferredVoiceModel || '')
+  const [continuousConversation, setContinuousConversation] = useState(config.continuousConversation ?? false)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<TestResult | null>(null)
+  const [saveMsg, setSaveMsg] = useState<string | null>(null)
+
+  async function save() {
+    setSaving(true)
+    setSaveMsg(null)
+    try {
+      const res = await fetch('/api/admin/settings/integrations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aiva: { typedEnabled, voiceEnabled, sttProvider, ttsProvider, preferredVoiceModel, continuousConversation },
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setSaveMsg(`Error: ${d.error ?? 'Save failed'}`)
+      } else {
+        setSaveMsg('Saved')
+        onSaved()
+        setTimeout(() => setSaveMsg(null), 3000)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function testVoice() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetch('/api/admin/settings/test-aiva', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sttProvider, ttsProvider, preferredVoiceModel }),
+      })
+      setTestResult(await res.json())
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const voiceStatus = voiceEnabled ? 'Voice enabled' : 'Typed only'
+  const badge = typedEnabled || voiceEnabled
+    ? { label: voiceStatus, color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' }
+    : { label: 'Disabled', color: 'text-slate-400 bg-slate-500/10 border-slate-500/20' }
+
+  return (
+    <motion.div variants={fadeUp}>
+      <SectionCard
+        icon={<Bot className="h-5 w-5 text-blue-400" />}
+        title="Aiva"
+        badge={badge}
+        open={open}
+        onToggle={() => setOpen(v => !v)}
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Aiva — AmarktAI Voice &amp; Intelligence Assistant. Configure typed chat mode and voice mode separately. Voice mode requires STT and TTS providers to be configured.
+          </p>
+
+          {open && (
+            <div className="space-y-4">
+              {/* Mode toggles */}
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 cursor-pointer hover:bg-white/[0.04] transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={typedEnabled}
+                    onChange={e => setTypedEnabled(e.target.checked)}
+                    className="accent-blue-400 h-4 w-4"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-white">Typed Mode</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Text chat connected to workspace context</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 cursor-pointer hover:bg-white/[0.04] transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={voiceEnabled}
+                    onChange={e => setVoiceEnabled(e.target.checked)}
+                    className="accent-blue-400 h-4 w-4"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-white">Voice Mode</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Orb UI — STT → AI Engine → TTS loop</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Voice provider config — only shown when voice is enabled */}
+              {voiceEnabled && (
+                <div className="space-y-3 rounded-xl border border-blue-500/15 bg-blue-500/5 p-4">
+                  <p className="text-[10px] uppercase tracking-widest text-blue-400 font-semibold">Voice Provider Config</p>
+
+                  <Field label="STT Provider (Speech-to-Text)">
+                    <select value={sttProvider} onChange={e => setSttProvider(e.target.value)} className={inputCls}>
+                      {STT_PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                  </Field>
+
+                  <Field label="TTS Provider (Text-to-Speech)">
+                    <select value={ttsProvider} onChange={e => setTtsProvider(e.target.value)} className={inputCls}>
+                      {TTS_PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                  </Field>
+
+                  <Field label="Preferred Voice Model">
+                    <select value={preferredVoiceModel} onChange={e => setPreferredVoiceModel(e.target.value)} className={inputCls}>
+                      {VOICE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </Field>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={continuousConversation}
+                      onChange={e => setContinuousConversation(e.target.checked)}
+                      className="accent-blue-400 h-4 w-4"
+                    />
+                    <span className="text-xs text-slate-300">Enable continuous conversation by default</span>
+                  </label>
+
+                  {testResult && (
+                    <TestResultBanner result={testResult} extra={testResult.message as string | undefined} />
+                  )}
+
+                  <button onClick={testVoice} disabled={testing} className={btnSecondary}>
+                    {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mic className="h-3.5 w-3.5" />}
+                    Test STT + TTS
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-1">
+                <button onClick={save} disabled={saving} className={btnPrimary}>
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  Save
                 </button>
                 {saveMsg && (
                   <span className={`text-xs ${saveMsg.startsWith('Error') ? 'text-red-400' : 'text-emerald-400'}`}>
@@ -627,11 +874,39 @@ function StorageSection({ config, onSaved }: { config: StorageConfig; onSaved: (
 
 // ── Adult Mode Section ────────────────────────────────────────────────────────
 
+const ADULT_PROVIDER_TYPES = [
+  { value: 'together',    label: 'Together AI (image)' },
+  { value: 'huggingface', label: 'HuggingFace Private Endpoint' },
+  { value: 'xai',         label: 'xAI / Grok Imagine (image + video)' },
+  { value: 'custom',      label: 'Custom (OpenAI-compatible)' },
+]
+
+const ADULT_ALLOWED = [
+  'Adult consensual suggestive content',
+  'Topless adult subjects',
+  'Lingerie (thongs, g-strings)',
+  'Suggestive / erotic visuals',
+  'Nudity without visible genitals',
+]
+
+const ADULT_BLOCKED = [
+  'Minors or age-ambiguous subjects',
+  'Visible genitals',
+  'Explicit sex acts',
+  'Sexual violence / non-consensual',
+  'Real-person sexual deepfakes',
+  'Self-harm content',
+  'Illegal content',
+]
+
 function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () => void }) {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState(config.mode || 'disabled')
+  const [providerType, setProviderType] = useState(config.providerType || 'together')
   const [specialistEndpoint, setSpecialistEndpoint] = useState(config.specialistEndpoint)
   const [specialistKey, setSpecialistKey] = useState('')
+  const [providerModel, setProviderModel] = useState(config.providerModel || '')
+  const [testPrompt, setTestPrompt] = useState('a tasteful topless portrait, artistic lighting')
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -648,8 +923,10 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
         body: JSON.stringify({
           adult: {
             mode,
+            providerType: mode === 'specialist' ? providerType : undefined,
             specialistEndpoint: specialistEndpoint || undefined,
             specialistKey: specialistKey || undefined,
+            providerModel: providerModel || undefined,
           },
         }),
       })
@@ -674,7 +951,14 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
       const res = await fetch('/api/admin/settings/test-adult', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode, endpoint: specialistEndpoint, apiKey: specialistKey }),
+        body: JSON.stringify({
+          mode,
+          providerType,
+          endpoint: specialistEndpoint,
+          apiKey: specialistKey,
+          model: providerModel || undefined,
+          testPrompt: testPrompt || undefined,
+        }),
       })
       setTestResult(await res.json())
     } finally {
@@ -684,43 +968,79 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
 
   const badge = mode === 'disabled'
     ? { label: 'Disabled', color: 'text-slate-400 bg-slate-500/10 border-slate-500/20' }
-    : { label: 'Specialist provider', color: 'text-violet-400 bg-violet-500/10 border-violet-500/20' }
+    : { label: ADULT_PROVIDER_TYPES.find(p => p.value === providerType)?.label ?? 'Specialist provider', color: 'text-violet-400 bg-violet-500/10 border-violet-500/20' }
 
   return (
     <motion.div variants={fadeUp}>
       <SectionCard
         icon={<ShieldCheck className="h-5 w-5 text-violet-400" />}
-        title="Adult Content Mode"
+        title="Adult Creative Mode"
         badge={badge}
         open={open}
         onToggle={() => setOpen(v => !v)}
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            Adult content generation is off by default. Enable only after verifying compliance with applicable content policies.
+            Adult Creative Mode routes adult content generation to a specialist provider. The AI Engine is never used for adult content. Disabled by default — must be enabled explicitly and requires a passing provider test.
           </p>
 
           {open && (
             <div className="space-y-3">
+              {/* Allowed / blocked rules */}
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-1">
+                  <p className="text-[10px] uppercase tracking-widest text-emerald-400 font-semibold mb-1.5">Allowed</p>
+                  {ADULT_ALLOWED.map(item => (
+                    <p key={item} className="text-xs text-emerald-300 flex items-start gap-1.5"><span className="mt-px">✓</span>{item}</p>
+                  ))}
+                </div>
+                <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 space-y-1">
+                  <p className="text-[10px] uppercase tracking-widest text-red-400 font-semibold mb-1.5">Always Blocked</p>
+                  {ADULT_BLOCKED.map(item => (
+                    <p key={item} className="text-xs text-red-300 flex items-start gap-1.5"><span className="mt-px">✗</span>{item}</p>
+                  ))}
+                </div>
+              </div>
+
               <Field label="Mode">
                 <select value={mode} onChange={e => setMode(e.target.value)} className={inputCls}>
                   <option value="disabled">Disabled (default)</option>
-                  <option value="specialist">Specialist provider</option>
+                  <option value="specialist">Specialist provider only</option>
                 </select>
               </Field>
 
               {mode === 'specialist' && (
                 <>
-                  <Field label="Specialist Endpoint">
-                    <input
-                      type="url"
-                      value={specialistEndpoint}
-                      onChange={e => setSpecialistEndpoint(e.target.value)}
-                      placeholder="https://your-adult-provider.com/v1/generate"
-                      className={inputCls}
-                    />
+                  <Field label="Provider Type">
+                    <select value={providerType} onChange={e => setProviderType(e.target.value)} className={inputCls}>
+                      {ADULT_PROVIDER_TYPES.map(p => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </select>
+                    {providerType === 'together' && (
+                      <p className="text-[10px] text-slate-600 mt-1">Together AI image API — disable_safety_checker is sent automatically for supported models</p>
+                    )}
+                    {providerType === 'xai' && (
+                      <p className="text-[10px] text-amber-600 mt-1">xAI/Grok adult access must be confirmed — test image and video separately</p>
+                    )}
+                    {providerType === 'huggingface' && (
+                      <p className="text-[10px] text-slate-600 mt-1">HuggingFace private inference endpoint — use your own deployed model</p>
+                    )}
                   </Field>
-                  <Field label="Specialist API Key">
+
+                  {(providerType === 'huggingface' || providerType === 'custom') && (
+                    <Field label="Provider Endpoint URL">
+                      <input
+                        type="url"
+                        value={specialistEndpoint}
+                        onChange={e => setSpecialistEndpoint(e.target.value)}
+                        placeholder="https://your-endpoint.huggingface.cloud/generate"
+                        className={inputCls}
+                      />
+                    </Field>
+                  )}
+
+                  <Field label="API Key">
                     <div className="relative">
                       <input
                         type={showKey ? 'text' : 'password'}
@@ -736,13 +1056,40 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
                     </div>
                     {config.hasSpecialistKey && <p className="text-[10px] text-slate-600 mt-1">Leave blank to keep existing key</p>}
                   </Field>
+
+                  <Field label="Model ID (optional)">
+                    <input
+                      type="text"
+                      value={providerModel}
+                      onChange={e => setProviderModel(e.target.value)}
+                      placeholder={
+                        providerType === 'together' ? 'e.g. black-forest-labs/FLUX.1-schnell-Free' :
+                        providerType === 'xai' ? 'e.g. grok-2-image' :
+                        'model-id'
+                      }
+                      className={inputCls}
+                    />
+                  </Field>
+
+                  <Field label="Test Prompt">
+                    <input
+                      type="text"
+                      value={testPrompt}
+                      onChange={e => setTestPrompt(e.target.value)}
+                      placeholder="a tasteful topless portrait, artistic lighting"
+                      className={inputCls}
+                    />
+                    <p className="text-[10px] text-slate-600 mt-1">Used only during connection test — not saved</p>
+                  </Field>
+
+                  {config.lastTestStatus && (
+                    <p className="text-[10px] text-slate-500">Last test: {config.lastTestStatus}</p>
+                  )}
                 </>
               )}
 
               {testResult && (
-                <TestResultBanner result={testResult} extra={
-                  testResult.message as string | undefined
-                } />
+                <TestResultBanner result={testResult} extra={testResult.message as string | undefined} />
               )}
 
               <div className="flex items-center gap-2 pt-1">
@@ -750,9 +1097,9 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
                   {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                   Save
                 </button>
-                <button onClick={test} disabled={testing} className={btnSecondary}>
+                <button onClick={test} disabled={testing || mode === 'disabled'} className={btnSecondary}>
                   {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TestTube2 className="h-3.5 w-3.5" />}
-                  Test
+                  Test provider
                 </button>
                 {saveMsg && (
                   <span className={`text-xs ${saveMsg.startsWith('Error') ? 'text-red-400' : 'text-emerald-400'}`}>
@@ -767,7 +1114,6 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
     </motion.div>
   )
 }
-
 // ── Webdock Section ───────────────────────────────────────────────────────────
 
 function WebdockSection() {
