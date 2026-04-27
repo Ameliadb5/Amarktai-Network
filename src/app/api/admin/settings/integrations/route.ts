@@ -111,7 +111,7 @@ export async function GET() {
   // ── Adult mode ──
   let adultNotes: Record<string, string> = {}
   try { adultNotes = JSON.parse(adultRow?.notes ?? '{}') } catch { /* ignore */ }
-  const adultMode = adultNotes.mode || (process.env.GENX_ADULT_CONTENT_SUPPORTED === 'true' ? 'genx' : 'disabled')
+  const adultMode = adultNotes.mode || 'disabled'
 
   return NextResponse.json({
     genx: {
@@ -159,7 +159,7 @@ const patchSchema = z.object({
     defaultOwner: z.string().optional(),
   }).optional(),
   storage: z.object({
-    driver: z.enum(['local', 's3', 'r2']).optional(),
+    driver: z.enum(['local_vps', 'local', 's3', 'r2']).optional(),
     bucket: z.string().optional(),
     region: z.string().optional(),
     endpoint: z.string().optional(),
@@ -168,9 +168,12 @@ const patchSchema = z.object({
     r2PublicUrl: z.string().optional(),
   }).optional(),
   adult: z.object({
-    mode: z.enum(['genx', 'specialist', 'disabled']).optional(),
+    mode: z.enum(['specialist', 'disabled']).optional(),
     specialistEndpoint: z.string().optional(),
     specialistKey: z.string().optional(),
+  }).optional(),
+  webdock: z.object({
+    apiKey: z.string().optional(),
   }).optional(),
 })
 
@@ -304,6 +307,17 @@ export async function PATCH(req: NextRequest) {
         displayName: 'Adult Content Provider',
         ...(adultKey ? { apiKey: adultKey } : {}),
         notes: JSON.stringify(notes),
+      }),
+    )
+  }
+
+  // ── Save Webdock ──
+  if (data.webdock?.apiKey) {
+    ops.push(
+      upsertIntegrationConfig({
+        key: 'webdock',
+        displayName: 'Webdock',
+        apiKey: data.webdock.apiKey,
       }),
     )
   }

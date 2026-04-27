@@ -3,15 +3,15 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Settings2, Zap, FolderGit2, RefreshCw, CheckCircle, AlertCircle,
-  ExternalLink, ShieldCheck, Key, ArrowRight, HardDrive, Loader2,
+  Settings2, Cpu, FolderGit2, RefreshCw, CheckCircle, AlertCircle,
+  ShieldCheck, Key, HardDrive, Loader2,
   Eye, EyeOff, Save, TestTube2, XCircle, ChevronDown, ChevronRight,
+  Server,
 } from 'lucide-react'
-import Link from 'next/link'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface GenXConfig {
+interface AIEngineConfig {
   configured: boolean
   maskedKey: string
   apiUrl: string
@@ -45,8 +45,19 @@ interface AdultConfig {
   maskedSpecialistKey: string
 }
 
+interface ProviderRecord {
+  id: number
+  providerKey: string
+  displayName: string
+  enabled: boolean
+  maskedPreview: string
+  baseUrl: string
+  healthStatus: string
+  healthMessage: string | null
+}
+
 interface IntegrationsData {
-  genx: GenXConfig
+  genx: AIEngineConfig
   github: GitHubConfig
   storage: StorageConfig
   adult: AdultConfig
@@ -131,20 +142,21 @@ export default function SettingsPage() {
         </div>
       ) : data ? (
         <>
-          <GenXSection config={data.genx} onSaved={load} />
+          <AIEngineSection config={data.genx} onSaved={load} />
           <GitHubSection config={data.github} onSaved={load} />
+          <WebdockSection />
           <StorageSection config={data.storage} onSaved={load} />
           <AdultSection config={data.adult} onSaved={load} />
-          <FallbackProvidersSection />
+          <ProvidersSection />
         </>
       ) : null}
     </motion.div>
   )
 }
 
-// ── GenX Section ──────────────────────────────────────────────────────────────
+// ── AI Engine Section ─────────────────────────────────────────────────────────
 
-function GenXSection({ config, onSaved }: { config: GenXConfig; onSaved: () => void }) {
+function AIEngineSection({ config, onSaved }: { config: AIEngineConfig; onSaved: () => void }) {
   const [open, setOpen] = useState(!config.configured)
   const [apiKey, setApiKey] = useState('')
   const [apiUrl, setApiUrl] = useState(config.apiUrl)
@@ -199,15 +211,15 @@ function GenXSection({ config, onSaved }: { config: GenXConfig; onSaved: () => v
   return (
     <motion.div variants={fadeUp}>
       <SectionCard
-        icon={<Zap className="h-5 w-5 text-cyan-400" />}
-        title="GenX AI"
+        icon={<Cpu className="h-5 w-5 text-cyan-400" />}
+        title="AI Engine"
         badge={badge}
         open={open}
         onToggle={() => setOpen(v => !v)}
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            GenX is the primary AI execution layer. All workspace tasks, image generation, TTS, and code assistance route through GenX.
+            The primary AI execution layer. All workspace tasks, image generation, TTS, and code assistance route through the AI Engine.
           </p>
 
           {config.configured && !open && (
@@ -219,7 +231,7 @@ function GenXSection({ config, onSaved }: { config: GenXConfig; onSaved: () => v
 
           {open && (
             <div className="space-y-3">
-              <Field label="API URL">
+              <Field label="API Base URL">
                 <input
                   type="url"
                   value={apiUrl}
@@ -271,10 +283,6 @@ function GenXSection({ config, onSaved }: { config: GenXConfig; onSaved: () => v
               </div>
             </div>
           )}
-
-          <Link href="/admin/dashboard/genx-models" className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 mt-1">
-            View model catalog <ArrowRight className="h-3 w-3" />
-          </Link>
         </div>
       </SectionCard>
     </motion.div>
@@ -495,7 +503,9 @@ function StorageSection({ config, onSaved }: { config: StorageConfig; onSaved: (
   }
 
   const isCloud = driver === 's3' || driver === 'r2'
-  const badge = driver === 'local'
+  const badge = driver === 'local_vps'
+    ? { label: 'VPS Local (persistent)', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' }
+    : driver === 'local'
     ? { label: 'Local (ephemeral)', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' }
     : config.configured
     ? { label: `${driver.toUpperCase()} · configured`, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' }
@@ -512,7 +522,7 @@ function StorageSection({ config, onSaved }: { config: StorageConfig; onSaved: (
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            Where generated artifacts (images, audio, video, code) are stored. Local storage is ephemeral — use S3 or R2 for persistence.
+            Where generated artifacts (images, audio, video, code) are stored. VPS local storage persists across redeployments. Use S3 or R2 for external cloud storage.
           </p>
 
           {open && (
@@ -523,16 +533,23 @@ function StorageSection({ config, onSaved }: { config: StorageConfig; onSaved: (
                   onChange={e => setDriver(e.target.value)}
                   className={inputCls}
                 >
+                  <option value="local_vps">VPS Local Storage (persistent, recommended)</option>
                   <option value="local">Local filesystem (ephemeral)</option>
                   <option value="s3">Amazon S3 / S3-compatible</option>
                   <option value="r2">Cloudflare R2</option>
                 </select>
               </Field>
 
+              {driver === 'local_vps' && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-300">
+                  VPS local storage uses <code className="font-mono">/var/www/amarktai/storage</code>. Data persists across redeployments.
+                </div>
+              )}
+
               {driver === 'local' && (
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-400 flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  Local storage is ephemeral. Artifacts will be lost on redeploy. Configure S3 or R2 for persistent storage.
+                  Local storage is ephemeral — artifacts will be lost on redeploy. Use VPS local or cloud storage for persistence.
                 </div>
               )}
 
@@ -751,33 +768,310 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
   )
 }
 
-// ── Fallback Providers Section ────────────────────────────────────────────────
+// ── Webdock Section ───────────────────────────────────────────────────────────
 
-function FallbackProvidersSection() {
+function WebdockSection() {
+  const [open, setOpen] = useState(false)
+  const [apiKey, setApiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<TestResult | null>(null)
+  const [saveMsg, setSaveMsg] = useState<string | null>(null)
+
+  async function save() {
+    setSaving(true)
+    setSaveMsg(null)
+    try {
+      const res = await fetch('/api/admin/settings/integrations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webdock: { apiKey: apiKey || undefined } }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setSaveMsg(`Error: ${d.error ?? 'Save failed'}`)
+      } else {
+        setSaveMsg('Saved')
+        setApiKey('')
+        setTimeout(() => setSaveMsg(null), 3000)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function test() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetch('/api/admin/settings/test-webdock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: apiKey || undefined }),
+      })
+      setTestResult(await res.json())
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  return (
+    <motion.div variants={fadeUp}>
+      <SectionCard
+        icon={<Server className="h-5 w-5 text-blue-400" />}
+        title="Webdock"
+        badge={{ label: 'VPS provider', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' }}
+        open={open}
+        onToggle={() => setOpen(v => !v)}
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Webdock API key for server management. Used to list and manage VPS servers from the AmarktAI console.
+          </p>
+
+          {open && (
+            <div className="space-y-3">
+              <Field label="API Key">
+                <div className="relative">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={apiKey}
+                    onChange={e => setApiKey(e.target.value)}
+                    placeholder="wdck_…"
+                    className={`${inputCls} pr-10`}
+                  />
+                  <button type="button" onClick={() => setShowKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </Field>
+
+              {testResult && (
+                <TestResultBanner result={testResult} extra={
+                  testResult.success && testResult.serverCount != null
+                    ? `${testResult.serverCount} server${Number(testResult.serverCount) !== 1 ? 's' : ''} · ${testResult.latencyMs ?? 0}ms`
+                    : undefined
+                } />
+              )}
+
+              <div className="flex items-center gap-2 pt-1">
+                <button onClick={save} disabled={saving} className={btnPrimary}>
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  Save
+                </button>
+                <button onClick={test} disabled={testing} className={btnSecondary}>
+                  {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TestTube2 className="h-3.5 w-3.5" />}
+                  Test connection
+                </button>
+                {saveMsg && (
+                  <span className={`text-xs ${saveMsg.startsWith('Error') ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {saveMsg}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+    </motion.div>
+  )
+}
+
+// ── Providers Section ─────────────────────────────────────────────────────────
+
+const PROVIDER_DEFS = [
+  { key: 'openai',       label: 'OpenAI',            placeholder: 'sk-…',    caps: ['chat', 'code', 'images', 'embeddings', 'tts'] },
+  { key: 'gemini',       label: 'Google Gemini',      placeholder: 'AIza…',  caps: ['chat', 'reasoning', 'vision'] },
+  { key: 'qwen',         label: 'Qwen / DashScope',   placeholder: 'sk-…',   caps: ['chat', 'reasoning', 'images', 'video', 'stt'] },
+  { key: 'groq',         label: 'Groq',               placeholder: 'gsk_…',  caps: ['chat', 'code'] },
+  { key: 'huggingface',  label: 'HuggingFace',        placeholder: 'hf_…',   caps: ['chat', 'embeddings', 'images', 'tts'] },
+  { key: 'together',     label: 'Together AI',        placeholder: 'tg_…',   caps: ['chat', 'code', 'images'] },
+  { key: 'grok',         label: 'xAI / Grok',         placeholder: 'xai-…',  caps: ['chat', 'reasoning', 'vision'] },
+]
+
+function ProvidersSection() {
+  const [providers, setProviders] = useState<ProviderRecord[]>([])
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/admin/providers')
+      if (res.ok) setProviders(await res.json())
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { if (open) load() }, [open, load])
+
+  const configured = providers.filter(p => p.maskedPreview || p.enabled).length
+
   return (
     <motion.div variants={fadeUp}>
       <SectionCard
         icon={<Key className="h-5 w-5 text-slate-400" />}
-        title="Fallback &amp; Specialist Providers"
-        badge={{ label: 'Fallback only', color: 'text-slate-400 bg-slate-500/10 border-slate-500/20' }}
-        open={false}
-        onToggle={() => {}}
+        title="Providers"
+        badge={{ label: configured > 0 ? `${configured} configured` : 'None configured', color: configured > 0 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-slate-400 bg-slate-500/10 border-slate-500/20' }}
+        open={open}
+        onToggle={() => setOpen(v => !v)}
       >
-        <div className="space-y-3">
+        <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            These providers are only used when GenX is unavailable or for specialist capabilities (e.g. ElevenLabs TTS, Firecrawl web crawl). Configure them in the Integrations page.
+            Fallback AI providers used when the AI Engine is unavailable. Each key is stored encrypted and never returned in plaintext.
           </p>
-          <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-            {['Firecrawl', 'Mem0', 'Graphiti', 'LiteLLM', 'PostHog', 'LangGraph', 'Qdrant', 'HuggingFace'].map(p => (
-              <span key={p} className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06]">{p}</span>
-            ))}
-          </div>
-          <Link href="/admin/dashboard/integrations" className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300">
-            Manage integration keys <ExternalLink className="h-3 w-3" />
-          </Link>
+
+          {open && (
+            <div className="space-y-4">
+              {loading ? (
+                <div className="flex items-center gap-2 py-4 text-xs text-slate-400">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading providers…
+                </div>
+              ) : (
+                PROVIDER_DEFS.map(def => {
+                  const record = providers.find(p => p.providerKey === def.key)
+                  return (
+                    <ProviderForm
+                      key={def.key}
+                      providerKey={def.key}
+                      label={def.label}
+                      placeholder={def.placeholder}
+                      capabilities={def.caps}
+                      record={record ?? null}
+                      onSaved={load}
+                    />
+                  )
+                })
+              )}
+            </div>
+          )}
         </div>
       </SectionCard>
     </motion.div>
+  )
+}
+
+function ProviderForm({
+  providerKey, label, placeholder, capabilities, record, onSaved,
+}: {
+  providerKey: string
+  label: string
+  placeholder: string
+  capabilities: string[]
+  record: ProviderRecord | null
+  onSaved: () => void
+}) {
+  const [apiKey, setApiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<TestResult | null>(null)
+  const [saveMsg, setSaveMsg] = useState<string | null>(null)
+
+  async function save() {
+    if (!apiKey.trim()) { setSaveMsg('Enter an API key'); return }
+    setSaving(true)
+    setSaveMsg(null)
+    try {
+      // Create or update via providers API
+      if (record) {
+        const res = await fetch(`/api/admin/providers/${record.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey }),
+        })
+        if (!res.ok) { const d = await res.json(); setSaveMsg(`Error: ${d.error ?? 'Save failed'}`); return }
+      } else {
+        const res = await fetch('/api/admin/providers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ providerKey, displayName: label, apiKey, enabled: true }),
+        })
+        if (!res.ok) { const d = await res.json(); setSaveMsg(`Error: ${d.error ?? 'Save failed'}`); return }
+      }
+      setSaveMsg('Saved')
+      setApiKey('')
+      onSaved()
+      setTimeout(() => setSaveMsg(null), 3000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function test() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const id = record?.id
+      if (!id && !apiKey) { setTestResult({ success: false, error: 'Enter an API key to test' }); return }
+      const body = id
+        ? (apiKey ? { apiKey } : {})
+        : { providerKey, apiKey }
+      const url = id ? `/api/admin/providers/${id}/health-check` : '/api/admin/providers/health-check-all'
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      setTestResult(await res.json())
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const isConfigured = !!(record?.maskedPreview)
+
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-white">{label}</p>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {capabilities.map(c => (
+              <span key={c} className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-slate-400 border border-white/[0.06]">{c}</span>
+            ))}
+          </div>
+        </div>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full border shrink-0 ${isConfigured ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-slate-500 bg-slate-500/10 border-slate-500/20'}`}>
+          {isConfigured ? `Configured · ${record?.maskedPreview}` : 'Not set'}
+        </span>
+      </div>
+
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1">
+          <input
+            type={showKey ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
+            placeholder={isConfigured ? 'Leave blank to keep existing key' : placeholder}
+            className={`${inputCls} pr-10 text-xs`}
+          />
+          <button type="button" onClick={() => setShowKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+            {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+        <button onClick={save} disabled={saving} className={btnPrimary}>
+          {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+          Save
+        </button>
+        <button onClick={test} disabled={testing} className={btnSecondary}>
+          {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <TestTube2 className="h-3 w-3" />}
+          Test
+        </button>
+      </div>
+
+      {saveMsg && (
+        <p className={`text-xs ${saveMsg.startsWith('Error') ? 'text-red-400' : 'text-emerald-400'}`}>{saveMsg}</p>
+      )}
+
+      {testResult && (
+        <TestResultBanner result={testResult} extra={testResult.latencyMs != null ? `${testResult.latencyMs}ms` : undefined} />
+      )}
+    </div>
   )
 }
 

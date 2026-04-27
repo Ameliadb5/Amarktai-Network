@@ -161,7 +161,7 @@ export default function WorkspacePage() {
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryCard label="Requests (30d)" value={usage?.totalRequests ?? 0} />
-          <SummaryCard label="GenX" value={genxLabel} highlight />
+          <SummaryCard label="AI Engine" value={genxLabel} highlight />
           <SummaryCard label="Top capability" value={topCapabilities[0] ? normalizeCapabilityName(topCapabilities[0][0]) : '—'} />
         </div>
 
