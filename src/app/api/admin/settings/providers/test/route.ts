@@ -47,21 +47,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'No API key configured for this provider' })
   }
 
-  // Validate URL to prevent SSRF
-  let parsedUrl: URL
-  try { parsedUrl = new URL(apiUrl) } catch {
+  // Validate URL to prevent SSRF — parse, validate protocol and host, then use the normalised URL
+  let normalizedBaseUrl: string
+  try {
+    const parsed = new URL(apiUrl)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return NextResponse.json({ success: false, error: 'API URL must use http or https' })
+    }
+    // Reconstruct from parsed to avoid any bypass via encoding tricks
+    normalizedBaseUrl = `${parsed.protocol}//${parsed.host}${parsed.pathname}`.replace(/\/+$/, '')
+  } catch {
     return NextResponse.json({ success: false, error: 'Invalid API URL' })
   }
-  if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
-    return NextResponse.json({ success: false, error: 'API URL must use http or https' })
-  }
-  // suppress unused var warning
-  void parsedUrl
 
   const start = Date.now()
 
   try {
-    // Special-case HuggingFace — test via /whoami
+    // Special-case HuggingFace — test via a fixed URL (not user-provided)
     if (meta.id === 'huggingface') {
       const res = await fetch('https://huggingface.co/api/whoami', {
         headers: { Authorization: `Bearer ${apiKey}` },
@@ -79,9 +81,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: `HuggingFace returned HTTP ${res.status}`, latencyMs })
     }
 
-    // Special-case Gemini — uses API key as query param
+    // Special-case Gemini — uses API key as query param; use validated normalizedBaseUrl
     if (meta.id === 'gemini') {
-      const testUrl = `${apiUrl}/models?key=${encodeURIComponent(apiKey)}`
+      const testUrl = `${normalizedBaseUrl}/models?key=${encodeURIComponent(apiKey)}`
       const res = await fetch(testUrl, { signal: AbortSignal.timeout(10_000) })
       const latencyMs = Date.now() - start
       if (res.ok) {
@@ -93,12 +95,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: `Gemini API returned HTTP ${res.status}`, latencyMs })
     }
 
-    // Standard OpenAI-compatible test — GET /models with Bearer token
+    // Standard OpenAI-compatible test — GET /models with Bearer token; use validated normalizedBaseUrl
     if (!meta.testEndpoint) {
       return NextResponse.json({ success: false, error: 'No test endpoint configured for this provider' })
     }
 
-    const testUrl = `${apiUrl}${meta.testEndpoint}`
+    const testUrl = `${normalizedBaseUrl}${meta.testEndpoint}`
     const res = await fetch(testUrl, {
       method: meta.testMethod,
       headers: {

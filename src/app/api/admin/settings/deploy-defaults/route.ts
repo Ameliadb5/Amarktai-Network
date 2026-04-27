@@ -54,11 +54,18 @@ export async function GET() {
   })
 }
 
+const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i
+
 const patchSchema = z.object({
-  domainRoot: z.string().max(253).optional(),
-  deployRoot: z.string().max(512).optional(),
+  domainRoot: z.string().max(253).refine(v => !v || DOMAIN_RE.test(v), { message: 'Must be a valid domain name' }).optional(),
+  deployRoot: z.string().max(512)
+    .refine(v => !v || v.startsWith('/'), { message: 'Deploy root must be an absolute path starting with /' })
+    .refine(v => !v || !v.includes('..'), { message: 'Deploy root must not contain path traversal sequences' })
+    .optional(),
   nginxTemplate: z.enum(['reverse_proxy', 'static', 'none']).optional(),
-  systemdNaming: z.string().max(128).optional(),
+  systemdNaming: z.string().max(128)
+    .refine(v => !v || !v.includes('..'), { message: 'Invalid naming pattern' })
+    .optional(),
   defaultWebdockSlug: z.string().max(64).optional(),
   deployMethod: z.enum(['direct_vps', 'github_actions', 'manual']).optional(),
 })

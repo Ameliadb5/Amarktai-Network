@@ -86,7 +86,17 @@ export interface WebdockCallResult<T> {
 const WEBDOCK_BASE_URL = 'https://app.webdock.io/api/v1'
 const WEBDOCK_TIMEOUT = 20_000
 
-// ── Config Resolution ─────────────────────────────────────────────────────────
+// ── Slug validation ───────────────────────────────────────────────────────────
+
+const VALID_SLUG_RE = /^[a-zA-Z0-9_-]{1,128}$/
+
+function isValidSlug(slug: string): boolean {
+  return VALID_SLUG_RE.test(slug)
+}
+
+function invalidSlugResult<T>(): WebdockCallResult<T> {
+  return { success: false, data: null, error: 'Invalid server slug', latencyMs: 0, statusCode: null }
+}
 
 /**
  * Resolve the Webdock API token from DB config or environment variable.
@@ -184,25 +194,19 @@ export async function listWebdockServers(): Promise<WebdockCallResult<WebdockSer
 
 /** Get a single server by slug. */
 export async function getWebdockServer(slug: string): Promise<WebdockCallResult<WebdockServer>> {
-  if (!slug || !/^[a-zA-Z0-9_-]+$/.test(slug)) {
-    return { success: false, data: null, error: 'Invalid server slug', latencyMs: 0, statusCode: null }
-  }
+  if (!isValidSlug(slug)) return invalidSlugResult<WebdockServer>()
   return webdockFetch<WebdockServer>(`/servers/${encodeURIComponent(slug)}`)
 }
 
 /** Get live server metrics (now). */
 export async function getWebdockMetricsNow(slug: string): Promise<WebdockCallResult<WebdockMetrics>> {
-  if (!slug || !/^[a-zA-Z0-9_-]+$/.test(slug)) {
-    return { success: false, data: null, error: 'Invalid server slug', latencyMs: 0, statusCode: null }
-  }
+  if (!isValidSlug(slug)) return invalidSlugResult<WebdockMetrics>()
   return webdockFetch<WebdockMetrics>(`/servers/${encodeURIComponent(slug)}/metrics/now`)
 }
 
 /** List scripts for a server. */
 export async function listWebdockScripts(slug: string): Promise<WebdockCallResult<WebdockScript[]>> {
-  if (!slug || !/^[a-zA-Z0-9_-]+$/.test(slug)) {
-    return { success: false, data: null, error: 'Invalid server slug', latencyMs: 0, statusCode: null }
-  }
+  if (!isValidSlug(slug)) return invalidSlugResult<WebdockScript[]>()
   return webdockFetch<WebdockScript[]>(`/servers/${encodeURIComponent(slug)}/scripts`)
 }
 
@@ -211,9 +215,7 @@ export async function executeWebdockScript(
   slug: string,
   scriptId: number,
 ): Promise<WebdockCallResult<WebdockScriptExecution>> {
-  if (!slug || !/^[a-zA-Z0-9_-]+$/.test(slug)) {
-    return { success: false, data: null, error: 'Invalid server slug', latencyMs: 0, statusCode: null }
-  }
+  if (!isValidSlug(slug)) return invalidSlugResult<WebdockScriptExecution>()
   if (!Number.isInteger(scriptId) || scriptId <= 0) {
     return { success: false, data: null, error: 'Invalid script ID', latencyMs: 0, statusCode: null }
   }
@@ -225,9 +227,7 @@ export async function executeWebdockScript(
 
 /** List server events. */
 export async function listWebdockEvents(slug: string): Promise<WebdockCallResult<WebdockEvent[]>> {
-  if (!slug || !/^[a-zA-Z0-9_-]+$/.test(slug)) {
-    return { success: false, data: null, error: 'Invalid server slug', latencyMs: 0, statusCode: null }
-  }
+  if (!isValidSlug(slug)) return invalidSlugResult<WebdockEvent[]>()
   return webdockFetch<WebdockEvent[]>(`/servers/${encodeURIComponent(slug)}/events`)
 }
 
@@ -238,9 +238,7 @@ export async function listWebdockPublicKeys(): Promise<WebdockCallResult<Webdock
 
 /** List shell users for a server. */
 export async function listWebdockShellUsers(slug: string): Promise<WebdockCallResult<WebdockShellUser[]>> {
-  if (!slug || !/^[a-zA-Z0-9_-]+$/.test(slug)) {
-    return { success: false, data: null, error: 'Invalid server slug', latencyMs: 0, statusCode: null }
-  }
+  if (!isValidSlug(slug)) return invalidSlugResult<WebdockShellUser[]>()
   return webdockFetch<WebdockShellUser[]>(`/servers/${encodeURIComponent(slug)}/shellUsers`)
 }
 
