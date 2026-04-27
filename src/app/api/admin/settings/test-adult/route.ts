@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
       const authOk = res.status !== 401 && res.status !== 403
 
       let extraNote = ''
-      if (res.status === 422) extraNote = ' — safety checker triggered (use a model that supports disable_safety_checker)'
+      if (res.status === 422) extraNote = ' — provider returned 422 (disable_safety_checker was sent; model may not support this operation)'
       if (res.status === 401 || res.status === 403) extraNote = ' — authentication failed'
 
       return NextResponse.json({
@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
       const authOk = res.status !== 401 && res.status !== 403
 
       let note = ''
-      if (res.status === 401 || res.status === 403) note = ' — xAI adult/spicy image access not confirmed for this key'
+      if (res.status === 401 || res.status === 403) note = ' — xAI adult content access not confirmed for this key'
       if (res.ok) note = ' — xAI image endpoint accessible'
 
       return NextResponse.json({

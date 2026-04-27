@@ -284,7 +284,7 @@ function AIEngineSection({ config, onSaved }: { config: AIEngineConfig; onSaved:
                     className={inputCls}
                   />
                   <p className="text-[10px] text-slate-600 mt-1">
-                    Default: {DEFAULT_AI_ENGINE_URL}. Enter only the base URL — do not add /api/v1/models or other paths.
+                    Default: {DEFAULT_AI_ENGINE_URL}. Enter the base URL only — any /api/v1/models or path suffixes will be stripped automatically.
                   </p>
                 </Field>
               )}
