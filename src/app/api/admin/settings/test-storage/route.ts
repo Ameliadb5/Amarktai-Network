@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     } catch { /* ignore */ }
   }
 
-  if (!driver)    driver    = process.env.STORAGE_DRIVER ?? 'local'
+  if (!driver)    driver    = process.env.STORAGE_DRIVER ?? 'local_vps'
   if (!bucket)    bucket    = process.env.S3_BUCKET ?? ''
   if (!region)    region    = process.env.S3_REGION ?? ''
   if (!endpoint)  endpoint  = process.env.S3_ENDPOINT ?? ''
@@ -74,14 +74,41 @@ export async function POST(req: NextRequest) {
   if (!secretKey) secretKey = process.env.AWS_SECRET_ACCESS_KEY ?? ''
   if (!r2PublicUrl) r2PublicUrl = process.env.R2_PUBLIC_URL ?? ''
 
-  // ── Local ──
+  // ── VPS Local (persistent) ──
+  if (driver === 'local_vps') {
+    const VPS_BASE = '/var/www/amarktai/storage'
+    const start = Date.now()
+    try {
+      const { mkdir, writeFile, unlink } = await import('fs/promises')
+      await mkdir(VPS_BASE, { recursive: true })
+      const testFile = `${VPS_BASE}/.write-test-${Date.now()}`
+      await writeFile(testFile, 'test')
+      await unlink(testFile)
+      return NextResponse.json({
+        success: true,
+        driver: 'local_vps',
+        persistent: true,
+        basePath: VPS_BASE,
+        latencyMs: Date.now() - start,
+      })
+    } catch (err) {
+      return NextResponse.json({
+        success: false,
+        driver: 'local_vps',
+        error: `Write access test failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+        latencyMs: Date.now() - start,
+      })
+    }
+  }
+
+  // ── Local (ephemeral) ──
   if (driver === 'local') {
     const status = getStorageStatus()
     return NextResponse.json({
       success: true,
       driver: 'local',
       persistent: false,
-      warning: 'Local file storage is ephemeral — artifacts will be lost on redeploy. Configure S3 or R2 for persistent storage.',
+      warning: 'Local file storage is ephemeral — artifacts will be lost on redeploy. Use VPS local storage for persistence.',
       basePath: status.basePath,
     })
   }

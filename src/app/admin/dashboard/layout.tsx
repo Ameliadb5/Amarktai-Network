@@ -8,9 +8,10 @@ import {
   Menu,
   X,
   User,
+  LayoutDashboard,
   Sparkles,
   AppWindow,
-  Zap,
+  Cpu,
   Archive,
   Rocket,
   Settings2,
@@ -23,13 +24,14 @@ const NAV_GROUPS: Array<{
 }> = [
   {
     items: [
-      { href: '/admin/dashboard/workspace',   label: 'Workspace',      icon: Sparkles  },
-      { href: '/admin/dashboard/apps',         label: 'Apps & Agents',  icon: AppWindow },
-      { href: '/admin/dashboard/genx-models',  label: 'GenX Models',    icon: Zap       },
-      { href: '/admin/dashboard/artifacts',    label: 'Artifacts',      icon: Archive   },
-      { href: '/admin/dashboard/deployments',  label: 'Deployments',    icon: Rocket    },
-      { href: '/admin/dashboard/monitor',      label: 'Monitor',        icon: Activity  },
-      { href: '/admin/dashboard/settings',     label: 'Settings',       icon: Settings2 },
+      { href: '/admin/dashboard',              label: 'Overview',       icon: LayoutDashboard },
+      { href: '/admin/dashboard/workspace',    label: 'Workspace',      icon: Sparkles        },
+      { href: '/admin/dashboard/apps',         label: 'Apps & Agents',  icon: AppWindow       },
+      { href: '/admin/dashboard/ai-engine',    label: 'AI Engine',      icon: Cpu             },
+      { href: '/admin/dashboard/artifacts',    label: 'Artifacts',      icon: Archive         },
+      { href: '/admin/dashboard/deployments',  label: 'Deployments',    icon: Rocket          },
+      { href: '/admin/dashboard/monitor',      label: 'Monitor',        icon: Activity        },
+      { href: '/admin/dashboard/settings',     label: 'Settings',       icon: Settings2       },
     ],
   },
 ]
@@ -47,13 +49,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/admin/login')
   }, [router])
 
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + '/')
+  const isActive = (href: string) => {
+    // Exact match for Overview (/admin/dashboard) to avoid matching all child routes
+    if (href === '/admin/dashboard') return pathname === '/admin/dashboard'
+    return pathname === href || pathname.startsWith(href + '/')
+  }
 
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="h-16 border-b border-white/10 px-5">
-        <Link href="/admin/dashboard/workspace" className="flex h-full items-center gap-2">
+        <Link href="/admin/dashboard" className="flex h-full items-center gap-2">
           <div className="rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 px-2 py-1 text-xs font-bold text-white">AN</div>
           <div>
             <p className="text-sm font-bold text-white">Amarktai Network</p>
