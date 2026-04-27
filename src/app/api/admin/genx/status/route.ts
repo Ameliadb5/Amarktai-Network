@@ -55,7 +55,7 @@ export async function GET() {
     adultCapability: {
       supported:   adultStatus.supported,
       route:       adultStatus.route,
-      reason:      adultStatus.reason,
+      reason:      adultStatus.note,
     },
   })
 }
