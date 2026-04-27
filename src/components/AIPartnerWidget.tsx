@@ -224,7 +224,7 @@ export default function AIPartnerWidget({ open, onClose, onAction, variant = 'fl
       if (!res.ok) {
         if (res.status === 503 || res.status === 404) {
           setTtsUnconfigured(true)
-          setVoiceError('Voice (TTS) provider not configured. Set up a TTS provider in Settings to enable Voice Buddy.')
+          setVoiceError('Voice (TTS) provider not configured. Set up a TTS provider in Admin Settings (/admin/dashboard/settings) to enable Voice Buddy.')
         } else {
           setVoiceError(`Voice playback failed (HTTP ${res.status})`)
         }

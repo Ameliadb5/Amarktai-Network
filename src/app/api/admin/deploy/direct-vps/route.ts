@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     if (!appSlug || !repo || !deployPath || !serviceName) {
       return NextResponse.json({
-        error: 'appSlug, repo, branch, deployPath, and serviceName are required',
+        error: 'appSlug, repo, deployPath, and serviceName are required',
       }, { status: 400 })
     }
 
@@ -132,12 +132,32 @@ export async function POST(req: NextRequest) {
       logLines.push(`=== Health Check ===`)
       logLines.push(`Target: ${healthCheckUrl}`)
       try {
-        const hcRes = await fetch(healthCheckUrl, {
-          method: 'GET',
-          signal: AbortSignal.timeout(5000),
-        })
-        logLines.push(`Status: ${hcRes.status} ${hcRes.ok ? '✓ OK' : '✗ FAILED'}`)
-        if (hcRes.ok) deploySuccess = true
+        // Validate the health check URL before fetching — must be http/https and not private IP
+        let parsedHcUrl: URL
+        try {
+          parsedHcUrl = new URL(healthCheckUrl)
+        } catch {
+          logLines.push(`Health check skipped: invalid URL`)
+          parsedHcUrl = null as unknown as URL
+        }
+        if (parsedHcUrl) {
+          if (parsedHcUrl.protocol !== 'https:' && parsedHcUrl.protocol !== 'http:') {
+            logLines.push(`Health check skipped: only http/https URLs are supported`)
+          } else {
+            const hcHost = parsedHcUrl.hostname.toLowerCase()
+            const isPrivate = /^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.0\.0\.|::1$|fd[0-9a-f]{2}:)/.test(hcHost)
+            if (isPrivate && process.env.NODE_ENV === 'production') {
+              logLines.push(`Health check skipped: private/loopback URLs not allowed in production`)
+            } else {
+              const hcRes = await fetch(parsedHcUrl.href, {
+                method: 'GET',
+                signal: AbortSignal.timeout(5000),
+              })
+              logLines.push(`Status: ${hcRes.status} ${hcRes.ok ? '✓ OK' : '✗ FAILED'}`)
+              if (hcRes.ok) deploySuccess = true
+            }
+          }
+        }
       } catch (hcErr) {
         logLines.push(`Health check failed: ${String(hcErr)}`)
       }

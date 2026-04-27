@@ -42,10 +42,19 @@ export async function POST(req: NextRequest) {
     const repoName = match[2].replace(/\.git$/, '')
     const repoFullName = `${owner}/${repoName}`
 
+    // Validate owner and repoName contain only safe characters to prevent injection
+    if (!/^[a-zA-Z0-9_.-]+$/.test(owner) || !/^[a-zA-Z0-9_.-]+$/.test(repoName)) {
+      return NextResponse.json({ error: 'Invalid repository owner or name format' }, { status: 400 })
+    }
+
     // Get public repo info via GitHub public API (no token needed for public repos)
-    // The stored token is used automatically by getFileTree/getFileContent if available
+    // URL is always api.github.com — no user-controlled host in the URL
+    const githubApiUrl = new URL(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`)
+    if (githubApiUrl.hostname !== 'api.github.com') {
+      return NextResponse.json({ error: 'Invalid GitHub API URL' }, { status: 400 })
+    }
     const repoInfoRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repoName}`,
+      githubApiUrl.href,
       {
         headers: {
           Accept: 'application/vnd.github+json',

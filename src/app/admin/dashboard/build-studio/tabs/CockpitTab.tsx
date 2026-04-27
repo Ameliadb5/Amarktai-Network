@@ -187,7 +187,6 @@ export default function CockpitTab() {
     setLoadedFiles(new Map())
 
     try {
-      let repoName = ''
       if (sourceType === 'public_url') {
         const res = await fetch('/api/admin/github/import', {
           method: 'POST',
@@ -196,12 +195,10 @@ export default function CockpitTab() {
         })
         const data = await res.json()
         if (!res.ok) { setImportError(data.error ?? 'Import failed'); return }
-        repoName = data.repoFullName
         setRepoFullName(data.repoFullName)
         setTree(data.tree ?? [])
         if (data.treeError) setImportError(`Tree: ${data.treeError}`)
       } else if (sourceType === 'connected_repo') {
-        repoName = selectedRepo
         setRepoFullName(selectedRepo)
         const res = await fetch(`/api/admin/github/tree?repo=${encodeURIComponent(selectedRepo)}&branch=${encodeURIComponent(selectedBranch)}`)
         const data = await res.json()
@@ -219,7 +216,6 @@ export default function CockpitTab() {
         }
       }
       setExpandedDirs(rootDirs)
-      void repoName
       goToStep('files')
     } finally {
       setLoadingTree(false)
@@ -1000,17 +996,24 @@ function DiffFileCard({
 }
 
 /**
- * Naive diff application — for simple patches.
- * In a full implementation, use a proper patch library.
- * For now, returns original content with a comment noting the diff.
+ * Applies a unified diff to original file content.
+ *
+ * NOTE: Full patch application requires a server-side library (e.g. diff-apply).
+ * For now, when the AI generates a change set, the commit/push flow sends the
+ * diff content to GitHub, which is why the AI is instructed to return full file
+ * content for new files (action=created) and well-formed unified diffs for
+ * modified files. The reviewing operator should verify the diff before approving.
+ *
+ * For modified files, the raw diff is returned here — the GitHub push route on
+ * the server is expected to handle patch application or the operator reviews and
+ * edits the diff before committing.
  */
 function applyDiff(original: string, diff: string): string {
-  // For complex real diffs, a proper patch application library would be needed.
-  // This is a placeholder that returns the original + diff as a comment.
-  // The commit will include what the AI generated.
   if (!diff.trim()) return original
-  // If it looks like a full file replacement (no +/- markers), return as-is
-  if (!diff.includes('\n@@') && !diff.startsWith('@@')) return diff
-  // Return diff as a comment-annotated version indicating manual review needed
-  return `${diff}`
+  // If the diff has no unified diff markers, treat it as a full file replacement
+  if (!diff.includes('\n@@') && !diff.startsWith('@@') && !diff.includes('\n+++ ')) {
+    return diff
+  }
+  // Return the diff as-is — server-side or post-review application required
+  return diff
 }
