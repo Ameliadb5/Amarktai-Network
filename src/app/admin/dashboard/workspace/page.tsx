@@ -27,11 +27,13 @@ const CreatorStudioTab = dynamic(() => import('../build-studio/tabs/CreatorStudi
 const WorkflowBuilderTab = dynamic(() => import('../build-studio/tabs/WorkflowBuilderTab'), { ssr: false })
 const CompareTab = dynamic(() => import('../build-studio/tabs/CompareTab'), { ssr: false })
 const GitHubTab = dynamic(() => import('../build-studio/tabs/GitHubTab'), { ssr: false })
+const CockpitTab = dynamic(() => import('../build-studio/tabs/CockpitTab'), { ssr: false })
 const AIPartnerWidget = dynamic(() => import('@/components/AIPartnerWidget'), { ssr: false })
 
-type TabKey = 'test-ai' | 'github' | 'build-app' | 'images' | 'voice' | 'video' | 'music' | 'compare' | 'workflows'
+type TabKey = 'cockpit' | 'test-ai' | 'github' | 'build-app' | 'images' | 'voice' | 'video' | 'music' | 'compare' | 'workflows'
 
 const tabs: { key: TabKey; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }[] = [
+  { key: 'cockpit',   label: 'Cockpit',   icon: Workflow    },
   { key: 'test-ai',   label: 'Run Tasks',  icon: FlaskConical },
   { key: 'github',    label: 'GitHub',     icon: FolderGit2  },
   { key: 'build-app', label: 'Build Apps', icon: Rocket      },
@@ -49,6 +51,7 @@ interface UsageSummary {
 }
 
 const SECTION_TO_TAB: Record<string, TabKey> = {
+  'cockpit':  'cockpit',
   'test-ai': 'test-ai',
   test: 'test-ai',
   github: 'github',
@@ -68,7 +71,7 @@ const normalizeCapabilityName = (value: string) => value.replace(/_/g, ' ')
 
 export default function WorkspacePage() {
   const router = useRouter()
-  const [active, setActive] = useState<TabKey>('test-ai')
+  const [active, setActive] = useState<TabKey>('cockpit')
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [loadingUsage, setLoadingUsage] = useState(false)
   const [partnerOpen, setPartnerOpen] = useState(false)
@@ -188,6 +191,7 @@ export default function WorkspacePage() {
 
       <div className={`grid gap-4 ${partnerOpen ? 'xl:grid-cols-[1fr_360px]' : 'grid-cols-1'}`}>
         <motion.div key={active} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          {active === 'cockpit' && <CockpitTab />}
           {active === 'test-ai' && <TestAITab />}
           {active === 'github' && <GitHubTab />}
           {active === 'build-app' && (

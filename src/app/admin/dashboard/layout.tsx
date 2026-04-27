@@ -14,6 +14,7 @@ import {
   Archive,
   Rocket,
   Settings2,
+  Activity,
 } from 'lucide-react'
 
 const NAV_GROUPS: Array<{
@@ -27,6 +28,7 @@ const NAV_GROUPS: Array<{
       { href: '/admin/dashboard/genx-models',  label: 'GenX Models',    icon: Zap       },
       { href: '/admin/dashboard/artifacts',    label: 'Artifacts',      icon: Archive   },
       { href: '/admin/dashboard/deployments',  label: 'Deployments',    icon: Rocket    },
+      { href: '/admin/dashboard/monitor',      label: 'Monitor',        icon: Activity  },
       { href: '/admin/dashboard/settings',     label: 'Settings',       icon: Settings2 },
     ],
   },
