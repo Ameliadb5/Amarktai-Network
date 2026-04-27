@@ -11,11 +11,10 @@ const columns = [
     ],
   },
   {
-    heading: 'Operator',
+    heading: 'Access',
     links: [
-      { href: '/admin/login', label: 'Dashboard Login' },
       { href: '/contact', label: 'Request Access' },
-      { href: '/apps', label: 'Builder & Agent Surfaces' },
+      { href: '/apps', label: 'Capability Surfaces' },
     ],
   },
   {
@@ -33,7 +32,9 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="grid gap-10 md:grid-cols-12">
           <div className="md:col-span-5">
-            <p className="text-lg font-bold text-white">Amarktai Network</p>
+            <p className="text-lg font-bold text-white">
+              Amarkt<span className="text-blue-400">AI</span> Network
+            </p>
             <p className="mt-3 max-w-sm text-sm text-slate-400">
               Multi-provider AI orchestration for real products: one routing brain, one capability engine, one operator console.
             </p>
@@ -45,7 +46,7 @@ export default function Footer() {
               <ul className="space-y-2">
                 {column.links.map((link) => (
                   <li key={link.href}>
-                    <Link href={link.href} className="text-sm text-slate-400 hover:text-white">
+                    <Link href={link.href} className="text-sm text-slate-400 hover:text-white transition-colors">
                       {link.label}
                     </Link>
                   </li>
@@ -56,7 +57,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-10 border-t border-white/10 pt-5 text-xs text-slate-500">
-          © {new Date().getFullYear()} Amarktai Network. Operator-grade AI infrastructure.
+          © {new Date().getFullYear()} Amarkt<span className="text-blue-400/70">AI</span> Network. Operator-grade AI infrastructure.
         </div>
       </div>
     </footer>

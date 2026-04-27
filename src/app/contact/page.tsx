@@ -58,16 +58,16 @@ export default function ContactPage() {
       <main className="px-4 pb-20 pt-32 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1fr_1.1fr]">
           <section>
-            <p className="text-label text-blue-300">Controlled onboarding</p>
-            <h1 className="text-headline mt-4">Request operator access to Amarktai Network.</h1>
+            <p className="text-label text-blue-300">Controlled access</p>
+            <h1 className="text-headline mt-4">Request operator access to Amarkt<span className="text-blue-400">AI</span> Network.</h1>
             <p className="mt-5 max-w-xl text-slate-300">
-              Access is reviewed for teams building serious AI products where orchestration quality, reliability, and cost control matter.
+              Access is reviewed for teams building serious AI products where orchestration quality, multi-provider reliability, and full operational visibility matter.
             </p>
             <div className="mt-8 space-y-3">
               {[
-                { icon: ShieldCheck, text: 'Private onboarding, not open-signup onboarding.' },
-                { icon: Cpu, text: 'Configured around production capabilities and deployment realities.' },
-                { icon: Sparkles, text: 'Capability and provider access scoped per approved use case.' },
+                { icon: ShieldCheck, text: 'Private onboarding — not an open-signup product.' },
+                { icon: Cpu,         text: 'Configured around your production capabilities and deployment stack.' },
+                { icon: Sparkles,    text: 'Capability and provider access scoped per approved use case.' },
               ].map((item) => (
                 <div key={item.text} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-200">
                   <item.icon className="h-4 w-4 text-cyan-300" />
@@ -76,11 +76,21 @@ export default function ContactPage() {
               ))}
             </div>
 
-            <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-slate-300">
+            <div className="mt-8 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 text-sm text-slate-300">
+              <p className="font-semibold text-white">What access gives you</p>
+              <ul className="mt-3 space-y-2">
+                <li className="flex items-start gap-2"><Sparkles className="h-4 w-4 text-cyan-300 shrink-0 mt-0.5" /> Full operator dashboard: Workspace, Apps &amp; Agents, GenX Models, Artifacts, Deployments, Settings</li>
+                <li className="flex items-start gap-2"><Cpu className="h-4 w-4 text-blue-300 shrink-0 mt-0.5" /> GenX-routed AI execution: chat, code gen, image, video, voice, workflows</li>
+                <li className="flex items-start gap-2"><Building2 className="h-4 w-4 text-violet-300 shrink-0 mt-0.5" /> GitHub repo editing, AI code generation, and deploy triggers from the workspace</li>
+                <li className="flex items-start gap-2"><Briefcase className="h-4 w-4 text-emerald-300 shrink-0 mt-0.5" /> App agent config, artifact storage, and operational event traces</li>
+              </ul>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 text-sm text-slate-300">
               <p className="font-semibold text-white">Best fit profiles</p>
               <ul className="mt-3 space-y-2">
-                <li className="flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-300" /> Product organizations operating multiple AI features.</li>
-                <li className="flex items-center gap-2"><Briefcase className="h-4 w-4 text-violet-300" /> Builders/integrators requiring provider routing + operational control.</li>
+                <li className="flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-300" /> Product organizations operating multiple AI-enabled applications.</li>
+                <li className="flex items-center gap-2"><Briefcase className="h-4 w-4 text-violet-300" /> Builders and integrators who need provider routing and operational control.</li>
               </ul>
             </div>
           </section>

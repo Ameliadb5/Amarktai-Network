@@ -342,7 +342,7 @@ export default function TestAITab() {
         }
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Test failed') } finally { setRunning(false) }
-  }, [prompt, capability, forceProvider, forceModel, appProfile, streamMode, costMode, ttsGender, ttsVoiceId, ttsAccent, ttsProvider, sttFile])
+  }, [prompt, capability, forceProvider, forceModel, appProfile, streamMode, costMode, ttsGender, ttsVoiceId, ttsAccent, ttsProvider, sttFile, genxPolicy])
 
   useEffect(() => { return () => { if (videoPollingRef.current) clearInterval(videoPollingRef.current) } }, [])
 

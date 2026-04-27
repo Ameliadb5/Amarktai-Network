@@ -156,7 +156,6 @@ export async function routeWorkspaceTask(
   input: WorkspaceTaskInput,
 ): Promise<WorkspaceTaskResult> {
   const traceId = randomUUID()
-  const start   = Date.now()
 
   // 1 + 2. Resolve policy
   const config = await getWorkspaceConfig()
@@ -224,8 +223,6 @@ export async function routeWorkspaceTask(
     // 6. GenX unavailable — fall back to provider vault if configured
     const fallbackResult = await callProviderFallback(
       messages,
-      input.maxTokens,
-      input.temperature,
     )
 
     result = {
@@ -256,8 +253,6 @@ export async function routeWorkspaceTask(
  */
 async function callProviderFallback(
   messages: GenXChatMessage[],
-  maxTokens?: number,
-  temperature?: number,
 ) {
   // Convert messages to a single user message for legacy callProvider()
   const systemMsg = messages.find((m) => m.role === 'system')?.content ?? ''

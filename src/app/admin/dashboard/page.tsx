@@ -6,14 +6,14 @@ import {
   ArrowRight,
   AppWindow,
   Sparkles,
-  Brain,
+  Zap,
   Archive,
-  Server,
-  Activity,
+  Rocket,
+  Settings2,
   RefreshCw,
-  ShieldCheck,
-  AlertTriangle,
-  Database,
+  CheckCircle,
+  AlertCircle,
+  GitBranch,
 } from 'lucide-react'
 
 interface DashboardData {
@@ -28,66 +28,51 @@ interface DashboardData {
   }
 }
 
-interface UsageData {
-  totalRequests: number
-  totalCostCents: number
-  byProvider: Record<string, { requests: number; costCents: number }>
+interface GenXStatusData {
+  configured: boolean
+  available: boolean
+  apiUrl: string | null
+  modelCount: number
+  adultCapability?: { supported: boolean }
 }
 
-interface JobsData {
-  queue?: {
-    healthy?: boolean
-    backendAvailable?: boolean
-  }
-}
-
-interface ReadinessData {
-  score?: number
-  summary?: {
-    failed?: number
-    critical?: number
-    warnings?: number
-  }
+interface GitHubStatusData {
+  valid: boolean
+  username?: string | null
 }
 
 const sections = [
-  { href: '/admin/dashboard/workspace', label: 'Workspace', icon: Sparkles, desc: 'Run tasks, route models, and operate generation surfaces.' },
-  { href: '/admin/dashboard/apps', label: 'Apps', icon: AppWindow, desc: 'Manage connected products and their AI runtime state.' },
-  { href: '/admin/dashboard/models', label: 'Model Registry', icon: Brain, desc: 'Inspect available models, providers, and capabilities.' },
-  { href: '/admin/dashboard/operations', label: 'Operations', icon: Server, desc: 'Provider health, budgets, readiness, and control actions.' },
-  { href: '/admin/dashboard/artifacts', label: 'Artifacts', icon: Archive, desc: 'Review generated outputs across modalities.' },
-  { href: '/admin/dashboard/events', label: 'Events', icon: Activity, desc: 'Inspect execution traces and operational event streams.' },
+  { href: '/admin/dashboard/workspace',   label: 'Workspace',     icon: Sparkles,  desc: 'AI developer cockpit — prompt, generate, edit code, and deploy.' },
+  { href: '/admin/dashboard/apps',        label: 'Apps & Agents', icon: AppWindow, desc: 'Manage connected apps and their AI agent configuration.' },
+  { href: '/admin/dashboard/genx-models', label: 'GenX Models',   icon: Zap,       desc: 'GenX catalog, model capabilities, and execution layer status.' },
+  { href: '/admin/dashboard/artifacts',   label: 'Artifacts',     icon: Archive,   desc: 'Review generated text, image, audio, video, and code outputs.' },
+  { href: '/admin/dashboard/deployments', label: 'Deployments',   icon: Rocket,    desc: 'GitHub Actions workflow runs, deploy status, and logs.' },
+  { href: '/admin/dashboard/settings',    label: 'Settings',      icon: Settings2, desc: 'Configure GenX API, GitHub integration, and provider keys.' },
 ]
 
 export default function DashboardOverview() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
-  const [usage, setUsage] = useState<UsageData | null>(null)
-  const [jobs, setJobs] = useState<JobsData | null>(null)
-  const [readiness, setReadiness] = useState<ReadinessData | null>(null)
+  const [genxStatus, setGenxStatus] = useState<GenXStatusData | null>(null)
+  const [githubStatus, setGithubStatus] = useState<GitHubStatusData | null>(null)
   const [loading, setLoading] = useState(true)
 
   async function load() {
     setLoading(true)
     try {
-      const [dashRes, usageRes, jobsRes, readinessRes] = await Promise.allSettled([
+      const [dashRes, genxRes, ghRes] = await Promise.allSettled([
         fetch('/api/admin/dashboard'),
-        fetch('/api/admin/usage?platform=true&days=30'),
-        fetch('/api/admin/jobs'),
-        fetch('/api/admin/readiness'),
+        fetch('/api/admin/genx/status'),
+        fetch('/api/admin/github/validate'),
       ])
 
       if (dashRes.status === 'fulfilled' && dashRes.value.ok) {
         setDashboard(await dashRes.value.json())
       }
-      if (usageRes.status === 'fulfilled' && usageRes.value.ok) {
-        const d = await usageRes.value.json()
-        setUsage(d?.usage ?? null)
+      if (genxRes.status === 'fulfilled' && genxRes.value.ok) {
+        setGenxStatus(await genxRes.value.json())
       }
-      if (jobsRes.status === 'fulfilled' && jobsRes.value.ok) {
-        setJobs(await jobsRes.value.json())
-      }
-      if (readinessRes.status === 'fulfilled' && readinessRes.value.ok) {
-        setReadiness(await readinessRes.value.json())
+      if (ghRes.status === 'fulfilled' && ghRes.value.ok) {
+        setGithubStatus(await ghRes.value.json())
       }
     } finally {
       setLoading(false)
@@ -100,61 +85,76 @@ export default function DashboardOverview() {
   const total = dashboard?.brainStats?.totalRequests ?? 0
   const successRate = total > 0 ? `${Math.round((success / total) * 100)}%` : '—'
 
-  const topProvider = usage
-    ? Object.entries(usage.byProvider)
-        .sort((a, b) => b[1].requests - a[1].requests)[0]
-    : null
-
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-[#101a34] to-[#060d1b] p-6">
-        <h1 className="text-2xl font-bold text-white">Operator Overview</h1>
-        <p className="mt-1 text-sm text-slate-400">Live operational signal across routing, usage, readiness, and system queue health.</p>
+        <h1 className="text-2xl font-bold text-white">Operator Console</h1>
+        <p className="mt-1 text-sm text-slate-400">Amarktai Network — AI execution, GitHub workflow, and deployment control.</p>
       </div>
 
+      {/* Real metrics from brain stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="Connected Apps" value={dashboard?.metrics?.totalProducts ?? 0} source="/api/admin/dashboard" />
-        <MetricCard label="Executed Requests" value={dashboard?.brainStats?.totalRequests ?? 0} source="/api/admin/dashboard" />
-        <MetricCard label="Success Rate" value={successRate} source="/api/admin/dashboard" />
-        <MetricCard label="Avg Latency" value={dashboard?.brainStats?.avgLatencyMs ? `${Math.round(dashboard.brainStats.avgLatencyMs)} ms` : '—'} source="/api/admin/dashboard" />
+        <MetricCard label="Connected Apps"    value={dashboard?.metrics?.totalProducts ?? 0} />
+        <MetricCard label="Executed Requests" value={dashboard?.brainStats?.totalRequests ?? 0} />
+        <MetricCard label="Success Rate"      value={successRate} />
+        <MetricCard label="Avg Latency"       value={dashboard?.brainStats?.avgLatencyMs ? `${Math.round(dashboard.brainStats.avgLatencyMs)} ms` : '—'} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Integration status */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* GenX status */}
         <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">Queue Health</p>
-          <div className="mt-3 flex items-center gap-2 text-sm">
-            {jobs?.queue?.backendAvailable ? <Database className="h-4 w-4 text-emerald-400" /> : <AlertTriangle className="h-4 w-4 text-amber-400" />}
-            <span className="text-slate-200">{jobs?.queue?.backendAvailable ? 'Queue backend connected' : 'Queue backend unavailable'}</span>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">GenX AI Layer</p>
+          <div className="mt-3 flex items-center gap-2">
+            {genxStatus?.available
+              ? <CheckCircle className="h-4 w-4 text-emerald-400" />
+              : <AlertCircle className="h-4 w-4 text-amber-400" />}
+            <span className="text-sm text-slate-200">
+              {genxStatus?.available ? 'Connected' : genxStatus?.configured ? 'Configured — unreachable' : 'Not configured'}
+            </span>
           </div>
-          <div className="mt-2 flex items-center gap-2 text-sm">
-            {jobs?.queue?.healthy ? <ShieldCheck className="h-4 w-4 text-emerald-400" /> : <AlertTriangle className="h-4 w-4 text-amber-400" />}
-            <span className="text-slate-300">{jobs?.queue?.healthy ? 'Queue status healthy' : 'Queue degraded'}</span>
+          {genxStatus?.apiUrl && (
+            <p className="mt-2 text-xs text-slate-500 font-mono">{genxStatus.apiUrl}</p>
+          )}
+          <div className="mt-2 flex items-center gap-4 text-xs text-slate-400">
+            {genxStatus?.modelCount != null && (
+              <span>{genxStatus.modelCount} models</span>
+            )}
+            {genxStatus?.adultCapability?.supported && (
+              <span className="text-violet-400">Adult capability enabled</span>
+            )}
           </div>
-          <p className="mt-3 text-[11px] text-slate-500">Source: /api/admin/jobs</p>
+          <Link href="/admin/dashboard/genx-models" className="mt-3 inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300">
+            View catalog <ArrowRight className="h-3 w-3" />
+          </Link>
         </div>
 
+        {/* GitHub status */}
         <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">Readiness</p>
-          <p className="mt-2 text-2xl font-semibold text-white">{readiness?.score ?? '—'}</p>
-          <p className="text-xs text-slate-400">Go-live readiness score</p>
-          <div className="mt-3 text-xs text-slate-300 space-y-1">
-            <p>Critical: {readiness?.summary?.critical ?? 0}</p>
-            <p>Failed checks: {readiness?.summary?.failed ?? 0}</p>
-            <p>Warnings: {readiness?.summary?.warnings ?? 0}</p>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">GitHub Integration</p>
+          <div className="mt-3 flex items-center gap-2">
+            {githubStatus?.valid
+              ? <CheckCircle className="h-4 w-4 text-emerald-400" />
+              : <AlertCircle className="h-4 w-4 text-amber-400" />}
+            <span className="text-sm text-slate-200">
+              {githubStatus?.valid
+                ? `Connected${githubStatus.username ? ` as ${githubStatus.username}` : ''}`
+                : 'Not connected'}
+            </span>
           </div>
-          <p className="mt-3 text-[11px] text-slate-500">Source: /api/admin/readiness</p>
-        </div>
-
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">Usage (30d)</p>
-          <p className="mt-2 text-2xl font-semibold text-white">{usage?.totalRequests ?? 0}</p>
-          <p className="text-xs text-slate-400">Total metered requests</p>
-          <p className="mt-3 text-sm text-slate-300">Cost: ${((usage?.totalCostCents ?? 0) / 100).toFixed(4)}</p>
-          {topProvider && <p className="mt-1 text-xs text-slate-400">Top provider: {topProvider[0]} ({topProvider[1].requests} req)</p>}
-          <p className="mt-3 text-[11px] text-slate-500">Source: /api/admin/usage</p>
+          {githubStatus?.valid && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+              <GitBranch className="h-3 w-3" />
+              <span>Repo import, code edit, push, and deploy available</span>
+            </div>
+          )}
+          <Link href="/admin/dashboard/deployments" className="mt-3 inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300">
+            View deployments <ArrowRight className="h-3 w-3" />
+          </Link>
         </div>
       </div>
 
+      {/* Navigation section cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {sections.map((section) => (
           <Link key={section.href} href={section.href} className="card-premium p-5">
@@ -167,18 +167,17 @@ export default function DashboardOverview() {
       </div>
 
       <button onClick={load} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 hover:text-white">
-        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh overview
+        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
       </button>
     </div>
   )
 }
 
-function MetricCard({ label, value, source }: { label: string; value: string | number; source: string }) {
+function MetricCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
       <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-semibold text-white">{value}</p>
-      <p className="mt-2 text-[10px] text-slate-500">Source: {source}</p>
     </div>
   )
 }
