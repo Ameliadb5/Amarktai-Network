@@ -30,12 +30,12 @@ const GitHubTab = dynamic(() => import('../build-studio/tabs/GitHubTab'), { ssr:
 const CockpitTab = dynamic(() => import('../build-studio/tabs/CockpitTab'), { ssr: false })
 const AIPartnerWidget = dynamic(() => import('@/components/AIPartnerWidget'), { ssr: false })
 
-type TabKey = 'cockpit' | 'test-ai' | 'github' | 'build-app' | 'images' | 'voice' | 'video' | 'music' | 'compare' | 'workflows'
+type TabKey = 'cockpit' | 'ai-lab' | 'github' | 'build-app' | 'images' | 'voice' | 'video' | 'music' | 'compare' | 'workflows'
 
 const tabs: { key: TabKey; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }[] = [
   { key: 'cockpit',   label: 'Cockpit',   icon: Workflow    },
-  { key: 'test-ai',   label: 'Run Tasks',  icon: FlaskConical },
-  { key: 'github',    label: 'GitHub',     icon: FolderGit2  },
+  { key: 'ai-lab',    label: 'AI Lab',    icon: FlaskConical },
+  { key: 'github',    label: 'GitHub',    icon: FolderGit2  },
   { key: 'build-app', label: 'Build Apps', icon: Rocket      },
   { key: 'images',    label: 'Images',     icon: ImageIcon   },
   { key: 'voice',     label: 'Voice',      icon: Mic         },
@@ -52,8 +52,9 @@ interface UsageSummary {
 
 const SECTION_TO_TAB: Record<string, TabKey> = {
   'cockpit':  'cockpit',
-  'test-ai': 'test-ai',
-  test: 'test-ai',
+  'ai-lab':  'ai-lab',
+  'test-ai': 'ai-lab',
+  test: 'ai-lab',
   github: 'github',
   'build-app': 'build-app',
   build: 'build-app',
@@ -99,7 +100,7 @@ export default function WorkspacePage() {
     } else if (action.type === 'generate_image') {
       setActive('images')
     } else if (action.type === 'run_test') {
-      setActive('test-ai')
+      setActive('ai-lab')
     }
   }, [router])
 
@@ -137,7 +138,7 @@ export default function WorkspacePage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white">Workspace</h1>
-            <p className="mt-1 text-sm text-slate-400">AI developer cockpit — run tasks, edit GitHub repos, generate outputs, and deploy.</p>
+            <p className="mt-1 text-sm text-slate-400">AI developer cockpit — AI Lab, GitHub, media generation, app builder, and deploy.</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -152,6 +153,7 @@ export default function WorkspacePage() {
             <button
               onClick={() => setPartnerOpen((v) => !v)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs transition-all ${partnerOpen ? 'border-blue-400/40 bg-blue-400/10 text-blue-300' : 'border-white/10 bg-white/5 text-slate-400 hover:text-white'}`}
+              title="Aiva — AmarktAI Voice &amp; Intelligence Assistant"
             >
               {partnerOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
               Aiva
@@ -192,7 +194,7 @@ export default function WorkspacePage() {
       <div className={`grid gap-4 ${partnerOpen ? 'xl:grid-cols-[1fr_360px]' : 'grid-cols-1'}`}>
         <motion.div key={active} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {active === 'cockpit' && <CockpitTab />}
-          {active === 'test-ai' && <TestAITab />}
+          {active === 'ai-lab' && <TestAITab />}
           {active === 'github' && <GitHubTab />}
           {active === 'build-app' && (
             <div className="space-y-5">

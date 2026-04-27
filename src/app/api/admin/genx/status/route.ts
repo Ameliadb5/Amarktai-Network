@@ -1,20 +1,22 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import {
-  getGenXStatus,
+  getGenXStatusAsync,
   listGenXModels,
   getAdultCapabilityStatus,
+  getCachedEndpointProfile,
 } from '@/lib/genx-client'
 
 /**
  * GET /api/admin/genx/status
  *
  * Returns the live GenX execution layer status:
- *   - configured: whether GENX_API_URL is set
+ *   - configured: whether the AI Engine URL is set (env or DB)
  *   - available:  whether GenX responded to the last request
- *   - modelCount: number of models returned by /api/v1/models
+ *   - modelCount: number of models returned by the catalog endpoint
  *   - adultCapability: truthful adult content routing status
  *   - apiUrl:     masked origin (host only, no path or key)
+ *   - discoveredEndpoints: which endpoint paths were found on the server
  */
 export async function GET() {
   const session = await getSession()
@@ -22,7 +24,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const status = getGenXStatus()
+  const status = await getGenXStatusAsync()
   const adultStatus = getAdultCapabilityStatus()
 
   let modelCount = 0
@@ -46,6 +48,10 @@ export async function GET() {
     }
   }
 
+  // Expose the discovered endpoint profile so the UI can show which paths
+  // the system is using — helps diagnose 404/405 issues.
+  const profile = getCachedEndpointProfile()
+
   return NextResponse.json({
     configured:     status.available,
     available:      status.available,
@@ -57,5 +63,11 @@ export async function GET() {
       route:       adultStatus.route,
       reason:      adultStatus.note,
     },
+    discoveredEndpoints: profile ? {
+      catalogPath:  profile.catalogPath,
+      chatPath:     profile.chatPath,
+      generatePath: profile.generatePath,
+      probeAge:     Math.round((Date.now() - profile.probeTime) / 1000) + 's ago',
+    } : null,
   })
 }

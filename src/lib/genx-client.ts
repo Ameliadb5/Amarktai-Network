@@ -149,6 +149,8 @@ export interface GenXStatus {
 // ── Configuration ─────────────────────────────────────────────────────────────
 
 const GENX_TIMEOUT  = 60_000 // 60 s
+const PROBE_TIMEOUT = 10_000 // 10 s — fast probe only
+const ENDPOINT_PROFILE_TTL_MS = 5 * 60 * 1000 // 5 min
 
 /**
  * Whether adult content is supported by the connected GenX deployment.
@@ -157,6 +159,31 @@ const GENX_TIMEOUT  = 60_000 // 60 s
  */
 export const GENX_ADULT_CONTENT_SUPPORTED =
   process.env.GENX_ADULT_CONTENT_SUPPORTED === 'true'
+
+/**
+ * Discovered endpoint profile — set after probing the GenX deployment.
+ * All AI calls use these paths instead of hardcoded ones, eliminating
+ * 404/405 confusion when servers expose non-standard endpoint layouts.
+ */
+export interface GenXEndpointProfile {
+  baseUrl: string
+  /** Path that serves GET /models catalog, e.g. '/api/v1/models' or '/v1/models' */
+  catalogPath: string
+  /** Path for POST chat completions, e.g. '/v1/chat/completions' */
+  chatPath: string
+  /** Path for POST media generation, e.g. '/api/v1/generate' or '/v1/generate' */
+  generatePath: string
+  /** Unix timestamp when this profile was discovered */
+  probeTime: number
+}
+
+/** In-process profile cache (one per Node.js process / worker). */
+let _endpointProfile: GenXEndpointProfile | null = null
+
+/** Invalidate the cached endpoint profile, forcing re-discovery on next call. */
+export function invalidateEndpointProfile(): void {
+  _endpointProfile = null
+}
 
 /**
  * Resolve the active GenX API URL and key.
@@ -185,6 +212,106 @@ async function resolveGenXConfig(): Promise<{ apiUrl: string; apiKey: string }> 
   return { apiUrl, apiKey }
 }
 
+/**
+ * Normalise a raw URL to a clean base URL (no trailing slash, no
+ * well-known path suffixes).  Returns null when the URL is invalid.
+ */
+function normaliseBaseUrl(raw: string): string | null {
+  if (!raw) return null
+  let url: URL
+  try { url = new URL(raw) } catch { return null }
+  const clean = url.pathname
+    .replace(/\/api\/v1\/models\/?$/, '')
+    .replace(/\/v1\/models\/?$/, '')
+    .replace(/\/api\/v1\/?$/, '')
+    .replace(/\/v1\/?$/, '')
+    .replace(/\/api\/?$/, '')
+    .replace(/\/$/, '')
+  return `${url.origin}${clean}`
+}
+
+/** Attempt a single probe request; return true when the endpoint is alive. */
+async function probeEndpoint(
+  url: string,
+  method: 'GET' | 'POST',
+  headers: Record<string, string>,
+  body?: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers,
+      body,
+      signal: AbortSignal.timeout(PROBE_TIMEOUT),
+    })
+    // Any response except 404/405 means the endpoint exists
+    return res.status !== 404 && res.status !== 405
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Discover working endpoint paths by probing the GenX deployment.
+ *
+ * Catalog candidates:   /api/v1/models  →  /v1/models
+ * Chat candidates:      /v1/chat/completions  (standard OpenAI-compat path)
+ * Generate candidates:  /api/v1/generate  →  /v1/generate
+ *
+ * Caches the discovered profile for ENDPOINT_PROFILE_TTL_MS (5 min).
+ * If all catalog probes fail the profile still records the default paths
+ * so callers receive a clear error rather than a silent wrong URL.
+ */
+async function discoverEndpointProfile(baseUrl: string, apiKey: string): Promise<GenXEndpointProfile> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+
+  // Probe catalog
+  let catalogPath = '/api/v1/models'
+  if (!await probeEndpoint(`${baseUrl}/api/v1/models`, 'GET', headers)) {
+    if (await probeEndpoint(`${baseUrl}/v1/models`, 'GET', headers)) {
+      catalogPath = '/v1/models'
+    }
+  }
+
+  // Chat completions — only one standard path in OpenAI-compat APIs
+  const chatPath = '/v1/chat/completions'
+
+  // Probe generate
+  const genProbeBody = JSON.stringify({ model: '__probe__', type: 'image', prompt: 'probe' })
+  let generatePath = '/api/v1/generate'
+  if (!await probeEndpoint(`${baseUrl}/api/v1/generate`, 'POST', headers, genProbeBody)) {
+    if (await probeEndpoint(`${baseUrl}/v1/generate`, 'POST', headers, genProbeBody)) {
+      generatePath = '/v1/generate'
+    }
+  }
+
+  return { baseUrl, catalogPath, chatPath, generatePath, probeTime: Date.now() }
+}
+
+/**
+ * Return a cached or freshly-discovered endpoint profile.
+ * Re-probes when the cached profile is older than ENDPOINT_PROFILE_TTL_MS
+ * or when the configured baseUrl changes.
+ */
+async function getEndpointProfile(): Promise<GenXEndpointProfile | null> {
+  const { apiUrl, apiKey } = await resolveGenXConfig()
+  const baseUrl = normaliseBaseUrl(apiUrl)
+  if (!baseUrl) return null
+
+  const now = Date.now()
+  if (
+    _endpointProfile &&
+    _endpointProfile.baseUrl === baseUrl &&
+    now - _endpointProfile.probeTime < ENDPOINT_PROFILE_TTL_MS
+  ) {
+    return _endpointProfile
+  }
+
+  const profile = await discoverEndpointProfile(baseUrl, apiKey)
+  _endpointProfile = profile
+  return profile
+}
 
 async function buildHeaders(): Promise<Record<string, string>> {
   const { apiKey } = await resolveGenXConfig()
@@ -226,16 +353,16 @@ let _modelCache: GenXModel[] | null = null
 let _modelCacheAge = 0
 const MODEL_CACHE_TTL_MS = 5 * 60 * 1000
 
-/** Fetch the GenX model catalog. Returns empty array when GenX is unavailable. */
+/** Fetch the GenX model catalog using the discovered catalog endpoint. */
 export async function listGenXModels(): Promise<GenXModel[]> {
-  const { apiUrl } = await resolveGenXConfig()
-  if (!apiUrl) return []
+  const profile = await getEndpointProfile()
+  if (!profile) return []
 
   const now = Date.now()
   if (_modelCache && now - _modelCacheAge < MODEL_CACHE_TTL_MS) return _modelCache
 
   try {
-    const res = await fetch(`${apiUrl}/api/v1/models`, {
+    const res = await fetch(`${profile.baseUrl}${profile.catalogPath}`, {
       headers: await buildHeaders(),
       signal: AbortSignal.timeout(GENX_TIMEOUT),
     })
@@ -340,14 +467,14 @@ function resolveDefaultByOperation(operationType: GenXOperationType): string {
 // ── Chat Execution ────────────────────────────────────────────────────────────
 
 /**
- * Call GenX /v1/chat/completions.
+ * Call GenX chat completions using the discovered chatPath.
  * Returns a normalised result. Never throws.
  */
 export async function callGenXChat(request: GenXChatRequest): Promise<GenXCallResult> {
   const start = Date.now()
 
-  const { apiUrl } = await resolveGenXConfig()
-  if (!apiUrl) {
+  const profile = await getEndpointProfile()
+  if (!profile) {
     return {
       success: false, output: null, model: request.model,
       usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
@@ -355,8 +482,10 @@ export async function callGenXChat(request: GenXChatRequest): Promise<GenXCallRe
     }
   }
 
+  const chatUrl = `${profile.baseUrl}${profile.chatPath}`
+
   try {
-    const res = await fetch(`${apiUrl}/v1/chat/completions`, {
+    const res = await fetch(chatUrl, {
       method: 'POST',
       headers: await buildHeaders(),
       body: JSON.stringify(request),
@@ -401,14 +530,14 @@ export async function callGenXChat(request: GenXChatRequest): Promise<GenXCallRe
 // ── Media Generation ──────────────────────────────────────────────────────────
 
 /**
- * Call GenX /api/v1/generate for media (image / video / audio).
+ * Call GenX media generation using the discovered generatePath.
  * Returns a normalised result. Never throws.
  */
 export async function callGenXMedia(request: GenXMediaRequest): Promise<GenXMediaResult> {
   const start = Date.now()
 
-  const { apiUrl } = await resolveGenXConfig()
-  if (!apiUrl) {
+  const profile = await getEndpointProfile()
+  if (!profile) {
     return {
       success: false, url: null, jobId: null, status: 'failed',
       model: request.model, latencyMs: 0,
@@ -416,8 +545,10 @@ export async function callGenXMedia(request: GenXMediaRequest): Promise<GenXMedi
     }
   }
 
+  const generateUrl = `${profile.baseUrl}${profile.generatePath}`
+
   try {
-    const res = await fetch(`${apiUrl}/api/v1/generate`, {
+    const res = await fetch(generateUrl, {
       method: 'POST',
       headers: await buildHeaders(),
       body: JSON.stringify(request),
@@ -461,11 +592,11 @@ export async function callGenXMedia(request: GenXMediaRequest): Promise<GenXMedi
  * Poll GenX /api/v1/jobs/:id for async job status.
  */
 export async function getGenXJobStatus(jobId: string): Promise<GenXJobStatus | null> {
-  const { apiUrl } = await resolveGenXConfig()
-  if (!apiUrl) return null
+  const profile = await getEndpointProfile()
+  if (!profile) return null
 
   try {
-    const res = await fetch(`${apiUrl}/api/v1/jobs/${encodeURIComponent(jobId)}`, {
+    const res = await fetch(`${profile.baseUrl}/api/v1/jobs/${encodeURIComponent(jobId)}`, {
       headers: await buildHeaders(),
       signal: AbortSignal.timeout(GENX_TIMEOUT),
     })
@@ -474,6 +605,14 @@ export async function getGenXJobStatus(jobId: string): Promise<GenXJobStatus | n
   } catch {
     return null
   }
+}
+
+/**
+ * Return the currently cached endpoint profile (if any).
+ * Used by the status route to expose which endpoints were discovered.
+ */
+export function getCachedEndpointProfile(): GenXEndpointProfile | null {
+  return _endpointProfile
 }
 
 // ── Adult Capability ──────────────────────────────────────────────────────────

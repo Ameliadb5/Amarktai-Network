@@ -54,6 +54,24 @@ interface DbStats {
   brainEventCount: number
   workspaceSessionCount: number
   alertCount: number
+  aiUsage?: {
+    totalRequestsThisMonth: number
+    recentWorkspaceSessions: number
+    byProvider: Record<string, number>
+  }
+  storage?: {
+    driver: string
+    configured: boolean
+    basePath: string
+    totalArtifacts: number
+    totalStorageBytes: number
+    totalStorageMb: number
+  }
+  providers?: {
+    failures: Array<{ key: string; name: string; status: string }>
+    failureCount: number
+    allProviders: Array<{ key: string; name: string; status: string }>
+  }
 }
 
 interface Recommendation {
@@ -255,9 +273,88 @@ export default function MonitorPage() {
           <h2 className="text-xs uppercase tracking-[0.14em] text-slate-500 mb-3">Platform Stats</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard icon={Database} label="Artifacts" value={dbStats.artifactCount.toLocaleString()} />
-            <StatCard icon={Zap} label="AI Requests" value={dbStats.brainEventCount.toLocaleString()} />
+            <StatCard icon={Zap} label="AI Requests (all)" value={dbStats.brainEventCount.toLocaleString()} />
             <StatCard icon={Activity} label="Workspace Sessions" value={dbStats.workspaceSessionCount.toLocaleString()} />
             <StatCard icon={AlertTriangle} label="Active Alerts" value={dbStats.alertCount.toLocaleString()} highlight={dbStats.alertCount > 0} />
+          </div>
+        </motion.div>
+      )}
+
+      {/* AI Usage (30 days) */}
+      {dbStats?.aiUsage && (
+        <motion.div variants={fadeUp}>
+          <h2 className="text-xs uppercase tracking-[0.14em] text-slate-500 mb-3">AI Usage — Last 30 Days</h2>
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+              <div>
+                <p className="text-[11px] text-slate-500 uppercase tracking-[0.1em]">AI Requests</p>
+                <p className="text-xl font-semibold text-cyan-300 mt-0.5">{dbStats.aiUsage.totalRequestsThisMonth.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-500 uppercase tracking-[0.1em]">Workspace Sessions</p>
+                <p className="text-xl font-semibold text-white mt-0.5">{dbStats.aiUsage.recentWorkspaceSessions.toLocaleString()}</p>
+              </div>
+            </div>
+            {Object.keys(dbStats.aiUsage.byProvider).length > 0 && (
+              <div>
+                <p className="text-[11px] text-slate-500 mb-2">By Provider</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(dbStats.aiUsage.byProvider)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([provider, count]) => (
+                      <span key={provider} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-300">
+                        {provider || 'unknown'} · {count.toLocaleString()}
+                      </span>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Storage */}
+      {dbStats?.storage && (
+        <motion.div variants={fadeUp}>
+          <h2 className="text-xs uppercase tracking-[0.14em] text-slate-500 mb-3">Storage</h2>
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-[11px] text-slate-500 uppercase tracking-[0.1em]">Driver</p>
+                <p className="text-sm font-semibold text-white mt-0.5 capitalize">{dbStats.storage.driver.replace('_', ' ')}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-500 uppercase tracking-[0.1em]">Artifacts Stored</p>
+                <p className="text-sm font-semibold text-white mt-0.5">{dbStats.storage.totalArtifacts.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-500 uppercase tracking-[0.1em]">Storage Used</p>
+                <p className="text-sm font-semibold text-white mt-0.5">{dbStats.storage.totalStorageMb.toFixed(1)} MB</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-500 uppercase tracking-[0.1em]">Status</p>
+                <p className={`text-sm font-semibold mt-0.5 ${dbStats.storage.configured ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {dbStats.storage.configured ? 'Configured' : 'Not configured'}
+                </p>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-600 mt-3 truncate">{dbStats.storage.basePath}</p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Provider Failures */}
+      {dbStats?.providers && dbStats.providers.failureCount > 0 && (
+        <motion.div variants={fadeUp}>
+          <h2 className="text-xs uppercase tracking-[0.14em] text-slate-500 mb-3">Provider Failures</h2>
+          <div className="space-y-2">
+            {dbStats.providers.failures.map((p) => (
+              <div key={p.key} className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2">
+                <XCircle className="h-4 w-4 text-red-400 shrink-0" />
+                <span className="text-sm text-red-300">{p.name || p.key}</span>
+                <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-red-400/10 text-red-400 capitalize">{p.status}</span>
+              </div>
+            ))}
           </div>
         </motion.div>
       )}

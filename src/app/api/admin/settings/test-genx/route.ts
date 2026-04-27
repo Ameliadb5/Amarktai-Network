@@ -140,36 +140,42 @@ export async function POST(req: NextRequest) {
     maskedUrl = baseUrl
   }
 
-  const catalogUrl  = `${baseUrl}/api/v1/models`
-  const chatUrl     = `${baseUrl}/v1/chat/completions`
-  const generateUrl = `${baseUrl}/api/v1/generate`
+  const catalogUrls  = [`${baseUrl}/api/v1/models`, `${baseUrl}/v1/models`]
+  const chatUrl      = `${baseUrl}/v1/chat/completions`
+  const generateUrls = [`${baseUrl}/api/v1/generate`, `${baseUrl}/v1/generate`]
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
 
   const start = Date.now()
 
-  // ── Test 1: Model catalog ─────────────────────────────────────────────────
+  // ── Test 1: Model catalog — try /api/v1/models then /v1/models ────────────
   let catalogOk = false
   let catalogError: string | undefined
   let modelCount = 0
+  let resolvedCatalogUrl = catalogUrls[0]
 
-  try {
-    // lgtm[js/request-forgery] — URL is validated above (protocol + private-IP checks); admin-only endpoint
-    const res = await fetch(catalogUrl, {
-      headers,
-      signal: AbortSignal.timeout(15_000),
-    })
-    if (res.ok) {
-      const data = await res.json() as { models?: unknown[] } | unknown[]
-      const models = Array.isArray(data) ? data : ((data as { models?: unknown[] }).models ?? [])
-      modelCount = models.length
-      catalogOk = true
-    } else {
-      catalogError = httpStatusToError(res.status)
+  for (const url of catalogUrls) {
+    try {
+      // lgtm[js/request-forgery] — URL is validated above (protocol + private-IP checks); admin-only endpoint
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (res.ok) {
+        const data = await res.json() as { models?: unknown[] } | unknown[]
+        const models = Array.isArray(data) ? data : ((data as { models?: unknown[] }).models ?? [])
+        modelCount = models.length
+        catalogOk = true
+        resolvedCatalogUrl = url
+        catalogError = undefined
+        break
+      } else {
+        catalogError = httpStatusToError(res.status)
+      }
+    } catch (err) {
+      catalogError = err instanceof Error ? err.message : 'catalog request failed'
     }
-  } catch (err) {
-    catalogError = err instanceof Error ? err.message : 'catalog request failed'
   }
 
   // ── Test 2: Chat completions ──────────────────────────────────────────────
@@ -198,35 +204,49 @@ export async function POST(req: NextRequest) {
     chatError = err instanceof Error ? err.message : 'chat request failed'
   }
 
-  // ── Test 3: Media generate endpoint ──────────────────────────────────────
+  // ── Test 3: Media generate — try /api/v1/generate then /v1/generate ───────
   // Use a minimal dry-run probe (no actual generation). If the endpoint responds
   // (even with 400/422 for a missing required field), it is reachable.
   let generateOk = false
   let generateNotTested = false
   let generateError: string | undefined
+  let resolvedGenerateUrl = generateUrls[0]
 
-  try {
-    // lgtm[js/request-forgery] — URL validated above; admin-only endpoint
-    const res = await fetch(generateUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ model: '__probe__', type: 'image', prompt: 'probe' }),
-      signal: AbortSignal.timeout(10_000),
-    })
-    // 200/202 → ok; 400/422/415 → endpoint exists but rejected the probe request (expected)
-    if (res.ok || res.status === 400 || res.status === 422 || res.status === 415) {
-      generateOk = true
-    } else if (res.status === 404) {
-      generateNotTested = true
-      generateError = 'generate endpoint not found at tested path'
-    } else {
-      generateError = httpStatusToError(res.status)
+  for (const url of generateUrls) {
+    try {
+      // lgtm[js/request-forgery] — URL validated above; admin-only endpoint
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ model: '__probe__', type: 'image', prompt: 'probe' }),
+        signal: AbortSignal.timeout(10_000),
+      })
+      // 200/202 → ok; 400/422/415 → endpoint exists but rejected the probe request (expected)
+      if (res.ok || res.status === 400 || res.status === 422 || res.status === 415) {
+        generateOk = true
+        resolvedGenerateUrl = url
+        generateError = undefined
+        generateNotTested = false
+        break
+      } else if (res.status === 404) {
+        generateError = `generate endpoint not found at ${url} (last attempted path)`
+      } else {
+        generateError = `${httpStatusToError(res.status)} (last attempted: ${url})`
+      }
+    } catch (err) {
+      generateError = err instanceof Error ? err.message : 'generate request failed'
     }
-  } catch (err) {
-    // Network error — mark as not tested rather than failing the whole test
-    generateNotTested = true
-    generateError = err instanceof Error ? err.message : 'generate request failed'
   }
+
+  if (!generateOk && !generateError) {
+    generateNotTested = true
+    generateError = 'generate endpoint not found at any tested path'
+  }
+
+  // Invalidate the in-process endpoint profile cache so the next real AI call
+  // re-probes using the newly validated configuration.
+  const { invalidateEndpointProfile } = await import('@/lib/genx-client')
+  invalidateEndpointProfile()
 
   const latencyMs = Date.now() - start
   const success = catalogOk && chatOk
@@ -240,7 +260,13 @@ export async function POST(req: NextRequest) {
     modelCount,
     latencyMs,
     apiUrl: maskedUrl,
-    testedUrls: { catalog: catalogUrl, chat: chatUrl, generate: generateUrl },
+    testedUrls: {
+      catalog:  resolvedCatalogUrl,
+      chat:     chatUrl,
+      generate: resolvedGenerateUrl,
+      allCatalogTested:  catalogUrls,
+      allGenerateTested: generateUrls,
+    },
     ...(catalogError  ? { catalogError }  : {}),
     ...(chatError     ? { chatError }     : {}),
     ...(generateError ? { generateError } : {}),

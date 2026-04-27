@@ -77,10 +77,15 @@ export async function POST(req: NextRequest) {
   // ── VPS Local (persistent) ──
   if (driver === 'local_vps') {
     const VPS_BASE = '/var/www/amarktai/storage'
+    const REQUIRED_SUBDIRS = ['artifacts', 'workspaces', 'repos', 'uploads', 'logs']
     const start = Date.now()
     try {
       const { mkdir, writeFile, unlink } = await import('fs/promises')
-      await mkdir(VPS_BASE, { recursive: true })
+      // Ensure all required subdirectories exist
+      await Promise.all([
+        mkdir(VPS_BASE, { recursive: true }),
+        ...REQUIRED_SUBDIRS.map(sub => mkdir(`${VPS_BASE}/${sub}`, { recursive: true })),
+      ])
       const testFile = `${VPS_BASE}/.write-test-${Date.now()}`
       await writeFile(testFile, 'test')
       await unlink(testFile)
@@ -89,6 +94,7 @@ export async function POST(req: NextRequest) {
         driver: 'local_vps',
         persistent: true,
         basePath: VPS_BASE,
+        subdirectories: REQUIRED_SUBDIRS,
         latencyMs: Date.now() - start,
       })
     } catch (err) {

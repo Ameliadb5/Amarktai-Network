@@ -99,7 +99,7 @@ class VpsLocalStorageDriver implements StorageDriver {
 
   /** Ensure all required subdirectories exist. */
   async ensureDirectories(): Promise<void> {
-    for (const sub of ['artifacts', 'workspaces', 'logs']) {
+    for (const sub of ['artifacts', 'workspaces', 'repos', 'uploads', 'logs']) {
       await fs.mkdir(path.join(VPS_STORAGE_BASE, sub), { recursive: true })
     }
   }

@@ -427,7 +427,10 @@ export default function AIPartnerWidget({ open, onClose, onAction, variant = 'fl
               <Bot className="w-3.5 h-3.5 text-white" />
             </motion.div>
           </div>
-          <span className="text-sm font-medium text-white">Aiva</span>
+          <div>
+            <span className="text-sm font-medium text-white">Aiva</span>
+            <p className="text-[10px] text-slate-500 leading-tight">AmarktAI Voice &amp; Intelligence Assistant</p>
+          </div>
           <span className={`text-[10px] rounded-full px-2 py-0.5 transition-colors ${
             voiceError ? 'text-red-300 bg-red-400/10' :
             speaking ? 'text-cyan-300 bg-cyan-400/10' :
