@@ -1,18 +1,17 @@
 'use client'
 
 /**
- * Aiva Avatar Generation Helper
+ * Aiva Avatar Generation — Admin Dashboard
  *
- * Admin UI to generate, preview, and slot avatar assets for each Aiva state
- * using the GenX image_generation capability via /api/brain/execute.
- *
- * Outputs: 512×512 PNG files saved to /public/aiva/ (via download — admin
- * manually copies them to the server or uploads to storage).
+ * Generates, previews, and persists avatar images for each Aiva state.
+ * Images are generated via /api/brain/execute (capability=image_generation),
+ * saved as Artifacts, then stored in the AivaAvatarConfig table via
+ * /api/admin/aiva/avatar-config so AivaAssistant loads them dynamically.
  *
  * Route: /admin/dashboard/settings/aiva-avatar
  */
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Sparkles,
   Download,
@@ -22,10 +21,12 @@ import {
   Loader2,
   Image as ImageIcon,
   Info,
+  Save,
+  Database,
 } from 'lucide-react'
 import { AIVA_AVATAR_ASSETS } from '@/components/AivaAssistant'
 
-// ── Avatar State Definitions ─────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type AvatarState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error'
 
@@ -36,6 +37,14 @@ interface StateConfig {
   targetPath: string
   glowColor: string
 }
+
+interface SavedConfig {
+  artifactId: string | null
+  imageUrl: string
+  prompt: string
+}
+
+// ── State Definitions ─────────────────────────────────────────────────────────
 
 const STATE_CONFIGS: StateConfig[] = [
   {
@@ -75,10 +84,6 @@ const STATE_CONFIGS: StateConfig[] = [
   },
 ]
 
-/**
- * Core prompt template for Aiva avatar generation.
- * Insert the expression hint to produce a state-specific image.
- */
 function buildPrompt(expressionHint: string): string {
   return (
     `Semi-realistic futuristic female AI assistant avatar, ${expressionHint}, ` +
@@ -89,40 +94,41 @@ function buildPrompt(expressionHint: string): string {
   )
 }
 
-// ── Components ────────────────────────────────────────────────────────────────
+// ── PromptBlock ───────────────────────────────────────────────────────────────
 
 function PromptBlock({ prompt }: { prompt: string }) {
   const [copied, setCopied] = useState(false)
-
   async function copy() {
     await navigator.clipboard.writeText(prompt)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
-
   return (
     <div className="mt-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
       <p className="text-[11px] text-slate-400 leading-relaxed font-mono">{prompt}</p>
-      <button
-        onClick={copy}
-        className="mt-2 text-[10px] text-cyan-400 hover:text-cyan-300 transition"
-      >
+      <button onClick={copy} className="mt-2 text-[10px] text-cyan-400 hover:text-cyan-300 transition">
         {copied ? '✓ Copied' : 'Copy prompt'}
       </button>
     </div>
   )
 }
 
+// ── GenerateCard ──────────────────────────────────────────────────────────────
+
 interface GenerateCardProps {
   config: StateConfig
+  saved: SavedConfig | null
+  onSaved: (state: AvatarState, cfg: SavedConfig) => void
 }
 
-function GenerateCard({ config }: GenerateCardProps) {
+function GenerateCard({ config, saved, onSaved }: GenerateCardProps) {
   const [generating, setGenerating] = useState(false)
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(saved?.imageUrl || null)
+  const [artifactId, setArtifactId] = useState<string | null>(saved?.artifactId || null)
   const [error, setError] = useState<string | null>(null)
   const [customPromptSuffix, setCustomPromptSuffix] = useState('')
-  const [saveAsArtifact, setSaveAsArtifact] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedToAiva, setSavedToAiva] = useState(!!saved?.imageUrl)
 
   const prompt = buildPrompt(
     config.expressionHint + (customPromptSuffix ? ', ' + customPromptSuffix : ''),
@@ -132,6 +138,8 @@ function GenerateCard({ config }: GenerateCardProps) {
     setGenerating(true)
     setError(null)
     setImageUrl(null)
+    setArtifactId(null)
+    setSavedToAiva(false)
     try {
       const res = await fetch('/api/brain/execute', {
         method: 'POST',
@@ -139,26 +147,57 @@ function GenerateCard({ config }: GenerateCardProps) {
         body: JSON.stringify({
           input: prompt,
           capability: 'image_generation',
-          saveArtifact: saveAsArtifact,
+          saveArtifact: true,
         }),
       })
-      const data = await res.json()
+      const data = await res.json() as {
+        success: boolean; output?: string; outputType?: string;
+        artifactId?: string; error?: string; warning?: string;
+      }
       if (!data.success) {
         setError(data.error ?? data.warning ?? 'Generation failed')
         return
       }
-      const out = data.output
-      if (typeof out === 'string' && out.startsWith('data:')) {
+      const out = data.output ?? ''
+      if ((typeof out === 'string') && (out.startsWith('data:') || out.startsWith('http'))) {
         setImageUrl(out)
-      } else if (typeof out === 'string' && out.startsWith('http')) {
-        setImageUrl(out)
+        setArtifactId(data.artifactId ?? null)
       } else {
-        setError('Unexpected output type: ' + data.outputType + '. Provider may not support image generation.')
+        setError('Unexpected output type: ' + (data.outputType ?? 'unknown') + '. Provider may not support image generation.')
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Request failed')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  async function saveToAiva() {
+    if (!imageUrl) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/aiva/avatar-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          state: config.state,
+          imageUrl,
+          artifactId: artifactId ?? undefined,
+          prompt,
+        }),
+      })
+      const data = await res.json() as { success: boolean; error?: string }
+      if (!data.success) {
+        setError(data.error ?? 'Failed to save avatar config')
+        return
+      }
+      setSavedToAiva(true)
+      onSaved(config.state, { imageUrl, artifactId, prompt })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -180,8 +219,33 @@ function GenerateCard({ config }: GenerateCardProps) {
           style={{ background: config.glowColor, boxShadow: `0 0 6px ${config.glowColor}` }}
         />
         <span className="text-sm font-semibold text-white">{config.label}</span>
-        <span className="ml-auto text-[10px] text-slate-600">{config.targetPath}</span>
+        {savedToAiva && (
+          <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400">
+            <Database className="h-3 w-3" /> Saved to Aiva
+          </span>
+        )}
+        {!savedToAiva && (
+          <span className="ml-auto text-[10px] text-slate-600">{config.targetPath}</span>
+        )}
       </div>
+
+      {/* Saved preview */}
+      {savedToAiva && saved?.imageUrl && (
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={saved.imageUrl}
+            alt={`Saved Aiva ${config.state} avatar`}
+            className="h-12 w-12 rounded-full object-cover"
+          />
+          <div>
+            <p className="text-xs text-emerald-400 font-medium">Active avatar image</p>
+            {saved.artifactId && (
+              <p className="text-[10px] text-slate-500 font-mono mt-0.5">artifact: {saved.artifactId.slice(0, 16)}…</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Expression hint */}
       <p className="text-xs text-slate-500 italic">{config.expressionHint}</p>
@@ -193,20 +257,9 @@ function GenerateCard({ config }: GenerateCardProps) {
       <input
         value={customPromptSuffix}
         onChange={e => setCustomPromptSuffix(e.target.value)}
-        placeholder="Optional: add extra details to prompt…"
+        placeholder="Optional: add extra prompt details…"
         className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-cyan-400/40"
       />
-
-      {/* Save as artifact toggle */}
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={saveAsArtifact}
-          onChange={e => setSaveAsArtifact(e.target.checked)}
-          className="accent-cyan-400 h-4 w-4"
-        />
-        <span className="text-xs text-slate-400">Save as artifact (for versioning &amp; tracking)</span>
-      </label>
 
       {/* Generate button */}
       <button
@@ -214,11 +267,7 @@ function GenerateCard({ config }: GenerateCardProps) {
         disabled={generating}
         className="flex items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-xs text-cyan-400 transition hover:bg-cyan-400/20 disabled:opacity-40"
       >
-        {generating ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Sparkles className="h-3.5 w-3.5" />
-        )}
+        {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
         {generating ? 'Generating…' : 'Generate via GenX'}
       </button>
 
@@ -230,7 +279,7 @@ function GenerateCard({ config }: GenerateCardProps) {
         </div>
       )}
 
-      {/* Preview + download */}
+      {/* Preview + save + download */}
       {imageUrl && (
         <div className="space-y-2">
           <div
@@ -247,17 +296,26 @@ function GenerateCard({ config }: GenerateCardProps) {
           <div className="flex items-center gap-2 justify-center">
             <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
             <span className="text-xs text-emerald-400">Generated</span>
+            {artifactId && <span className="text-[10px] text-slate-500 font-mono">·&nbsp;artifact saved</span>}
           </div>
+
+          {/* Save to Aiva */}
+          <button
+            onClick={saveToAiva}
+            disabled={saving || savedToAiva}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-xs text-emerald-400 transition hover:bg-emerald-400/20 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {savedToAiva ? '✓ Saved to Aiva' : saving ? 'Saving…' : 'Save as Aiva Avatar'}
+          </button>
+
           <button
             onClick={downloadImage}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-300 transition hover:text-white"
           >
             <Download className="h-3.5 w-3.5" />
-            Download — save as <code className="text-cyan-400">{config.targetPath}</code>
+            Download PNG
           </button>
-          <p className="text-[10px] text-slate-600 text-center">
-            Place the file at <code className="text-slate-400">public{config.targetPath}</code> on the server.
-          </p>
         </div>
       )}
     </div>
@@ -267,6 +325,41 @@ function GenerateCard({ config }: GenerateCardProps) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AivaAvatarPage() {
+  const [savedConfigs, setSavedConfigs] = useState<Record<AvatarState, SavedConfig | null>>({
+    idle: null, listening: null, thinking: null, speaking: null, error: null,
+  })
+  const [loadingConfigs, setLoadingConfigs] = useState(true)
+
+  // Load existing saved configs on mount
+  const loadConfigs = useCallback(async () => {
+    setLoadingConfigs(true)
+    try {
+      const res = await fetch('/api/admin/aiva/avatar-config')
+      const data = await res.json() as { config?: Record<string, SavedConfig> }
+      if (data.config) {
+        setSavedConfigs({
+          idle: data.config.idle ?? null,
+          listening: data.config.listening ?? null,
+          thinking: data.config.thinking ?? null,
+          speaking: data.config.speaking ?? null,
+          error: data.config.error ?? null,
+        })
+      }
+    } catch {
+      // Non-fatal
+    } finally {
+      setLoadingConfigs(false)
+    }
+  }, [])
+
+  useEffect(() => { loadConfigs() }, [loadConfigs])
+
+  function handleSaved(state: AvatarState, cfg: SavedConfig) {
+    setSavedConfigs(prev => ({ ...prev, [state]: cfg }))
+  }
+
+  const savedCount = Object.values(savedConfigs).filter(c => c?.imageUrl).length
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
@@ -274,11 +367,17 @@ export default function AivaAvatarPage() {
         <div className="flex items-center gap-3 mb-2">
           <ImageIcon className="h-6 w-6 text-cyan-400" />
           <h1 className="text-2xl font-bold text-white">Aiva Avatar Generator</h1>
+          {!loadingConfigs && savedCount > 0 && (
+            <span className="ml-auto text-xs text-emerald-400 flex items-center gap-1">
+              <Database className="h-3.5 w-3.5" />
+              {savedCount}/5 states saved
+            </span>
+          )}
         </div>
         <p className="text-sm text-slate-400">
-          Generate avatar images for each Aiva state using the GenX image_generation capability.
-          Assets are saved to <code className="text-cyan-400">/public/aiva/</code>.
-          Aiva automatically falls back to the animated SVG orb if an image is missing or fails to load.
+          Generate avatar images for each Aiva state via the GenX image_generation capability.
+          Images are saved as artifacts and stored in the DB — Aiva loads them automatically.
+          Falls back to the animated SVG orb if an image is missing.
         </p>
       </div>
 
@@ -288,24 +387,33 @@ export default function AivaAvatarPage() {
         <div className="space-y-1">
           <p className="font-medium">How to use</p>
           <ol className="text-xs text-slate-400 space-y-1 list-decimal list-inside">
-            <li>Generate each avatar state using GenX below (requires GENX_API_KEY + image model).</li>
-            <li>Download each image and place it at the path shown (e.g. <code className="text-slate-300">public/aiva/avatar-idle.png</code>).</li>
-            <li>Restart or redeploy — Aiva will automatically use the images.</li>
+            <li>Generate each avatar state using the GenX button below (requires image model).</li>
+            <li>Click <strong className="text-slate-200">Save as Aiva Avatar</strong> — the image URL is stored in the DB.</li>
+            <li>Aiva will immediately use the saved image for that state — no server restart needed.</li>
             <li>If an image fails to load, the animated orb fallback activates automatically.</li>
           </ol>
         </div>
       </div>
 
-      {/* Regenerate all note */}
+      {/* Progress */}
       <div className="flex items-center gap-2 text-xs text-slate-500">
         <RefreshCw className="h-3 w-3" />
-        Generate all 5 states to complete the avatar set.
+        {loadingConfigs
+          ? 'Loading saved configs…'
+          : savedCount === 5
+            ? '✓ All 5 avatar states configured.'
+            : `Generate and save all 5 states to complete the avatar set. (${savedCount}/5 saved)`}
       </div>
 
       {/* State cards */}
       <div className="grid gap-5 sm:grid-cols-1 lg:grid-cols-2">
         {STATE_CONFIGS.map(cfg => (
-          <GenerateCard key={cfg.state} config={cfg} />
+          <GenerateCard
+            key={cfg.state}
+            config={cfg}
+            saved={savedConfigs[cfg.state]}
+            onSaved={handleSaved}
+          />
         ))}
       </div>
 
@@ -322,9 +430,12 @@ export default function AivaAvatarPage() {
           <li>512×512 square portrait</li>
         </ul>
         <p className="text-[11px] text-slate-600">
-          Tip: Regenerate with a custom suffix to fine-tune the result. E.g. &ldquo;wearing a sleek black jacket&rdquo; or &ldquo;holographic UI panels in background&rdquo;.
+          Tip: Add a custom suffix to fine-tune the result — e.g. &ldquo;wearing a sleek black jacket&rdquo; or &ldquo;holographic UI panels in background&rdquo;.
         </p>
       </div>
     </div>
   )
 }
+
+
+
