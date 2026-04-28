@@ -188,17 +188,18 @@ const HEALTH: Record<string, { color: string; icon: typeof CheckCircle; label: s
   offline:  { color: 'text-slate-500',   icon: WifiOff,     label: 'Offline' },
 }
 
-const TABS = ['Overview', 'AI Stack', 'Agents', 'Metrics', 'Learning', 'Strategy', 'Events', 'Safety'] as const
+const TABS = ['Overview', 'AI Stack', 'Agents', 'Intelligence', 'Metrics', 'Learning', 'Strategy', 'Events', 'Safety'] as const
 type Tab = (typeof TABS)[number]
 const TAB_ICONS: Record<Tab, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
-  Overview:  LayoutDashboard,
-  'AI Stack': Brain,
-  Agents:    Bot,
-  Metrics:   BarChart3,
-  Learning:  BookOpen,
-  Strategy:  Target,
-  Events:    FileText,
-  Safety:    Shield,
+  Overview:      LayoutDashboard,
+  'AI Stack':    Brain,
+  Agents:        Bot,
+  Intelligence:  Globe,
+  Metrics:       BarChart3,
+  Learning:      BookOpen,
+  Strategy:      Target,
+  Events:        FileText,
+  Safety:        Shield,
 }
 
 const fadeUp = {
@@ -397,6 +398,7 @@ export default function AppDetailPage() {
         {tab === 'Overview' && <OverviewTab app={app} />}
         {tab === 'AI Stack' && <AIStackTab app={app} />}
         {tab === 'Agents' && <AgentsTab appSlug={app.slug} appId={app.slug} appSecret={app.appSecret} productId={app.id} onSecretRotated={(newSecret) => setApp(prev => prev ? { ...prev, appSecret: newSecret } : prev)} />}
+        {tab === 'Intelligence' && <IntelligenceTab appSlug={app.slug} websiteUrl={app.primaryUrl} appName={app.name} />}
         {tab === 'Metrics' && <MetricsTab appSlug={app.slug} />}
         {tab === 'Learning' && <AppLearningTab appSlug={app.slug} />}
         {tab === 'Strategy' && <StrategyTab appSlug={app.slug} appName={app.name} appCategory={app.category} />}
@@ -1944,6 +1946,266 @@ function SafetyTab({ appSlug }: { appSlug: string }) {
           All prompts are scanned before generation. CSAM, violence, self-harm, and hate speech are always blocked.
         </p>
       </div>
+    </div>
+  )
+}
+
+/* ── Tab: Intelligence ─────────────────────────────────────── */
+
+interface IntelligenceProfile {
+  id: string
+  appSlug: string
+  websiteUrl: string
+  businessType: string
+  brandSummary: string
+  tone: string
+  targetUsers: string[]
+  productsServices: string[]
+  supportKnowledge: string
+  contentTopics: string[]
+  risks: string[]
+  recommendedCapabilities: string[]
+  recommendedModelPackage: Record<string, unknown>
+  crawlSummary: string
+  crawlArtifactId: string | null
+  lastCrawledAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+function IntelligenceTab({ appSlug, websiteUrl: defaultUrl, appName }: { appSlug: string; websiteUrl: string; appName: string }) {
+  const [profile, setProfile] = useState<IntelligenceProfile | null>(null)
+  const [loadingProfile, setLoadingProfile] = useState(true)
+  const [crawling, setCrawling] = useState(false)
+  const [crawlError, setCrawlError] = useState<string | null>(null)
+  const [crawlWarnings, setCrawlWarnings] = useState<string[]>([])
+  const [websiteUrl, setWebsiteUrl] = useState(defaultUrl || '')
+  const [description, setDescription] = useState('')
+  const [crawlSuccess, setCrawlSuccess] = useState(false)
+
+  const loadProfile = useCallback(async () => {
+    setLoadingProfile(true)
+    try {
+      const res = await fetch(`/api/admin/apps/intelligence?appSlug=${encodeURIComponent(appSlug)}`)
+      const data = await res.json() as { profile: IntelligenceProfile | null; found: boolean }
+      setProfile(data.profile)
+    } catch {
+      setProfile(null)
+    } finally {
+      setLoadingProfile(false)
+    }
+  }, [appSlug])
+
+  useEffect(() => { loadProfile() }, [loadProfile])
+
+  async function runCrawl() {
+    if (!websiteUrl.trim()) return
+    setCrawling(true)
+    setCrawlError(null)
+    setCrawlWarnings([])
+    setCrawlSuccess(false)
+    try {
+      const res = await fetch('/api/admin/apps/intelligence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: appSlug,
+          name: appName,
+          websiteUrl: websiteUrl.trim(),
+          description: description.trim() || undefined,
+        }),
+      })
+      const data = await res.json() as {
+        success: boolean; profile?: IntelligenceProfile; warnings?: string[]; error?: string; crawlStatus?: string
+      }
+      if (!data.success) {
+        setCrawlError(data.error ?? 'Intelligence generation failed')
+        return
+      }
+      if (data.warnings?.length) setCrawlWarnings(data.warnings)
+      setCrawlSuccess(true)
+      await loadProfile()
+    } catch (e) {
+      setCrawlError(e instanceof Error ? e.message : 'Request failed')
+    } finally {
+      setCrawling(false)
+    }
+  }
+
+  const modelPkg = profile?.recommendedModelPackage as Record<string, unknown> | undefined
+
+  return (
+    <div className="space-y-6">
+      {/* Crawl form */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Globe className="w-4 h-4 text-cyan-400" />
+          <h3 className="text-sm font-semibold text-white">App Intelligence — Firecrawl</h3>
+        </div>
+        <p className="text-xs text-slate-400">
+          Crawl the app website with Firecrawl to auto-generate the App Intelligence Profile.
+          The profile is used by Aiva, workspace, and agents as context.
+        </p>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Website URL</label>
+            <input
+              value={websiteUrl}
+              onChange={e => setWebsiteUrl(e.target.value)}
+              placeholder="https://yourapp.com"
+              className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Optional Description (used if Firecrawl unavailable)</label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Brief description of what this app does, its users, and main features…"
+              className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 resize-none"
+            />
+          </div>
+          <button
+            onClick={runCrawl}
+            disabled={crawling || !websiteUrl.trim()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-400 hover:bg-cyan-400/20 disabled:opacity-40 transition"
+          >
+            {crawling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+            {crawling ? 'Crawling & analysing…' : profile ? 'Re-crawl Website' : 'Crawl with Firecrawl'}
+          </button>
+        </div>
+
+        {crawlWarnings.length > 0 && (
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-1">
+            {crawlWarnings.map((w, i) => (
+              <p key={i} className="text-xs text-amber-400">{w}</p>
+            ))}
+          </div>
+        )}
+        {crawlError && (
+          <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-400">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            {crawlError}
+          </div>
+        )}
+        {crawlSuccess && !crawlError && (
+          <p className="text-xs text-emerald-400 flex items-center gap-1">
+            <CheckCircle className="w-3.5 h-3.5" /> Intelligence profile saved.
+          </p>
+        )}
+      </div>
+
+      {/* Profile display */}
+      {loadingProfile ? (
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading intelligence profile…
+        </div>
+      ) : !profile ? (
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 text-center text-xs text-slate-500">
+          No intelligence profile yet. Run Firecrawl above to generate one.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Brand summary */}
+          {profile.brandSummary && (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 space-y-2">
+              <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Brand Summary</h4>
+              <p className="text-sm text-white">{profile.brandSummary}</p>
+              {profile.businessType && (
+                <span className="text-[10px] text-cyan-400 font-mono">Type: {profile.businessType} · Tone: {profile.tone}</span>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Target users */}
+            {profile.targetUsers?.length > 0 && (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-2">
+                <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Target Users</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.targetUsers.map((u, i) => (
+                    <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300">{u}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Products/Services */}
+            {profile.productsServices?.length > 0 && (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-2">
+                <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Products & Services</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.productsServices.map((p, i) => (
+                    <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">{p}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Content Topics */}
+            {profile.contentTopics?.length > 0 && (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-2">
+                <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Content Topics</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.contentTopics.map((t, i) => (
+                    <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300">{t}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Risks */}
+            {profile.risks?.length > 0 && (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-2">
+                <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">AI Risks</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.risks.map((r, i) => (
+                    <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-300">{r}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Recommended Capabilities */}
+          {profile.recommendedCapabilities?.length > 0 && (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-2">
+              <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Recommended Capabilities</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {profile.recommendedCapabilities.map((c, i) => (
+                  <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-mono">{c}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Model Package */}
+          {modelPkg && Object.keys(modelPkg).length > 0 && (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Recommended Model Package</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {Object.entries(modelPkg).map(([k, v]) => {
+                  if (!v || v === false) return null
+                  return (
+                    <div key={k} className="bg-white/[0.02] rounded-lg p-2.5">
+                      <p className="text-[10px] text-slate-500 uppercase">{k}</p>
+                      <p className="text-xs text-white font-mono mt-0.5">{String(v)}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Crawl metadata */}
+          <div className="flex items-center gap-4 text-[10px] text-slate-600">
+            {profile.lastCrawledAt && <span>Last crawled: {new Date(profile.lastCrawledAt).toLocaleString()}</span>}
+            {profile.crawlArtifactId && <span>Crawl artifact: <code className="font-mono">{profile.crawlArtifactId.slice(0, 12)}…</code></span>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

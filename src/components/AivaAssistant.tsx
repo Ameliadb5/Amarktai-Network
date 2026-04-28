@@ -96,6 +96,32 @@ export const AIVA_AVATAR_ASSETS: Record<OrbState, string> = {
   error:     '/aiva/avatar-error.png',
 }
 
+// ── Dynamic Avatar Config (DB-backed) ─────────────────────────────────────────
+/**
+ * Fetch avatar URLs saved via the Aiva Avatar Generator.
+ * Returns merged map: DB URL takes priority over static path.
+ * Falls back silently — never throws.
+ */
+async function fetchDynamicAvatarConfig(): Promise<Record<OrbState, string> | null> {
+  try {
+    const res = await fetch('/api/admin/aiva/avatar-config', { cache: 'no-store' })
+    if (!res.ok) return null
+    const data = await res.json() as { config?: Record<string, { imageUrl: string }> }
+    if (!data.config) return null
+    const result: Partial<Record<OrbState, string>> = {}
+    const states: OrbState[] = ['idle', 'listening', 'thinking', 'speaking', 'error']
+    for (const state of states) {
+      const url = data.config[state]?.imageUrl
+      if (url) result[state] = url
+    }
+    // Only return if at least one URL was found
+    if (Object.keys(result).length === 0) return null
+    return { ...AIVA_AVATAR_ASSETS, ...result }
+  } catch {
+    return null
+  }
+}
+
 const ORB_COLORS: Record<OrbState, { ring: string; glow: string; pulse: string; glowHex: string }> = {
   idle:      { ring: 'stroke-cyan-400',   glow: '#22d3ee',  pulse: 'bg-cyan-400/20',   glowHex: '#22d3ee' },
   listening: { ring: 'stroke-green-400',  glow: '#4ade80',  pulse: 'bg-green-400/20',  glowHex: '#4ade80' },
@@ -113,10 +139,12 @@ function AivaAvatarDisplay({
   state,
   size = 96,
   onClick,
+  avatarAssets,
 }: {
   state: OrbState
   size?: number
   onClick?: () => void
+  avatarAssets?: Record<OrbState, string>
 }) {
   const [imgFailed, setImgFailed] = useState(false)
   const colors = ORB_COLORS[state]
@@ -126,7 +154,7 @@ function AivaAvatarDisplay({
   // Reset failure state when state changes (different state may have its asset)
   useEffect(() => { setImgFailed(false) }, [state])
 
-  const src = AIVA_AVATAR_ASSETS[state]
+  const src = (avatarAssets ?? AIVA_AVATAR_ASSETS)[state]
   const showOrb = imgFailed || !src
 
   return (
@@ -283,6 +311,9 @@ export default function AivaAssistant() {
   const [mode, setMode] = useState<'chat' | 'orb'>('chat')
   const [minimized, setMinimized] = useState(false)
 
+  // Dynamic avatar URLs loaded from DB (falls back to static paths if unavailable)
+  const [avatarAssets, setAvatarAssets] = useState<Record<OrbState, string> | undefined>(undefined)
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -302,6 +333,13 @@ export default function AivaAssistant() {
   const audioChunksRef = useRef<Blob[]>([])
 
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Load dynamic avatar config from DB on mount
+  useEffect(() => {
+    fetchDynamicAvatarConfig().then(config => {
+      if (config) setAvatarAssets(config)
+    })
+  }, [])
 
   const [conversationId, setConversationId] = useState<string | undefined>(() => {
     if (typeof window !== 'undefined') {
@@ -580,6 +618,7 @@ export default function AivaAssistant() {
             state={orbState}
             size={56}
             onClick={() => setMinimized(false)}
+            avatarAssets={avatarAssets}
           />
           <span className="text-[9px] uppercase tracking-widest text-cyan-400/70">Aiva</span>
         </div>
@@ -791,6 +830,7 @@ export default function AivaAssistant() {
             state={isRecording ? 'listening' : orbState}
             size={104}
             onClick={toggleRecording}
+            avatarAssets={avatarAssets}
           />
 
           {/* State label */}
