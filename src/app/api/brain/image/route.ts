@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getVaultApiKey, OPENAI_IMAGE_MODELS } from '@/lib/brain';
+import { callGenXMedia, GENX_IMAGE_MODELS } from '@/lib/genx-client';
 
 /**
  * POST /api/brain/image — Standard image generation
  *
  * Provider chain (first configured key that succeeds wins):
+ *   0. GenX — gpt-image-2, nano-banana-2, nano-banana-pro, etc. (primary)
  *   1. OpenAI — gpt-image-1 → dall-e-3 → dall-e-2
  *   2. Together AI — FLUX.1-schnell-Free → FLUX.1-schnell
  *   3. Gemini — imagen-3.0-generate-002 (Gemini API Prediction endpoint)
@@ -52,11 +54,15 @@ export async function POST(request: NextRequest) {
       model: requestedModel,
       size = '1024x1024',
       quality = 'standard',
+      providerOverride,
+      modelOverride,
     } = body as {
       prompt?: string;
       model?: string;
       size?: string;
       quality?: string;
+      providerOverride?: string;
+      modelOverride?: string;
     };
 
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
@@ -70,9 +76,28 @@ export async function POST(request: NextRequest) {
       ? (size as ImageSize)
       : '1024x1024';
 
+    // ── Provider 0: GenX — primary image generation ─────────────────────
+    if (!providerOverride || providerOverride === 'genx') {
+      const genxModel = modelOverride ?? requestedModel ?? GENX_IMAGE_MODELS[0];
+      try {
+        const genxResult = await callGenXMedia({ model: genxModel, prompt: prompt.trim(), type: 'image' });
+        if (genxResult.success && genxResult.url) {
+          return NextResponse.json({
+            executed: true,
+            imageUrl: genxResult.url,
+            provider: 'genx',
+            model: genxResult.model,
+            size: resolvedSize,
+          });
+        }
+      } catch (genxErr) {
+        console.warn('[brain/image] GenX image failed:', genxErr instanceof Error ? genxErr.message : genxErr);
+      }
+    }
+
     // ── Provider 1: OpenAI — GPT Image family + DALL-E fallback ────────
     const openaiKey = await getVaultApiKey('openai');
-    if (openaiKey) {
+    if (openaiKey && (!providerOverride || providerOverride === 'openai')) {
       // Resolve the model to use:
       //   1. If the caller requested a specific image model, honour it.
       //   2. Otherwise try each GPT Image model in capability order.
@@ -157,7 +182,7 @@ export async function POST(request: NextRequest) {
 
     // ── Provider 2: Together AI FLUX (fallback) ────────────────────────
     const togetherKey = await getVaultApiKey('together');
-    if (togetherKey) {
+    if (togetherKey && (!providerOverride || providerOverride === 'together')) {
       for (const { id: fluxModel, steps } of FLUX_MODELS) {
         try {
           const response = await fetch('https://api.together.xyz/v1/images/generations', {
@@ -200,7 +225,7 @@ export async function POST(request: NextRequest) {
     // The endpoint uses the same API key as chat but the `:predict` action.
     // Access may be gated by account tier — fails gracefully when denied.
     const geminiKey = await getVaultApiKey('gemini');
-    if (geminiKey) {
+    if (geminiKey && (!providerOverride || providerOverride === 'gemini')) {
       try {
         const imagenEndpoint =
           `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(geminiKey)}`;
@@ -242,7 +267,7 @@ export async function POST(request: NextRequest) {
     // Uses the DashScope International AIGC text-to-image endpoint.
     // Polls until the job succeeds or the deadline is reached.
     const qwenKey = await getVaultApiKey('qwen');
-    if (qwenKey) {
+    if (qwenKey && (!providerOverride || providerOverride === 'qwen')) {
       const WANX_MODELS = [
         { id: 'wanx2.1-t2i-turbo', label: 'Wanx 2.1 Turbo' },
         { id: 'wanx-v1',           label: 'Wanx v1' },
@@ -319,8 +344,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ── No provider available — structured failure, never falls back to text ──
-    const candidateModels = [...GPT_IMAGE_MODELS_ORDERED, 'dall-e-3', 'dall-e-2'];
-    const rejectionReasons: string[] = [];
+    const candidateModels = [...GENX_IMAGE_MODELS, ...GPT_IMAGE_MODELS_ORDERED, 'dall-e-3', 'dall-e-2'];
+    const rejectionReasons: string[] = ['genx: not configured or returned no image'];
     if (!openaiKey) rejectionReasons.push('openai: no API key configured');
     if (!togetherKey) rejectionReasons.push('together: no API key configured');
     if (!geminiKey) rejectionReasons.push('gemini: no API key configured (Imagen 3.0)');
@@ -333,11 +358,11 @@ export async function POST(request: NextRequest) {
         code: 'no_eligible_image_model',
         error:
           'No image generation provider is configured. ' +
-          'Configure at least one of: OpenAI (gpt-image-1/dall-e-3), Together AI (FLUX), ' +
+          'Configure at least one of: GenX, OpenAI (gpt-image-1/dall-e-3), Together AI (FLUX), ' +
           'Gemini (Imagen 3.0), or Qwen/DashScope (Wanx) in Admin → AI Providers.',
         candidate_models: candidateModels,
         rejection_reasons: rejectionReasons,
-        providers_checked: ['openai', 'together', 'gemini', 'qwen'],
+        providers_checked: ['genx', 'openai', 'together', 'gemini', 'qwen'],
       },
       { status: 503 },
     );

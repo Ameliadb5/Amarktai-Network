@@ -168,6 +168,39 @@ export async function POST(request: NextRequest) {
     const elevenLabsKey = await getServiceKey('elevenlabs', 'ELEVENLABS_API_KEY');
     const deepgramKey   = await getServiceKey('deepgram', 'DEEPGRAM_API_KEY');
 
+    // ── GenX TTS first attempt (before provider selection) ───────────────
+    if (requestedProvider === 'auto' || requestedProvider === 'genx') {
+      try {
+        const { callGenXMedia, GENX_TTS_MODELS } = await import('@/lib/genx-client');
+        const genxModel = requestedModel ?? GENX_TTS_MODELS[0];
+        const genxResult = await callGenXMedia({ model: genxModel, prompt: text.trim(), type: 'audio' });
+        if (genxResult.success && genxResult.url) {
+          // Fetch audio bytes from GenX and stream back
+          const audioRes = await fetch(genxResult.url, { signal: AbortSignal.timeout(30_000) });
+          if (audioRes.ok) {
+            const audioBytes = await audioRes.arrayBuffer();
+            return new NextResponse(audioBytes, {
+              status: 200,
+              headers: {
+                'Content-Type': 'audio/mpeg',
+                'X-Provider': 'genx',
+                'X-Model': genxResult.model,
+                'X-Executed': 'true',
+                'X-Capability': 'voice_output',
+              },
+            });
+          }
+        }
+        // GenX TTS failed — fall through to other providers
+      } catch { /* fall through */ }
+      if (requestedProvider === 'genx') {
+        return NextResponse.json(
+          { error: 'GenX TTS requested but GenX is not configured or returned no audio. Add GENX_API_URL/GENX_API_KEY.', executed: false, provider: 'genx', capability: 'voice_output' },
+          { status: 503 },
+        );
+      }
+    }
+
     // Determine provider
     let provider: 'groq' | 'openai' | 'gemini' | 'huggingface' | 'elevenlabs' | 'deepgram';
     if (requestedProvider === 'groq') {

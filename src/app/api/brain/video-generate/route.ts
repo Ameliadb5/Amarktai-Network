@@ -28,6 +28,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getVaultApiKey, callProvider } from '@/lib/brain';
+import { callGenXMedia, GENX_VIDEO_MODELS } from '@/lib/genx-client';
 import { z } from 'zod';
 
 const FRAMES_PER_SECOND = 24;
@@ -55,7 +56,7 @@ const RequestSchema = z.object({
   // error message rather than a schema-validation failure.
   // 'gemini' is listed for completeness but Veo 2 requires Vertex AI enterprise tier;
   // callers who send 'gemini' receive a clear explanation rather than a schema error.
-  provider: z.enum(['replicate', 'together', 'qwen', 'huggingface', 'gemini', 'auto']).optional().default('auto'),
+  provider: z.enum(['genx', 'replicate', 'together', 'qwen', 'huggingface', 'gemini', 'auto']).optional().default('auto'),
   model: z.string().optional(),
 });
 
@@ -278,8 +279,33 @@ export async function POST(req: Request): Promise<NextResponse> {
   let usedModel = '';
   let initialStatus = 'processing';
 
+  // ── GenX video attempt (first priority) ────────────────────────────────
+  if (provider === 'auto' || provider === 'genx') {
+    try {
+      const genxModel = model && GENX_VIDEO_MODELS.includes(model as (typeof GENX_VIDEO_MODELS)[number])
+        ? model
+        : GENX_VIDEO_MODELS[0];
+      const genxResult = await callGenXMedia({ model: genxModel, prompt: enhancedPrompt, type: 'video', duration });
+      if (genxResult.success) {
+        if (genxResult.jobId) {
+          providerJobId = `genx-job:${genxResult.jobId}`;
+          usedProvider = 'genx';
+          usedModel = genxModel;
+          initialStatus = genxResult.status === 'completed' ? 'succeeded' : 'processing';
+        } else if (genxResult.url) {
+          providerJobId = `genx-sync:${genxResult.url}`;
+          usedProvider = 'genx';
+          usedModel = genxModel;
+          initialStatus = 'succeeded';
+        }
+      }
+    } catch {
+      // GenX video failed — try next provider
+    }
+  }
+
   // Replicate attempt
-  if (provider === 'auto' || provider === 'replicate') {
+  if (!providerJobId && (provider === 'auto' || provider === 'replicate')) {
     const repKey = await getVaultApiKey('replicate');
     if (repKey) {
       const modelToUse = model
@@ -345,9 +371,11 @@ export async function POST(req: Request): Promise<NextResponse> {
     if (fallback) {
       return NextResponse.json(
         {
-          capability: 'video_planning',
+          capability: 'video_plan',
+          outputType: 'video_plan',
           executed: true,
           fallbackMode: 'video_planning',
+          warning: 'No real video provider configured — storyboard returned instead of generated video',
           note: fallback.note,
           script: fallback.script,
           error: null,
@@ -361,7 +389,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         executed: false,
         error:
           'Video generation is not available: no video provider is configured. ' +
-          'Configure Replicate, Together AI, or Qwen/DashScope (Wan) in Admin → AI Providers to enable video generation. ' +
+          'Configure GenX, Replicate, Together AI, or Qwen/DashScope (Wan) in Admin → AI Providers to enable video generation. ' +
           'Note: Gemini Veo 2 requires Vertex AI enterprise tier and is not supported via the standard API key.',
       },
       { status: 503 },

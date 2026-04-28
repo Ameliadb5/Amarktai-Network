@@ -68,6 +68,41 @@ export async function POST(request: NextRequest) {
     const hfKey    = await getVaultApiKey('huggingface');
     const qwenKey  = await getVaultApiKey('qwen');
 
+    // ── GenX STT first attempt ────────────────────────────────────────────────
+    // GenX STT accepts audio as base64 via the media generate endpoint.
+    if (requestedProvider === 'auto' || requestedProvider === 'genx') {
+      try {
+        const { callGenXMedia, GENX_STT_MODELS } = await import('@/lib/genx-client');
+        const genxModel = requestedModel ?? GENX_STT_MODELS[0];
+        const audioBytes = await file.arrayBuffer();
+        const audioBase64 = Buffer.from(audioBytes).toString('base64');
+        const mimeType = (file as File).type || 'audio/mpeg';
+        const genxResult = await callGenXMedia({
+          model: genxModel,
+          prompt: audioBase64,
+          type: 'audio',
+          metadata: { task: 'transcribe', mimeType, language: language ?? undefined },
+        });
+        if (genxResult.success && genxResult.url) {
+          // GenX STT returns the transcript text in the url field for text-mode outputs
+          const transcript = genxResult.url;
+          return NextResponse.json({
+            transcript,
+            model: genxResult.model,
+            language,
+            provider: 'genx',
+            executed: true,
+            fallback_used: false,
+            capability: 'voice_input',
+          });
+        }
+        // GenX STT failed — fall through to other providers
+      } catch { /* fall through */ }
+      if (requestedProvider === 'genx') {
+        return unavailable('provider_not_configured', 'GenX STT requested but GenX is not configured or returned no transcript. Add GENX_API_URL/GENX_API_KEY.', 503, 'genx');
+      }
+    }
+
     // Determine provider
     let provider: 'groq' | 'openai' | 'gemini' | 'huggingface' | 'qwen';
     if (requestedProvider === 'groq') {

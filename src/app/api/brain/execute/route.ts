@@ -31,6 +31,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { POST as handleRequest } from '@/app/api/brain/request/route'
 import { POST as handleAdminTest } from '@/app/api/admin/brain/test/route'
 import { resolveCapability } from '@/lib/capability-engine'
+import { executeCapability } from '@/lib/capability-router'
 
 /** Convert execute-route body to the admin/brain/test schema. */
 function toAdminTestBody(raw: Record<string, unknown>): Record<string, unknown> {
@@ -129,6 +130,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     )
     return handleAdminTest(adminReq) as Promise<NextResponse>
+  }
+
+  // ── Direct capability request (no appId) — route through capability router ─
+  // When the body carries `input` AND either an explicit `capability` key or
+  // no appId/app_id at all, bypass the app-auth pipeline and route directly
+  // through the central capability router.  This is the admin/internal path.
+  const hasInput = raw.input !== undefined && raw.input !== null
+  const hasNoAppId = !raw.appId && !raw.app_id
+  if (hasInput && (raw.capability !== undefined || hasNoAppId)) {
+    try {
+      const result = await executeCapability({
+        input: String(raw.input ?? ''),
+        capability: typeof raw.capability === 'string' ? raw.capability : undefined,
+        files: Array.isArray(raw.files) ? (raw.files as string[]) : undefined,
+        appId: typeof raw.appId === 'string' ? raw.appId : undefined,
+        workspaceId: typeof raw.workspaceId === 'string' ? raw.workspaceId : undefined,
+        providerOverride: typeof raw.providerOverride === 'string' ? raw.providerOverride : undefined,
+        modelOverride: typeof raw.modelOverride === 'string' ? raw.modelOverride : undefined,
+        adultMode: typeof raw.adultMode === 'boolean' ? raw.adultMode : false,
+        safeMode: typeof raw.safeMode === 'boolean' ? raw.safeMode : false,
+        saveArtifact: typeof raw.saveArtifact === 'boolean' ? raw.saveArtifact : false,
+        traceId: typeof raw.traceId === 'string' ? raw.traceId : undefined,
+        metadata: typeof raw.metadata === 'object' && raw.metadata !== null
+          ? raw.metadata as Record<string, unknown>
+          : undefined,
+      })
+      return NextResponse.json(result, { status: result.success ? 200 : 422 })
+    } catch (err) {
+      return NextResponse.json(
+        { success: false, error: err instanceof Error ? err.message : 'Internal server error' },
+        { status: 500 },
+      )
+    }
   }
 
   // ── Standard shape — pass through unchanged ──────────────────────────────

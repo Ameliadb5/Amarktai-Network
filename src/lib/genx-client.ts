@@ -146,6 +146,47 @@ export interface GenXStatus {
   error: string | null
 }
 
+// ── Known GenX model catalog (static fallback when live catalog unavailable) ──
+
+/** Known GenX text / code / reasoning models */
+export const GENX_TEXT_MODELS = [
+  'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5', 'gpt-5-mini',
+  'claude-sonnet-4-6', 'gemini-3.1-pro', 'grok-4.2',
+] as const
+
+/** Known GenX image generation models */
+export const GENX_IMAGE_MODELS = [
+  'gpt-image-2', 'nano-banana-2', 'nano-banana-pro',
+  'grok-imagine', 'grok-imagine-pro', 'recraft-v4',
+  'genxlm-pro-v1-img', 'genxlm-pro-v1-img-fast',
+] as const
+
+/** Known GenX video generation models */
+export const GENX_VIDEO_MODELS = [
+  'veo-3.1', 'veo-3.1-fast', 'grok-imagine-video',
+  'kling-v2.5-turbo', 'kling-v2.5-turbo-i2v',
+  'kling-v2.6-pro', 'kling-v2.6-pro-i2v',
+  'seedance-v1-fast', 'seedance-v1-fast-i2v',
+  'pixverse-v5.5', 'pixverse-v5.5-i2v',
+  'pixverse-v6', 'pixverse-v6-i2v',
+] as const
+
+/** Known GenX image-to-video models */
+export const GENX_I2V_MODELS = [
+  'kling-v2.5-turbo-i2v', 'kling-v2.6-pro-i2v',
+  'seedance-v1-fast-i2v', 'pixverse-v5.5-i2v', 'pixverse-v6-i2v',
+] as const
+
+/** Known GenX TTS / voice models */
+export const GENX_TTS_MODELS = [
+  'grok-tts', 'aura-2', 'genxlm-voice-v1',
+] as const
+
+/** Known GenX STT / transcription models */
+export const GENX_STT_MODELS = [
+  'genxlm-pro-v1-tr',
+] as const
+
 // ── Configuration ─────────────────────────────────────────────────────────────
 
 const GENX_TIMEOUT  = 60_000 // 60 s

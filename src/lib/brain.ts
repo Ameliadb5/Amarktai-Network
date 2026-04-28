@@ -199,6 +199,8 @@ export async function getVaultApiKey(providerKey: string): Promise<string | null
     replicate:   'REPLICATE_API_KEY',
     cohere:      'COHERE_API_KEY',
     mistral:     'MISTRAL_API_KEY',
+    genx:        'GENX_API_KEY',
+    firecrawl:   'FIRECRAWL_API_KEY',
   }
   const envVar = envMap[providerKey]
   if (envVar && process.env[envVar]) return normalizeProviderApiKey(process.env[envVar]!) ?? null
