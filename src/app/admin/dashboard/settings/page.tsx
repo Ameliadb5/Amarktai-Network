@@ -518,7 +518,7 @@ function AivaSection({ config, onSaved }: { config: AivaConfig; onSaved: () => v
                   label="Emotion"
                   value="In-memory only"
                   ok={false}
-                  warn
+                  warn={true}
                 />
                 <StatusRow
                   label="Last capability"
@@ -1779,11 +1779,8 @@ function StatusRow({
   ok: boolean
   warn?: boolean
 }) {
-  const color = ok
-    ? 'text-emerald-400'
-    : warn
-    ? 'text-amber-400'
-    : 'text-red-400'
+  // Precedence: ok (green) > warn (amber) > error (red)
+  const color = ok ? 'text-emerald-400' : warn ? 'text-amber-400' : 'text-red-400'
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-[10px] text-slate-500">{label}</span>

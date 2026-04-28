@@ -57,7 +57,16 @@ interface QuickAction {
   saveArtifact?: boolean
 }
 
-// ── Orb Colors ─────────────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+/**
+ * App ID used for internal Aiva requests to the brain execute endpoint.
+ * This bypasses normal app-auth and is forwarded to the admin brain-test handler,
+ * which requires an active admin session.
+ */
+const AIVA_APP_ID = '__admin_test__'
+
+// ── Capability Detection ───────────────────────────────────────────────────────
 
 const ORB_COLORS: Record<OrbState, { ring: string; glow: string; pulse: string }> = {
   idle:      { ring: 'stroke-cyan-400',   glow: '#22d3ee',  pulse: 'bg-cyan-400/20' },
@@ -293,7 +302,7 @@ export default function AivaAssistant() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                app_id: '__admin_test__',
+                app_id: AIVA_APP_ID,
                 task: 'stt',
                 input: base64,
                 metadata: { mimeType: 'audio/webm' },
@@ -325,7 +334,7 @@ export default function AivaAssistant() {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    app_id: '__admin_test__',
+                    app_id: AIVA_APP_ID,
                     task: 'tts',
                     input: responseText,
                   }),
@@ -334,7 +343,14 @@ export default function AivaAssistant() {
                 if (ttsData.output && typeof ttsData.output === 'string') {
                   const audio = new Audio(`data:audio/mpeg;base64,${ttsData.output}`)
                   audio.onended = () => setOrbState('idle')
-                  audio.play().catch(() => setOrbState('idle'))
+                  audio.onerror = () => {
+                    console.error('[Aiva] TTS audio playback failed')
+                    setOrbState('idle')
+                  }
+                  audio.play().catch(err => {
+                    console.error('[Aiva] TTS play() rejected:', err)
+                    setOrbState('idle')
+                  })
                 } else {
                   setOrbState('idle')
                 }
