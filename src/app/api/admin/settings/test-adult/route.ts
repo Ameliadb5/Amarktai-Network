@@ -1,9 +1,18 @@
 /**
  * POST /api/admin/settings/test-adult
  *
- * Test the adult content specialist provider connection.
+ * Test the adult content specialist provider — performs a REAL generation test,
+ * not just a connection probe.
+ *
  * The AI Engine (GenX) is NEVER used for adult content generation.
- * Only specialist providers are supported: Together AI, HuggingFace, xAI/Grok, Custom.
+ * Only specialist providers are supported: xAI/Grok, Together AI, HuggingFace, Custom.
+ *
+ * Returns:
+ *   { provider, model, success, outputType, status, error_category?, message, latencyMs }
+ *
+ * error_category values:
+ *   missing_key | provider_policy_block | model_not_supported |
+ *   endpoint_error | guardrail_block | unknown
  *
  * Returns truthful status — never faked.
  */
@@ -16,15 +25,30 @@ import { getVaultApiKey } from '@/lib/brain'
 
 type ProviderType = 'together' | 'huggingface' | 'xai' | 'custom'
 
-/** Translate an HTTP status to a user-facing error string */
-function httpErr(status: number): string {
-  if (status === 404) return 'endpoint not found'
-  if (status === 401 || status === 403) return 'authentication failed — check API key'
-  if (status === 422) return 'provider rejected request (422) — model may not support this operation or safety checker triggered'
-  if (status === 429) return 'rate limited'
-  if (status >= 500) return `server error (HTTP ${status})`
-  return `HTTP ${status}`
+type ErrorCategory =
+  | 'missing_key'
+  | 'provider_policy_block'
+  | 'model_not_supported'
+  | 'endpoint_error'
+  | 'guardrail_block'
+  | 'unknown'
+
+/** Classify an HTTP status into a structured error category */
+function classifyHttpError(status: number, body: string): ErrorCategory {
+  if (status === 401 || status === 403) return 'missing_key'
+  if (status === 404) return 'model_not_supported'
+  if (status === 429) return 'endpoint_error'
+  if (status === 422) {
+    const lower = body.toLowerCase()
+    if (lower.includes('safety') || lower.includes('policy') || lower.includes('content')) return 'provider_policy_block'
+    return 'model_not_supported'
+  }
+  if (status >= 500) return 'endpoint_error'
+  return 'unknown'
 }
+
+/** Safe test prompt used for all adult generation tests — not stored after test */
+const ADULT_TEST_PROMPT = 'a tasteful artistic portrait of a woman in soft studio lighting'
 
 /** Block SSRF: only allow http/https and block private/loopback in production */
 function validateUrl(raw: string): { url: URL; error: string | null } {
@@ -126,170 +150,301 @@ export async function POST(req: NextRequest) {
   // ── Specialist provider ──
   if (!providerType) providerType = 'together'
 
-  // ── Together AI ──
+  // ── Together AI — real generation test ──
   if (providerType === 'together') {
     if (!apiKey) {
       return NextResponse.json({
+        provider: 'together',
         mode: 'specialist', providerType: 'together',
-        supported: false, status: 'not_configured',
+        success: false, supported: false, status: 'not_configured',
+        outputType: 'image',
+        error_category: 'missing_key' as ErrorCategory,
         message: 'Together AI API key is required. Enter it here or save it via Admin → AI Providers → Together AI.',
       })
     }
 
-    const togetherEndpoint = 'https://api.together.xyz/v1/images/generations'
-    const model = providerModel || 'black-forest-labs/FLUX.1-schnell-Free'
+    const testModel = providerModel || 'black-forest-labs/FLUX.1-schnell-Free'
     const start = Date.now()
     try {
+      // Real generation test: attempt a minimal 512×512 image with a safe suggestive-adjacent prompt.
+      // disable_safety_checker is sent so we can verify adult content support.
+      // Test output is NOT stored — discarded immediately after status check.
       // lgtm[js/request-forgery] — hardcoded Together AI URL; admin-only endpoint
-      const res = await fetch(togetherEndpoint, {
+      const res = await fetch('https://api.together.xyz/v1/images/generations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
-          model,
-          prompt: 'probe',
+          model: testModel,
+          prompt: ADULT_TEST_PROMPT,
           n: 1,
-          width: 64,
-          height: 64,
+          steps: 4,
+          width: 512,
+          height: 512,
           disable_safety_checker: true,
         }),
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(30_000),
       })
       const latencyMs = Date.now() - start
+      const bodyText = await res.text().catch(() => '')
 
-      // 200 = success; 400/422 = endpoint exists but prompt/model rejected
-      const reachable = res.ok || res.status === 400 || res.status === 422 || res.status === 401 || res.status === 403
-      const authOk = res.status !== 401 && res.status !== 403
+      if (res.ok) {
+        let imageGenerated = false
+        try {
+          const parsed = JSON.parse(bodyText) as { data?: Array<{ url?: string; b64_json?: string }> }
+          imageGenerated = !!(parsed.data?.[0]?.url || parsed.data?.[0]?.b64_json)
+        } catch { /* non-JSON ok response */ }
 
-      let extraNote = ''
-      if (res.status === 422) extraNote = ' — provider returned 422 (disable_safety_checker was sent; model may not support this operation)'
-      if (res.status === 401 || res.status === 403) extraNote = ' — authentication failed'
+        return NextResponse.json({
+          provider: 'together',
+          model: testModel,
+          success: imageGenerated,
+          supported: true,
+          status: imageGenerated ? 'ready' : 'connected_no_output',
+          outputType: 'image',
+          mode: 'specialist', providerType: 'together',
+          message: imageGenerated
+            ? `Together AI generation test passed — image returned (${latencyMs}ms)`
+            : `Together AI connected but no image data returned (${latencyMs}ms) — model may not support image output`,
+          error_category: imageGenerated ? undefined : ('model_not_supported' as ErrorCategory),
+          latencyMs,
+        })
+      }
+
+      const errCat = classifyHttpError(res.status, bodyText)
+      let errMsg = `Together AI generation test failed (HTTP ${res.status}, ${latencyMs}ms)`
+      if (errCat === 'missing_key') errMsg += ' — authentication failed, check API key'
+      else if (errCat === 'provider_policy_block') errMsg += ' — provider safety policy blocked the test prompt'
+      else if (errCat === 'model_not_supported') errMsg += ' — model does not support this operation or disable_safety_checker is not allowed'
+      else if (errCat === 'endpoint_error') errMsg += ' — Together AI server error'
 
       return NextResponse.json({
+        provider: 'together',
+        model: testModel,
+        success: false,
+        supported: false,
+        status: errCat,
+        outputType: 'image',
         mode: 'specialist', providerType: 'together',
-        supported: authOk && reachable,
-        status: authOk && reachable ? 'available' : 'auth_failed',
-        httpStatus: res.status,
-        model,
-        message: `Together AI endpoint reachable (HTTP ${res.status})${extraNote}`,
+        error_category: errCat,
+        message: errMsg,
         latencyMs,
       })
     } catch (err) {
       return NextResponse.json({
+        provider: 'together',
+        model: testModel,
+        success: false,
+        supported: false,
+        status: 'unreachable',
+        outputType: 'image',
         mode: 'specialist', providerType: 'together',
-        supported: false, status: 'unreachable',
+        error_category: 'endpoint_error' as ErrorCategory,
         message: `Cannot reach Together AI: ${err instanceof Error ? err.message : 'network error'}`,
         latencyMs: Date.now() - start,
       })
     }
   }
 
-  // ── HuggingFace private endpoint ──
+  // ── HuggingFace private endpoint — real generation test ──
   if (providerType === 'huggingface') {
     if (!endpoint) {
       return NextResponse.json({
+        provider: 'huggingface',
+        model: providerModel || 'private-endpoint',
+        success: false,
+        supported: false,
+        status: 'not_configured',
+        outputType: 'image',
         mode: 'specialist', providerType: 'huggingface',
-        supported: false, status: 'not_configured',
-        message: 'HuggingFace private endpoint URL is required.',
+        error_category: 'missing_key' as ErrorCategory,
+        message: 'HuggingFace private endpoint URL is required for adult generation. For unrestricted adult content, use a private HuggingFace Inference Endpoint (not the public API).',
       })
     }
 
     const { url: hfUrl, error: hfErr } = validateUrl(endpoint)
     if (hfErr) {
       return NextResponse.json({
+        provider: 'huggingface',
+        model: providerModel || 'private-endpoint',
+        success: false,
+        supported: false,
+        status: 'invalid',
+        outputType: 'image',
         mode: 'specialist', providerType: 'huggingface',
-        supported: false, status: 'invalid', message: hfErr,
+        error_category: 'endpoint_error' as ErrorCategory,
+        message: hfErr,
       })
     }
 
+    const testModel = providerModel || hfUrl.href
     const start = Date.now()
     try {
       const hHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
       if (apiKey) hHeaders['Authorization'] = `Bearer ${apiKey}`
+      // Real generation test: send a minimal image generation prompt.
+      // Test output is NOT stored — discarded immediately after status check.
       // lgtm[js/request-forgery] — URL validated above; admin-only endpoint
       const res = await fetch(hfUrl.href, {
         method: 'POST',
         headers: hHeaders,
-        body: JSON.stringify({ inputs: 'probe', parameters: {} }),
-        signal: AbortSignal.timeout(20_000),
+        body: JSON.stringify({ inputs: ADULT_TEST_PROMPT, parameters: { num_inference_steps: 4 } }),
+        signal: AbortSignal.timeout(60_000),
       })
       const latencyMs = Date.now() - start
-      const reachable = res.status < 500
+      const bodyBuf = await res.arrayBuffer().catch(() => new ArrayBuffer(0))
+      const bodyText = Buffer.from(bodyBuf).toString('utf8', 0, 500)
 
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') ?? ''
+        const imageGenerated = contentType.startsWith('image/') || contentType === 'application/octet-stream'
+          ? bodyBuf.byteLength > 0
+          : false
+
+        return NextResponse.json({
+          provider: 'huggingface',
+          model: testModel,
+          success: imageGenerated,
+          supported: true,
+          status: imageGenerated ? 'ready' : 'connected_no_image',
+          outputType: 'image',
+          mode: 'specialist', providerType: 'huggingface',
+          error_category: imageGenerated ? undefined : ('model_not_supported' as ErrorCategory),
+          message: imageGenerated
+            ? `HuggingFace endpoint generation test passed — image returned (${latencyMs}ms)`
+            : `HuggingFace endpoint reachable but returned non-image response (content-type: ${contentType}) — verify model supports image generation`,
+          latencyMs,
+        })
+      }
+
+      const errCat = classifyHttpError(res.status, bodyText)
       return NextResponse.json({
+        provider: 'huggingface',
+        model: testModel,
+        success: false,
+        supported: false,
+        status: errCat,
+        outputType: 'image',
         mode: 'specialist', providerType: 'huggingface',
-        supported: reachable,
-        status: reachable ? 'available' : 'server_error',
-        httpStatus: res.status,
-        message: reachable
-          ? `HuggingFace endpoint reachable (HTTP ${res.status})`
-          : `HuggingFace endpoint returned HTTP ${res.status}`,
+        error_category: errCat,
+        message: `HuggingFace endpoint generation test failed (HTTP ${res.status}, ${latencyMs}ms)`,
         latencyMs,
       })
     } catch (err) {
       return NextResponse.json({
+        provider: 'huggingface',
+        model: testModel,
+        success: false,
+        supported: false,
+        status: 'unreachable',
+        outputType: 'image',
         mode: 'specialist', providerType: 'huggingface',
-        supported: false, status: 'unreachable',
+        error_category: 'endpoint_error' as ErrorCategory,
         message: `Cannot reach HuggingFace endpoint: ${err instanceof Error ? err.message : 'network error'}`,
         latencyMs: Date.now() - start,
       })
     }
   }
 
-  // ── xAI / Grok Imagine ──
+  // ── xAI / Grok Imagine — real generation test ──
   if (providerType === 'xai') {
     if (!apiKey) {
       return NextResponse.json({
+        provider: 'xai',
+        model: providerModel || 'grok-2-image',
+        success: false,
+        supported: false,
+        status: 'not_configured',
+        outputType: 'image',
         mode: 'specialist', providerType: 'xai',
-        supported: false, status: 'not_configured',
+        error_category: 'missing_key' as ErrorCategory,
         message: 'xAI API key is required. Enter it here or save it via Admin → AI Providers → xAI / Grok.',
       })
     }
 
-    const xaiImageEndpoint = 'https://api.x.ai/v1/images/generations'
-    const model = providerModel || 'grok-2-image'
+    const testModel = providerModel || 'grok-2-image'
     const start = Date.now()
     try {
+      // Real generation test with a safe test prompt.
+      // Test output is NOT stored — discarded immediately after status check.
       // lgtm[js/request-forgery] — hardcoded xAI URL; admin-only endpoint
-      const res = await fetch(xaiImageEndpoint, {
+      const res = await fetch('https://api.x.ai/v1/images/generations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, prompt: 'probe test', n: 1 }),
-        signal: AbortSignal.timeout(20_000),
+        body: JSON.stringify({ model: testModel, prompt: ADULT_TEST_PROMPT, n: 1 }),
+        signal: AbortSignal.timeout(30_000),
       })
       const latencyMs = Date.now() - start
+      const bodyText = await res.text().catch(() => '')
 
-      const reachable = res.ok || res.status === 400 || res.status === 422 || res.status === 401 || res.status === 403
-      const authOk = res.status !== 401 && res.status !== 403
+      if (res.ok) {
+        let imageGenerated = false
+        try {
+          const parsed = JSON.parse(bodyText) as { data?: Array<{ url?: string; b64_json?: string }> }
+          imageGenerated = !!(parsed.data?.[0]?.url || parsed.data?.[0]?.b64_json)
+        } catch { /* non-JSON ok response */ }
 
-      let note = ''
-      if (res.status === 401 || res.status === 403) note = ' — xAI adult content access not confirmed for this key'
-      if (res.ok) note = ' — xAI image endpoint accessible'
+        return NextResponse.json({
+          provider: 'xai',
+          model: testModel,
+          success: imageGenerated,
+          supported: true,
+          status: imageGenerated ? 'ready' : 'connected_no_output',
+          outputType: 'image',
+          mode: 'specialist', providerType: 'xai',
+          error_category: imageGenerated ? undefined : ('model_not_supported' as ErrorCategory),
+          message: imageGenerated
+            ? `xAI/Grok generation test passed — image returned (${latencyMs}ms)`
+            : `xAI/Grok connected but no image data returned (${latencyMs}ms)`,
+          latencyMs,
+        })
+      }
+
+      const errCat = classifyHttpError(res.status, bodyText)
+      let errMsg = `xAI/Grok generation test failed (HTTP ${res.status}, ${latencyMs}ms)`
+      if (errCat === 'missing_key') errMsg += ' — authentication failed, check API key'
+      else if (errCat === 'provider_policy_block') errMsg += ' — xAI safety policy blocked the test prompt; adult access may not be enabled for this key'
+      else if (errCat === 'model_not_supported') errMsg += ` — model "${testModel}" may not be available for this key`
 
       return NextResponse.json({
+        provider: 'xai',
+        model: testModel,
+        success: false,
+        supported: false,
+        status: errCat,
+        outputType: 'image',
         mode: 'specialist', providerType: 'xai',
-        supported: authOk && reachable,
-        status: authOk && reachable ? 'available' : 'auth_failed',
-        httpStatus: res.status,
-        model,
-        message: `xAI/Grok endpoint responded (HTTP ${res.status})${note}`,
+        error_category: errCat,
+        message: errMsg,
         latencyMs,
       })
     } catch (err) {
       return NextResponse.json({
+        provider: 'xai',
+        model: testModel,
+        success: false,
+        supported: false,
+        status: 'unreachable',
+        outputType: 'image',
         mode: 'specialist', providerType: 'xai',
-        supported: false, status: 'unreachable',
+        error_category: 'endpoint_error' as ErrorCategory,
         message: `Cannot reach xAI API: ${err instanceof Error ? err.message : 'network error'}`,
         latencyMs: Date.now() - start,
       })
     }
   }
 
-  // ── Custom (OpenAI-compatible) ──
+  // ── Custom (OpenAI-compatible) — real generation test ──
   if (providerType === 'custom') {
     if (!endpoint) {
       return NextResponse.json({
+        provider: 'custom',
+        model: providerModel || 'custom',
+        success: false,
+        supported: false,
+        status: 'not_configured',
+        outputType: 'image',
         mode: 'specialist', providerType: 'custom',
-        supported: false, status: 'not_configured',
+        error_category: 'missing_key' as ErrorCategory,
         message: 'Custom provider endpoint URL is required.',
       })
     }
@@ -297,39 +452,72 @@ export async function POST(req: NextRequest) {
     const { url: customUrl, error: customErr } = validateUrl(endpoint)
     if (customErr) {
       return NextResponse.json({
+        provider: 'custom',
+        model: providerModel || 'custom',
+        success: false,
+        supported: false,
+        status: 'invalid',
+        outputType: 'image',
         mode: 'specialist', providerType: 'custom',
-        supported: false, status: 'invalid', message: customErr,
+        error_category: 'endpoint_error' as ErrorCategory,
+        message: customErr,
       })
     }
 
+    const testModel = providerModel || 'default'
     const start = Date.now()
     try {
       const cHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
       if (apiKey) cHeaders['Authorization'] = `Bearer ${apiKey}`
+      // Real generation test.
+      // Test output is NOT stored — discarded immediately after status check.
       // lgtm[js/request-forgery] — URL validated above; admin-only endpoint
       const res = await fetch(customUrl.href, {
         method: 'POST',
         headers: cHeaders,
-        body: JSON.stringify({ prompt: 'probe', model: providerModel || 'default', n: 1 }),
-        signal: AbortSignal.timeout(20_000),
+        body: JSON.stringify({ prompt: ADULT_TEST_PROMPT, model: testModel, n: 1 }),
+        signal: AbortSignal.timeout(30_000),
       })
       const latencyMs = Date.now() - start
-      const reachable = res.status < 500
+      const bodyText = await res.text().catch(() => '')
 
+      if (res.ok) {
+        return NextResponse.json({
+          provider: 'custom',
+          model: testModel,
+          success: true,
+          supported: true,
+          status: 'ready',
+          outputType: 'image',
+          mode: 'specialist', providerType: 'custom',
+          message: `Custom endpoint generation test passed (HTTP 200, ${latencyMs}ms)`,
+          latencyMs,
+        })
+      }
+
+      const errCat = classifyHttpError(res.status, bodyText)
       return NextResponse.json({
+        provider: 'custom',
+        model: testModel,
+        success: false,
+        supported: errCat !== 'missing_key' && errCat !== 'endpoint_error',
+        status: errCat,
+        outputType: 'image',
         mode: 'specialist', providerType: 'custom',
-        supported: reachable,
-        status: reachable ? 'available' : 'server_error',
-        httpStatus: res.status,
-        message: reachable
-          ? `Custom endpoint reachable (HTTP ${res.status}${res.status === 422 ? ' — safety checker or bad request' : ''})`
-          : `Custom endpoint returned ${httpErr(res.status)}`,
+        error_category: errCat,
+        message: `Custom endpoint generation test failed (HTTP ${res.status}, ${latencyMs}ms)`,
         latencyMs,
       })
     } catch (err) {
       return NextResponse.json({
+        provider: 'custom',
+        model: testModel,
+        success: false,
+        supported: false,
+        status: 'unreachable',
+        outputType: 'image',
         mode: 'specialist', providerType: 'custom',
-        supported: false, status: 'unreachable',
+        error_category: 'endpoint_error' as ErrorCategory,
         message: `Cannot reach custom endpoint: ${err instanceof Error ? err.message : 'network error'}`,
         latencyMs: Date.now() - start,
       })
@@ -337,9 +525,14 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    mode: 'specialist',
+    provider: null,
+    model: null,
+    success: false,
     supported: false,
     status: 'unknown_provider',
-    message: `Unknown provider type: ${providerType}. Supported: together, huggingface, xai, custom`,
+    outputType: 'image',
+    mode: 'specialist',
+    error_category: 'unknown' as ErrorCategory,
+    message: `Unknown provider type: ${providerType}. Supported: xai, together, huggingface, custom`,
   })
 }

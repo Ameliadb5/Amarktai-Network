@@ -73,6 +73,8 @@ export interface CapabilityResponse {
   warning?: string
   /** Error message when success=false */
   error?: string
+  /** Structured error category for adult/specialist routes */
+  error_category?: 'missing_key' | 'provider_policy_block' | 'model_not_supported' | 'endpoint_error' | 'guardrail_block' | 'unknown'
 }
 
 // ── Supported capability set ───────────────────────────────────────────────────
@@ -84,6 +86,7 @@ const ALL_CAPABILITIES = [
   'music_generation', 'lyrics_generation',
   'tts', 'stt', 'voice_response',
   'adult_image', 'adult_video',
+  'suggestive_image', 'suggestive_video',
   'repo_edit', 'app_build', 'deploy_plan',
   'research', 'scrape_website',
 ] as const
@@ -102,6 +105,9 @@ const ADULT_BLOCKED_TERMS: readonly string[] = [
   'girl under 18', 'boy under 18', 'girl under 16', 'boy under 16',
   'non-consensual', 'rape', 'forced sex', 'forced intercourse',
 ]
+
+/** Style prefix injected into suggestive image prompts to enforce non-explicit output */
+const SUGGESTIVE_STYLE_PREFIX = 'Tasteful professional photograph, artistic lighting, no explicit sexual content, no genitalia:'
 
 /**
  * Check adult content guardrails.
@@ -233,9 +239,11 @@ function outputTypeForCapability(cap: string): string {
     case 'image_generation':
     case 'image_edit':
     case 'adult_image':   return 'image'
+    case 'suggestive_image': return 'image'
     case 'video_generation':
     case 'image_to_video':
     case 'adult_video':   return 'video'
+    case 'suggestive_video': return 'video'
     case 'music_generation': return 'audio'
     case 'tts':
     case 'voice_response': return 'audio'
@@ -303,8 +311,8 @@ async function tryFallbackText(
 // ── Artifact type mapping ─────────────────────────────────────────────────────
 
 const ARTIFACT_TYPE_MAP: Record<string, 'image' | 'audio' | 'video' | 'code' | 'document'> = {
-  image_generation: 'image', image_edit: 'image', adult_image: 'image',
-  video_generation: 'video', image_to_video: 'video', adult_video: 'video',
+  image_generation: 'image', image_edit: 'image', adult_image: 'image', suggestive_image: 'image',
+  video_generation: 'video', image_to_video: 'video', adult_video: 'video', suggestive_video: 'video',
   video_plan: 'document',
   music_generation: 'audio', tts: 'audio', voice_response: 'audio',
   code: 'code', repo_edit: 'code',
@@ -428,8 +436,8 @@ export async function executeCapability(
     }
   }
 
-  // ── Image generation ──────────────────────────────────────────────────────
-  if (cap === 'image_generation' || cap === 'image_edit' || cap === 'adult_image') {
+  // ── Image generation (normal — safe mode only) ────────────────────────────
+  if (cap === 'image_generation' || cap === 'image_edit') {
     const preferredModel = request.modelOverride ?? GENX_IMAGE_MODELS[0]
 
     if (!request.providerOverride || request.providerOverride === 'genx') {
@@ -503,8 +511,244 @@ export async function executeCapability(
     }
   }
 
-  // ── Video generation ──────────────────────────────────────────────────────
-  if (cap === 'video_generation' || cap === 'image_to_video' || cap === 'adult_video') {
+  // ── Adult image generation (adult-capable providers only — no safe fallback) ─
+  // adult_image MUST NOT fall back to normal image providers (OpenAI DALL-E,
+  // safe GenX image route). Only providers that explicitly support adult content.
+  // Provider order: xAI/Grok → Together AI (disable_safety_checker) → HuggingFace
+  if (cap === 'adult_image') {
+    // Guardrails already checked above. Proceed to adult-capable providers only.
+
+    // ── Provider 1: xAI / Grok image generation ─────────────────────────
+    const grokKey = await getVaultApiKey('grok')
+    if (grokKey && (!request.providerOverride || request.providerOverride === 'xai' || request.providerOverride === 'grok')) {
+      try {
+        const xaiModel = request.modelOverride ?? 'grok-2-image'
+        const res = await fetch('https://api.x.ai/v1/images/generations', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${grokKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: xaiModel, prompt: request.input, n: 1 }),
+          signal: AbortSignal.timeout(60_000),
+        })
+        if (res.ok) {
+          const data = await res.json() as { data?: Array<{ url?: string; b64_json?: string }> }
+          const url = data.data?.[0]?.url ?? null
+          const b64 = data.data?.[0]?.b64_json ? `data:image/png;base64,${data.data[0].b64_json}` : null
+          const output = url ?? b64
+          if (output) {
+            let artifactId: string | undefined
+            if (save) artifactId = await maybeSaveArtifact(cap, output, 'xai', xaiModel, appSlug, request.traceId)
+            logExecution(cap, 'xai', xaiModel, false, !!artifactId, null)
+            return { success: true, capability: cap, provider: 'xai', model: xaiModel, outputType: 'image', output, artifactId, fallbackUsed: false }
+          }
+        }
+      } catch (err) { console.warn('[capability-router] xAI adult image failed:', err instanceof Error ? err.message : err) }
+    }
+
+    // ── Provider 2: Together AI with disable_safety_checker ─────────────
+    const togetherKeyAdult = await getVaultApiKey('together')
+    if (togetherKeyAdult && (!request.providerOverride || request.providerOverride === 'together')) {
+      const adultModels = [
+        { model: 'black-forest-labs/FLUX.1-schnell-Free', steps: 4 },
+        { model: 'black-forest-labs/FLUX.1-schnell', steps: 4 },
+        { model: 'stabilityai/stable-diffusion-xl-base-1.0', steps: 30 },
+      ]
+      for (const { model: adultModel, steps } of adultModels) {
+        try {
+          const res = await fetch('https://api.together.xyz/v1/images/generations', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${togetherKeyAdult}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: adultModel, prompt: request.input, n: 1, steps, width: 768, height: 768, disable_safety_checker: true }),
+            signal: AbortSignal.timeout(60_000),
+          })
+          if (res.ok) {
+            const data = await res.json() as { data?: Array<{ url?: string }> }
+            const url = data.data?.[0]?.url ?? null
+            if (url) {
+              let artifactId: string | undefined
+              if (save) artifactId = await maybeSaveArtifact(cap, url, 'together', adultModel, appSlug, request.traceId)
+              logExecution(cap, 'together', adultModel, true, !!artifactId, null)
+              return { success: true, capability: cap, provider: 'together', model: adultModel, outputType: 'image', output: url, artifactId, fallbackUsed: true, fallbackReason: 'xAI unavailable' }
+            }
+          } else if (res.status === 422) {
+            // Safety checker triggered or model not supported — try next model
+            console.warn(`[capability-router] Together adult image model ${adultModel} blocked (422)`)
+            continue
+          }
+        } catch (err) { console.warn(`[capability-router] Together adult image (${adultModel}) failed:`, err instanceof Error ? err.message : err) }
+      }
+    }
+
+    // ── Provider 3: HuggingFace adult models ─────────────────────────────
+    const hfKeyAdult = await getVaultApiKey('huggingface')
+    if (hfKeyAdult && (!request.providerOverride || request.providerOverride === 'huggingface')) {
+      const hfAdultModels = [
+        'SG161222/RealVisXL_V4.0',
+        'Lykon/dreamshaper-8',
+        'stabilityai/stable-diffusion-xl-base-1.0',
+      ]
+      for (const hfAdultModel of hfAdultModels) {
+        try {
+          const res = await fetch(`https://api-inference.huggingface.co/models/${hfAdultModel}`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${hfKeyAdult}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inputs: request.input, parameters: { num_inference_steps: 28, guidance_scale: 7.0, width: 768, height: 768 } }),
+            signal: AbortSignal.timeout(120_000),
+          })
+          if (res.ok) {
+            const contentType = res.headers.get('content-type') ?? 'image/png'
+            if (contentType.startsWith('image/') || contentType === 'application/octet-stream') {
+              const buffer = await res.arrayBuffer()
+              if (buffer.byteLength > 0) {
+                const output = `data:${contentType.startsWith('image/') ? contentType : 'image/png'};base64,${Buffer.from(buffer).toString('base64')}`
+                let artifactId: string | undefined
+                if (save) artifactId = await maybeSaveArtifact(cap, output, 'huggingface', hfAdultModel, appSlug, request.traceId)
+                logExecution(cap, 'huggingface', hfAdultModel, true, !!artifactId, null)
+                return { success: true, capability: cap, provider: 'huggingface', model: hfAdultModel, outputType: 'image', output, artifactId, fallbackUsed: true, fallbackReason: 'xAI/Together unavailable' }
+              }
+            }
+          } else if (res.status === 503) {
+            continue // Model loading
+          }
+        } catch (err) { console.warn(`[capability-router] HuggingFace adult image (${hfAdultModel}) failed:`, err instanceof Error ? err.message : err) }
+      }
+    }
+
+    const adultMissingKeys: string[] = []
+    if (!grokKey) adultMissingKeys.push('xAI/Grok key missing (Admin → AI Providers → xAI / Grok)')
+    if (!togetherKeyAdult) adultMissingKeys.push('Together AI key missing (Admin → AI Providers → Together AI)')
+    if (!hfKeyAdult) adultMissingKeys.push('HuggingFace key missing (Admin → AI Providers → HuggingFace)')
+
+    logExecution(cap, null, null, false, false, 'No adult image provider available')
+    return {
+      success: false,
+      capability: cap,
+      provider: null,
+      model: null,
+      outputType: 'image',
+      output: null,
+      fallbackUsed: false,
+      error: adultMissingKeys.length === 3
+        ? `Adult image generation requires at least one provider key. ${adultMissingKeys.join('; ')}`
+        : 'All adult image providers failed. Configure xAI/Grok, Together AI, or HuggingFace with adult-capable models.',
+      error_category: adultMissingKeys.length === 3 ? 'missing_key' : 'provider_policy_block',
+    }
+  }
+
+  // ── Adult video generation ────────────────────────────────────────────────
+  // adult_video MUST NOT fall back to normal video or storyboard providers.
+  // No adult video provider is wired yet — return structured UNAVAILABLE error.
+  if (cap === 'adult_video') {
+    logExecution(cap, null, null, false, false, 'No adult video provider available')
+    return {
+      success: false,
+      capability: cap,
+      provider: null,
+      model: null,
+      outputType: 'video',
+      output: null,
+      fallbackUsed: false,
+      error: 'Adult video generation is not yet available. No adult-capable video provider is configured. Do not fall back to normal video or storyboard routes.',
+      error_category: 'model_not_supported',
+    }
+  }
+
+  // ── Suggestive image generation (non-explicit, gated) ────────────────────
+  // Requires safeMode=false (adultMode flag used as proxy in capability-router context).
+  if (cap === 'suggestive_image') {
+    if (request.safeMode) {
+      return {
+        success: false, capability: cap, provider: null, model: null,
+        outputType: 'image', output: null, fallbackUsed: false,
+        error: 'safeMode is active — suggestive image generation blocked',
+      }
+    }
+    const finalPrompt = `${SUGGESTIVE_STYLE_PREFIX} ${request.input}`
+
+    // Try OpenAI DALL-E 3 first (has built-in content policy for suggestive-but-not-explicit)
+    const openaiKeySug = await getVaultApiKey('openai')
+    if (openaiKeySug && (!request.providerOverride || request.providerOverride === 'openai')) {
+      try {
+        const res = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${openaiKeySug}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'dall-e-3', prompt: finalPrompt, n: 1, size: '1024x1024', style: 'natural' }),
+          signal: AbortSignal.timeout(60_000),
+        })
+        if (res.ok) {
+          const data = await res.json() as { data?: Array<{ url?: string }> }
+          const url = data.data?.[0]?.url ?? null
+          if (url) {
+            let artifactId: string | undefined
+            if (save) artifactId = await maybeSaveArtifact(cap, url, 'openai', 'dall-e-3', appSlug, request.traceId)
+            logExecution(cap, 'openai', 'dall-e-3', false, !!artifactId, null)
+            return { success: true, capability: cap, provider: 'openai', model: 'dall-e-3', outputType: 'image', output: url, artifactId, fallbackUsed: false }
+          }
+        }
+      } catch (err) { console.warn('[capability-router] OpenAI suggestive image failed:', err instanceof Error ? err.message : err) }
+    }
+
+    // Fallback: Together AI FLUX
+    const togetherKeySug = await getVaultApiKey('together')
+    if (togetherKeySug && (!request.providerOverride || request.providerOverride === 'together')) {
+      try {
+        const res = await fetch('https://api.together.xyz/v1/images/generations', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${togetherKeySug}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell-Free', prompt: finalPrompt, n: 1, steps: 4, width: 1024, height: 1024 }),
+          signal: AbortSignal.timeout(60_000),
+        })
+        if (res.ok) {
+          const data = await res.json() as { data?: Array<{ url?: string }> }
+          const url = data.data?.[0]?.url ?? null
+          if (url) {
+            let artifactId: string | undefined
+            if (save) artifactId = await maybeSaveArtifact(cap, url, 'together', 'FLUX.1-schnell-Free', appSlug, request.traceId)
+            logExecution(cap, 'together', 'FLUX.1-schnell-Free', true, !!artifactId, null)
+            return { success: true, capability: cap, provider: 'together', model: 'FLUX.1-schnell-Free', outputType: 'image', output: url, artifactId, fallbackUsed: true, fallbackReason: 'OpenAI unavailable' }
+          }
+        }
+      } catch (err) { console.warn('[capability-router] Together suggestive image failed:', err instanceof Error ? err.message : err) }
+    }
+
+    logExecution(cap, null, null, true, false, 'No suggestive image provider available')
+    return {
+      success: false, capability: cap, provider: null, model: null, outputType: 'image', output: null, fallbackUsed: true,
+      error: 'No suggestive image provider is configured. Configure OpenAI or Together AI.',
+    }
+  }
+
+  // ── Suggestive video planning (non-explicit, gated) ───────────────────────
+  // Returns a structured scene plan — no actual video generation.
+  if (cap === 'suggestive_video') {
+    if (request.safeMode) {
+      return {
+        success: false, capability: cap, provider: null, model: null,
+        outputType: 'video', output: null, fallbackUsed: false,
+        error: 'safeMode is active — suggestive video planning blocked',
+      }
+    }
+    // Produce a scene plan via text fallback
+    const planResult = await tryFallbackText(
+      `Create a tasteful suggestive video scene plan for: "${request.input}". ` +
+      `No explicit sexual content, no genitalia, no minors. ` +
+      `Include: style, scenes, camera angles, clothing notes, and audio direction.`,
+    )
+    if (planResult.success && planResult.output) {
+      let artifactId: string | undefined
+      if (save) artifactId = await maybeSaveArtifact(cap, planResult.output, planResult.provider, planResult.model, appSlug, request.traceId)
+      logExecution(cap, planResult.provider, planResult.model, false, !!artifactId, null)
+      return {
+        success: true, capability: cap, provider: planResult.provider, model: planResult.model,
+        outputType: 'video_plan', output: planResult.output, artifactId, fallbackUsed: false,
+        warning: 'Suggestive video generation is not available — scene plan returned instead',
+      }
+    }
+    logExecution(cap, null, null, false, false, 'Suggestive video planning failed')
+    return { success: false, capability: cap, provider: null, model: null, outputType: 'video', output: null, fallbackUsed: false, error: 'No text provider available for suggestive video planning.' }
+  }
+
+  // ── Video generation (normal — safe mode only) ────────────────────────────
+  if (cap === 'video_generation' || cap === 'image_to_video') {
     const preferredModel = request.modelOverride ?? GENX_VIDEO_MODELS[0]
 
     if (!request.providerOverride || request.providerOverride === 'genx') {

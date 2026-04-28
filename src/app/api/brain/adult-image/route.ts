@@ -18,9 +18,9 @@
  *   4. A HuggingFace API key with access to the chosen models is required.
  *
  * PROVIDERS (in order):
- *   1. HuggingFace `SG161222/RealVisXL_V4.0`    — photorealistic, SDXL quality
- *   2. HuggingFace `Lykon/dreamshaper-8`          — versatile, high quality
- *   3. HuggingFace `stabilityai/stable-diffusion-xl-base-1.0` — SDXL base fallback
+ *   1. xAI / Grok image generation (grok-2-image) — uses existing Grok vault key
+ *   2. Together AI (FLUX.1-schnell-Free, FLUX.1-schnell, SDXL) — disable_safety_checker
+ *   3. HuggingFace (RealVisXL, DreamShaper, SDXL) — private endpoint recommended
  *
  * NOTE: HuggingFace standard Inference API may apply its own content moderation.
  * For unrestricted adult content, configure a private HuggingFace Inference Endpoint
@@ -183,7 +183,110 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── Provider: HuggingFace ────────────────────────────────────────────
+    // ── Provider 1: xAI / Grok image generation ─────────────────────────
+    // Reuses the existing Grok/xAI vault key — no separate adult key needed.
+    const grokKey = await getVaultApiKey('grok');
+    if (grokKey) {
+      try {
+        const xaiModel = 'grok-2-image';
+        const xaiResponse = await fetch('https://api.x.ai/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${grokKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ model: xaiModel, prompt: prompt.trim(), n: 1 }),
+          signal: AbortSignal.timeout(60_000),
+        });
+
+        if (xaiResponse.ok) {
+          const xaiData = await xaiResponse.json().catch(() => ({})) as {
+            data?: Array<{ url?: string; b64_json?: string }>;
+          };
+          const xaiUrl = xaiData.data?.[0]?.url ?? null;
+          const xaiB64 = xaiData.data?.[0]?.b64_json
+            ? `data:image/png;base64,${xaiData.data[0].b64_json}`
+            : null;
+          const xaiOutput = xaiUrl ?? xaiB64;
+          if (xaiOutput) {
+            return NextResponse.json({
+              capability: 'adult_18plus_image',
+              executed: true,
+              imageUrl: xaiUrl ?? undefined,
+              imageBase64: xaiB64 ?? undefined,
+              provider: 'xai',
+              model: xaiModel,
+              modelLabel: 'Grok-2 Image',
+              size: resolvedSize,
+              promptUsed: prompt.trim(),
+            });
+          }
+        } else {
+          const xaiErr = await xaiResponse.text().catch(() => '');
+          console.warn(`[brain/adult-image] xAI/Grok failed (${xaiResponse.status}): ${xaiErr.slice(0, 200)}`);
+        }
+      } catch (xaiErr) {
+        console.warn('[brain/adult-image] xAI/Grok error:', xaiErr instanceof Error ? xaiErr.message : xaiErr);
+      }
+    }
+
+    // ── Provider 2: Together AI (disable_safety_checker) ─────────────────
+    const togetherKey = await getVaultApiKey('together');
+    if (togetherKey) {
+      for (const model of TOGETHER_ADULT_MODELS) {
+        try {
+          const response = await fetch('https://api.together.xyz/v1/images/generations', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${togetherKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: model.id,
+              prompt: prompt.trim(),
+              n: 1,
+              steps: model.steps,
+              width,
+              height,
+              // Required to bypass Together AI's built-in safety checker for adult content.
+              // Hard guardrails (CSAM, minors, non-consensual, violence) are enforced
+              // upstream in content-filter.ts and checkAdultGuardrails() before reaching here.
+              disable_safety_checker: true,
+            }),
+            signal: AbortSignal.timeout(60_000),
+          });
+
+          if (response.ok) {
+            const data = await response.json().catch(() => ({})) as { data?: Array<{ url?: string }> };
+            const imageUrl = data.data?.[0]?.url;
+            if (imageUrl) {
+              return NextResponse.json({
+                capability: 'adult_18plus_image',
+                executed: true,
+                imageUrl,
+                provider: 'together',
+                model: model.id,
+                modelLabel: model.id,
+                size: resolvedSize,
+                promptUsed: prompt.trim(),
+              });
+            }
+          } else if (response.status === 422) {
+            // Safety checker triggered or model does not support this operation
+            const errBody = await response.text().catch(() => '');
+            console.warn(`[brain/adult-image] Together ${model.id} blocked (422): ${errBody.slice(0, 200)}`);
+            continue;
+          }
+        } catch (err) {
+          console.warn(
+            `[brain/adult-image] Together ${model.id} error:`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
+    }
+
+    // ── Provider 3: HuggingFace (private endpoint recommended for adult) ─
     const hfKey = await getVaultApiKey('huggingface');
     if (hfKey) {
       for (const model of HF_ADULT_MODELS) {
@@ -203,7 +306,7 @@ export async function POST(request: NextRequest) {
               negative_prompt.trim();
           }
 
-          const response = await fetch(
+          const hfResponse = await fetch(
             `https://api-inference.huggingface.co/models/${model.id}`,
             {
               method: 'POST',
@@ -216,10 +319,10 @@ export async function POST(request: NextRequest) {
             },
           );
 
-          if (response.ok) {
-            const contentType = response.headers.get('content-type') ?? 'image/png';
+          if (hfResponse.ok) {
+            const contentType = hfResponse.headers.get('content-type') ?? 'image/png';
             if (contentType.startsWith('image/') || contentType === 'application/octet-stream') {
-              const buffer = await response.arrayBuffer();
+              const buffer = await hfResponse.arrayBuffer();
               if (buffer.byteLength > 0) {
                 const base64 = Buffer.from(buffer).toString('base64');
                 const mimeType = contentType.startsWith('image/') ? contentType : 'image/png';
@@ -236,23 +339,23 @@ export async function POST(request: NextRequest) {
               }
             }
             // HF can return JSON even on 200 for loading/error states
-            const json = await response.json().catch(() => null) as { error?: string } | null;
+            const json = await hfResponse.json().catch(() => null) as { error?: string } | null;
             if (json?.error) {
               console.warn(`[brain/adult-image] HF ${model.id} returned JSON error: ${json.error}`);
               if (json.error.toLowerCase().includes('loading')) continue;
               break;
             }
-          } else if (response.status === 503) {
+          } else if (hfResponse.status === 503) {
             // Model loading — try next
             console.warn(`[brain/adult-image] HF ${model.id} loading (503), trying next`);
             continue;
           } else {
-            const errText = await response.text().catch(() => '');
+            const errText = await hfResponse.text().catch(() => '');
             console.warn(
-              `[brain/adult-image] HF ${model.id} failed (${response.status}): ${errText.slice(0, 200)}`,
+              `[brain/adult-image] HF ${model.id} failed (${hfResponse.status}): ${errText.slice(0, 200)}`,
             );
             // 401/403 means key issue — no point trying other models
-            if (response.status === 401 || response.status === 403) break;
+            if (hfResponse.status === 401 || hfResponse.status === 403) break;
           }
         } catch (err) {
           console.warn(
@@ -263,72 +366,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── Provider fallback: Together AI ───────────────────────────────────
-    const togetherKey = await getVaultApiKey('together');
-    if (togetherKey) {
-      for (const model of TOGETHER_ADULT_MODELS) {
-        try {
-          const response = await fetch('https://api.together.xyz/v1/images/generations', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${togetherKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: model.id,
-              prompt: prompt.trim(),
-              n: 1,
-              steps: model.steps,
-              width,
-              height,
-            }),
-            signal: AbortSignal.timeout(60_000),
-          });
-
-          if (response.ok) {
-            const data = await response.json().catch(() => ({})) as { data?: Array<{ url?: string }> };
-            const imageUrl = data.data?.[0]?.url;
-            if (imageUrl) {
-              return NextResponse.json({
-                capability: 'adult_18plus_image',
-                executed: true,
-                imageBase64: imageUrl,
-                provider: 'together',
-                model: model.id,
-                modelLabel: model.id,
-                size: resolvedSize,
-                promptUsed: prompt.trim(),
-              });
-            }
-          }
-        } catch (err) {
-          console.warn(
-            `[brain/adult-image] Together ${model.id} error:`,
-            err instanceof Error ? err.message : err,
-          );
-        }
-      }
-    }
-
     // ── No provider available ────────────────────────────────────────────
     const rejectionReasons: string[] = [];
+    if (!grokKey) {
+      rejectionReasons.push('xai: no Grok/xAI API key configured (Admin → AI Providers → xAI / Grok).');
+    } else {
+      rejectionReasons.push('xai: grok-2-image generation failed — key may not have image access.');
+    }
+    if (!togetherKey) {
+      rejectionReasons.push('together: no API key configured (Admin → AI Providers → Together AI).');
+    } else {
+      rejectionReasons.push('together: all model attempts failed or blocked by safety policy.');
+    }
     if (!hfKey) {
       rejectionReasons.push(
-        'huggingface: no API key configured. ' +
-        'Set HUGGINGFACE_API_KEY (Admin → AI Providers → Hugging Face). ' +
+        'huggingface: no API key configured (Admin → AI Providers → HuggingFace). ' +
         'For unrestricted adult content, use a private HuggingFace Inference Endpoint.',
       );
     } else {
       rejectionReasons.push(
-        'huggingface: all model attempts failed. The models may be loading, or your ' +
-        'API key may not have access to these models. For best results, configure a ' +
-        'private HuggingFace Inference Endpoint.',
+        'huggingface: all model attempts failed. Models may be loading, or the standard ' +
+        'Inference API may be blocking content. Consider a private Inference Endpoint.',
       );
-    }
-    if (!togetherKey) {
-      rejectionReasons.push('together: no API key configured. Set TOGETHER_API_KEY (Admin → AI Providers → Together AI).');
-    } else {
-      rejectionReasons.push('together: all model attempts failed.');
     }
 
     return NextResponse.json(
@@ -338,9 +397,9 @@ export async function POST(request: NextRequest) {
         code: 'no_eligible_adult_image_model',
         error:
           'No adult image generation provider is available. ' +
-          'A HuggingFace API key is required (Admin → AI Providers → Hugging Face). ' +
-          'Models tried: ' + HF_ADULT_MODELS.map((m) => m.id).join(', '),
-        providers_checked: ['huggingface', 'together'],
+          'Configure at least one of: xAI/Grok, Together AI, or HuggingFace (Admin → AI Providers). ' +
+          'This route never falls back to normal image generation.',
+        providers_checked: ['xai', 'together', 'huggingface'],
         rejection_reasons: rejectionReasons,
       },
       { status: 503 },

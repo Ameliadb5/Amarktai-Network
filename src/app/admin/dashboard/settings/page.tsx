@@ -986,9 +986,9 @@ function StorageSection({ config, onSaved }: { config: StorageConfig; onSaved: (
 // ── Adult Mode Section ────────────────────────────────────────────────────────
 
 const ADULT_PROVIDER_TYPES = [
+  { value: 'xai',         label: 'xAI / Grok Imagine (image)' },
   { value: 'together',    label: 'Together AI (image)' },
   { value: 'huggingface', label: 'HuggingFace Private Endpoint' },
-  { value: 'xai',         label: 'xAI / Grok Imagine (image + video)' },
   { value: 'custom',      label: 'Custom (OpenAI-compatible)' },
 ]
 
@@ -1077,9 +1077,21 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
     }
   }
 
+  const readyState: 'ready' | 'blocked' | 'unavailable' = (() => {
+    if (mode === 'disabled') return 'unavailable'
+    if (!testResult) return 'blocked'
+    // New structured test result: { success: true } means READY
+    if ('success' in testResult && testResult.success) return 'ready'
+    return 'blocked'
+  })()
+
   const badge = mode === 'disabled'
     ? { label: 'Disabled', color: 'text-slate-400 bg-slate-500/10 border-slate-500/20' }
-    : { label: ADULT_PROVIDER_TYPES.find(p => p.value === providerType)?.label ?? 'Specialist provider', color: 'text-violet-400 bg-violet-500/10 border-violet-500/20' }
+    : readyState === 'ready'
+    ? { label: '✓ READY', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' }
+    : readyState === 'blocked'
+    ? { label: '⚠ BLOCKED', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' }
+    : { label: 'UNAVAILABLE', color: 'text-red-400 bg-red-500/10 border-red-500/20' }
 
   return (
     <motion.div variants={fadeUp}>
@@ -1122,20 +1134,49 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
 
               {mode === 'specialist' && (
                 <>
+                  {/* READY / BLOCKED / UNAVAILABLE status banner */}
+                  {readyState === 'ready' && (
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                      <p className="text-xs font-semibold text-emerald-400">✓ ADULT MODE READY</p>
+                      <p className="text-[10px] text-emerald-300 mt-0.5">Provider selected · Model confirmed · Generation test passed · App can use adult mode</p>
+                      {testResult && 'provider' in testResult && testResult.provider != null && (
+                        <p className="text-[10px] text-emerald-400 mt-0.5">
+                          Provider: {String(testResult.provider)} · Model: {String(testResult.model ?? 'default')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {readyState === 'blocked' && testResult && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                      <p className="text-xs font-semibold text-amber-400">⚠ BLOCKED</p>
+                      {'error_category' in testResult && testResult.error_category != null && (
+                        <p className="text-[10px] text-amber-300 mt-0.5">Error: {String(testResult.error_category)}</p>
+                      )}
+                      {'message' in testResult && testResult.message != null && (
+                        <p className="text-[10px] text-amber-300 mt-0.5">{String(testResult.message)}</p>
+                      )}
+                    </div>
+                  )}
+                  {readyState === 'blocked' && !testResult && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                      <p className="text-xs font-semibold text-amber-400">⚠ BLOCKED — Test not run</p>
+                      <p className="text-[10px] text-amber-300 mt-0.5">Run &quot;Test provider&quot; to confirm adult generation works before enabling.</p>
+                    </div>
+                  )}
                   <Field label="Provider Type">
                     <select value={providerType} onChange={e => setProviderType(e.target.value)} className={inputCls}>
                       {ADULT_PROVIDER_TYPES.map(p => (
                         <option key={p.value} value={p.value}>{p.label}</option>
                       ))}
                     </select>
-                    {providerType === 'together' && (
-                      <p className="text-[10px] text-slate-600 mt-1">Together AI image API — disable_safety_checker is sent automatically for supported models</p>
-                    )}
                     {providerType === 'xai' && (
-                      <p className="text-[10px] text-amber-600 mt-1">xAI/Grok adult access must be confirmed — test image and video separately</p>
+                      <p className="text-[10px] text-blue-400 mt-1">Uses existing xAI/Grok vault key — no separate key needed if already configured in AI Providers</p>
+                    )}
+                    {providerType === 'together' && (
+                      <p className="text-[10px] text-blue-400 mt-1">Uses existing Together AI vault key — disable_safety_checker sent automatically</p>
                     )}
                     {providerType === 'huggingface' && (
-                      <p className="text-[10px] text-slate-600 mt-1">HuggingFace private inference endpoint — use your own deployed model</p>
+                      <p className="text-[10px] text-slate-400 mt-1">HuggingFace private inference endpoint — use your own deployed model for unrestricted adult content</p>
                     )}
                   </Field>
 
@@ -1165,7 +1206,13 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
                         {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    {config.hasSpecialistKey && <p className="text-[10px] text-slate-600 mt-1">Leave blank to keep existing key</p>}
+                    {config.hasSpecialistKey && <p className="text-[10px] text-slate-500 mt-1">Leave blank to keep existing key</p>}
+                    {(providerType === 'xai' || providerType === 'together') && !config.hasSpecialistKey && (
+                      <p className="text-[10px] text-blue-400 mt-1">
+                        ℹ Leave blank to use existing {providerType === 'xai' ? 'xAI/Grok' : 'Together AI'} vault key from AI Providers.
+                        {' '}Key status: using existing provider vault key
+                      </p>
+                    )}
                   </Field>
 
                   <Field label="Model ID (optional)">
@@ -1199,6 +1246,14 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
                 </>
               )}
 
+              {/* Unavailable banner when mode is disabled */}
+              {mode === 'disabled' && (
+                <div className="rounded-xl border border-slate-500/20 bg-slate-500/5 p-3">
+                  <p className="text-xs font-semibold text-slate-400">UNAVAILABLE — Adult mode is disabled</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Enable &quot;Specialist provider only&quot; and run a generation test to make adult mode available.</p>
+                </div>
+              )}
+
               {testResult && (
                 <TestResultBanner result={testResult} extra={testResult.message as string | undefined} />
               )}
@@ -1208,9 +1263,14 @@ function AdultSection({ config, onSaved }: { config: AdultConfig; onSaved: () =>
                   {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                   Save
                 </button>
-                <button onClick={test} disabled={testing || mode === 'disabled'} className={btnSecondary}>
+                <button
+                  onClick={test}
+                  disabled={testing || mode === 'disabled'}
+                  title={mode === 'disabled' ? 'Enable specialist provider first' : readyState === 'ready' ? 'Test passed — adult mode ready' : 'Run generation test'}
+                  className={`${btnSecondary} ${readyState === 'ready' ? 'border-emerald-500/30 text-emerald-400' : ''}`}
+                >
                   {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TestTube2 className="h-3.5 w-3.5" />}
-                  Test provider
+                  {readyState === 'ready' ? 'Re-test provider' : 'Test provider (required)'}
                 </button>
                 {saveMsg && (
                   <span className={`text-xs ${saveMsg.startsWith('Error') ? 'text-red-400' : 'text-emerald-400'}`}>
@@ -1524,31 +1584,34 @@ function WebdockSection() {
 
 // ── Providers Section ─────────────────────────────────────────────────────────
 
-const PROVIDER_DEFS = [
-  // ── Chat / reasoning ──────────────────────────────────────────────────────
-  { key: 'openai',       label: 'OpenAI',            placeholder: 'sk-…',       caps: ['chat', 'code', 'images', 'embeddings', 'tts', 'stt'] },
+// ── Providers Section ─────────────────────────────────────────────────────────
+
+const PROVIDER_DEFS_CORE = [
   { key: 'gemini',       label: 'Google Gemini',     placeholder: 'AIza…',      caps: ['chat', 'reasoning', 'vision'] },
-  { key: 'groq',         label: 'Groq',              placeholder: 'gsk_…',      caps: ['chat', 'code', 'stt'] },
-  { key: 'anthropic',    label: 'Anthropic',         placeholder: 'sk-ant-…',   caps: ['chat', 'code', 'reasoning', 'vision'] },
-  { key: 'mistral',      label: 'Mistral AI',        placeholder: 'XXXX…',      caps: ['chat', 'code', 'embeddings'] },
-  { key: 'cohere',       label: 'Cohere',            placeholder: 'XXXX…',      caps: ['chat', 'embeddings', 'reranking'] },
-  { key: 'grok',         label: 'xAI / Grok',        placeholder: 'xai-…',      caps: ['chat', 'reasoning', 'vision'] },
   { key: 'qwen',         label: 'Qwen / DashScope',  placeholder: 'sk-…',       caps: ['chat', 'reasoning', 'images', 'video', 'stt'] },
+  { key: 'groq',         label: 'Groq',              placeholder: 'gsk_…',      caps: ['chat', 'code', 'stt'] },
+  { key: 'grok',         label: 'xAI / Grok',        placeholder: 'xai-…',      caps: ['chat', 'reasoning', 'vision', 'adult_image'] },
   { key: 'openrouter',   label: 'OpenRouter',        placeholder: 'sk-or-…',    caps: ['chat', 'code', 'reasoning'] },
-  // ── Images / video ────────────────────────────────────────────────────────
-  { key: 'together',     label: 'Together AI',       placeholder: 'tg_…',       caps: ['chat', 'code', 'images'] },
-  { key: 'replicate',    label: 'Replicate',         placeholder: 'r8_…',       caps: ['images', 'video'] },
-  { key: 'huggingface',  label: 'HuggingFace',       placeholder: 'hf_…',       caps: ['chat', 'embeddings', 'images', 'tts'] },
-  // ── Voice (TTS / STT) ──────────────────────────────────────────────────────
+  { key: 'together',     label: 'Together AI',       placeholder: 'tg_…',       caps: ['chat', 'code', 'images', 'adult_image'] },
+  { key: 'huggingface',  label: 'HuggingFace',       placeholder: 'hf_…',       caps: ['chat', 'embeddings', 'images', 'tts', 'adult_image'] },
+]
+
+const PROVIDER_DEFS_ADVANCED = [
+  { key: 'openai',       label: 'OpenAI',            placeholder: 'sk-…',       caps: ['chat', 'code', 'images', 'embeddings', 'tts', 'stt'] },
   { key: 'elevenlabs',   label: 'ElevenLabs',        placeholder: 'XXXX…',      caps: ['tts', 'voice'] },
   { key: 'deepgram',     label: 'Deepgram',          placeholder: 'XXXX…',      caps: ['stt', 'tts', 'voice'] },
   { key: 'assemblyai',   label: 'AssemblyAI',        placeholder: 'XXXX…',      caps: ['stt', 'transcription'] },
+  { key: 'anthropic',    label: 'Anthropic',         placeholder: 'sk-ant-…',   caps: ['chat', 'code', 'reasoning', 'vision'] },
+  { key: 'mistral',      label: 'Mistral AI',        placeholder: 'XXXX…',      caps: ['chat', 'code', 'embeddings'] },
+  { key: 'cohere',       label: 'Cohere',            placeholder: 'XXXX…',      caps: ['chat', 'embeddings', 'reranking'] },
+  { key: 'replicate',    label: 'Replicate',         placeholder: 'r8_…',       caps: ['images', 'video'] },
 ]
 
 function ProvidersSection() {
   const [providers, setProviders] = useState<ProviderRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1575,7 +1638,7 @@ function ProvidersSection() {
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            Fallback AI providers used when the AI Engine is unavailable. Each key is stored encrypted and never returned in plaintext.
+            Fallback AI providers used when the AI Engine is unavailable. Each key is stored encrypted and never returned in plaintext. xAI/Grok, Together AI, and HuggingFace keys are also used by Adult Mode.
           </p>
 
           {open && (
@@ -1585,20 +1648,52 @@ function ProvidersSection() {
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading providers…
                 </div>
               ) : (
-                PROVIDER_DEFS.map(def => {
-                  const record = providers.find(p => p.providerKey === def.key)
-                  return (
-                    <ProviderForm
-                      key={def.key}
-                      providerKey={def.key}
-                      label={def.label}
-                      placeholder={def.placeholder}
-                      capabilities={def.caps}
-                      record={record ?? null}
-                      onSaved={load}
-                    />
-                  )
-                })
+                <>
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Core Providers</p>
+                  {PROVIDER_DEFS_CORE.map(def => {
+                    const record = providers.find(p => p.providerKey === def.key)
+                    return (
+                      <ProviderForm
+                        key={def.key}
+                        providerKey={def.key}
+                        label={def.label}
+                        placeholder={def.placeholder}
+                        capabilities={def.caps}
+                        record={record ?? null}
+                        onSaved={load}
+                      />
+                    )
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced(v => !v)}
+                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 mt-2"
+                  >
+                    {showAdvanced ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    Advanced / Legacy providers
+                  </button>
+
+                  {showAdvanced && (
+                    <>
+                      <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Advanced / Legacy</p>
+                      {PROVIDER_DEFS_ADVANCED.map(def => {
+                        const record = providers.find(p => p.providerKey === def.key)
+                        return (
+                          <ProviderForm
+                            key={def.key}
+                            providerKey={def.key}
+                            label={def.label}
+                            placeholder={def.placeholder}
+                            capabilities={def.caps}
+                            record={record ?? null}
+                            onSaved={load}
+                          />
+                        )
+                      })}
+                    </>
+                  )}
+                </>
               )}
             </div>
           )}
