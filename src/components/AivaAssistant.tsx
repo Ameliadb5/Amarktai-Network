@@ -107,16 +107,19 @@ const ORB_COLORS: Record<OrbState, { ring: string; glow: string; pulse: string; 
 // ── Avatar Component ───────────────────────────────────────────────────────────
 /**
  * Shows avatar image for the given state.
+ * Prefers dynamicUrls (from DB settings) over static paths.
  * Falls back to a gradient-orb SVG if the image is absent or fails to load.
  */
 function AivaAvatarDisplay({
   state,
   size = 96,
   onClick,
+  dynamicUrls,
 }: {
   state: OrbState
   size?: number
   onClick?: () => void
+  dynamicUrls?: Record<string, string | null>
 }) {
   const [imgFailed, setImgFailed] = useState(false)
   const colors = ORB_COLORS[state]
@@ -126,7 +129,8 @@ function AivaAvatarDisplay({
   // Reset failure state when state changes (different state may have its asset)
   useEffect(() => { setImgFailed(false) }, [state])
 
-  const src = AIVA_AVATAR_ASSETS[state]
+  // Prefer DB-stored URL, fall back to static path
+  const src = (dynamicUrls?.[state] ?? null) || AIVA_AVATAR_ASSETS[state]
   const showOrb = imgFailed || !src
 
   return (
@@ -283,6 +287,9 @@ export default function AivaAssistant() {
   const [mode, setMode] = useState<'chat' | 'orb'>('chat')
   const [minimized, setMinimized] = useState(false)
 
+  // Dynamic avatar URLs loaded from DB settings (set via avatar generator)
+  const [dynamicAvatarUrls, setDynamicAvatarUrls] = useState<Record<string, string | null>>({})
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -314,6 +321,18 @@ export default function AivaAssistant() {
       localStorage.setItem('aiva-conversation-id', conversationId)
     }
   }, [conversationId])
+
+  // Load dynamic avatar URLs from DB settings (set via Admin → Settings → Aiva Avatar)
+  useEffect(() => {
+    fetch('/api/admin/aiva/avatar-settings')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d && d.avatarUrls) {
+          setDynamicAvatarUrls(d.avatarUrls as Record<string, string | null>)
+        }
+      })
+      .catch(() => { /* silent — falls back to static paths or orb */ })
+  }, [])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -580,6 +599,7 @@ export default function AivaAssistant() {
             state={orbState}
             size={56}
             onClick={() => setMinimized(false)}
+            dynamicUrls={dynamicAvatarUrls}
           />
           <span className="text-[9px] uppercase tracking-widest text-cyan-400/70">Aiva</span>
         </div>
@@ -791,6 +811,7 @@ export default function AivaAssistant() {
             state={isRecording ? 'listening' : orbState}
             size={104}
             onClick={toggleRecording}
+            dynamicUrls={dynamicAvatarUrls}
           />
 
           {/* State label */}

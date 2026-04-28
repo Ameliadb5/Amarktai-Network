@@ -116,6 +116,11 @@ export default function NewAppPage() {
   const [capPack, setCapPack] = useState<CapabilityPack | null>(null)
   const [discoveryError, setDiscoveryError] = useState('')
   const [discoveryAccepted, setDiscoveryAccepted] = useState(false)
+  // Firecrawl intelligence crawl
+  const [crawling, setCrawling] = useState(false)
+  const [crawlProfile, setCrawlProfile] = useState<Record<string, unknown> | null>(null)
+  const [crawlError, setCrawlError] = useState<string | null>(null)
+  const [crawlWarning, setCrawlWarning] = useState<string | null>(null)
   // Step 1 – Identity
   const [slug, setSlug] = useState('')
   const [category, setCategory] = useState('generic')
@@ -192,6 +197,34 @@ export default function NewAppPage() {
     setDiscoveryAccepted(true)
     if (!slug) setSlug(slugify(appName))
   }
+
+  // Firecrawl intelligence crawl
+  async function runFirecrawl() {
+    if (!appUrl.trim()) { setCrawlError('Enter an App URL above first.'); return }
+    setCrawling(true); setCrawlError(null); setCrawlWarning(null); setCrawlProfile(null)
+    try {
+      const res = await fetch('/api/admin/apps/intelligence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: appName.trim() || 'New App', websiteUrl: appUrl.trim(), description: description.trim() || undefined }),
+      })
+      const data = await res.json() as {
+        success?: boolean; error?: string
+        firecrawlWarning?: string; profile?: Record<string, unknown>
+        modelPackage?: Record<string, unknown>
+      }
+      if (!res.ok || !data.success) { setCrawlError(data.error ?? 'Intelligence crawl failed'); return }
+      if (data.firecrawlWarning) setCrawlWarning(data.firecrawlWarning)
+      if (data.profile) {
+        setCrawlProfile({ ...data.profile, modelPackage: data.modelPackage ?? {} })
+        // Auto-populate capabilities from recommendation
+        const rec = (data.profile.recommendedCapabilities ?? []) as string[]
+        if (rec.length > 0) setCaps(rec)
+      }
+    } catch (e) { setCrawlError(e instanceof Error ? e.message : 'Request failed') }
+    finally { setCrawling(false) }
+  }
+
   // Deploy API call
   async function handleDeploy() {
     setSubmitting(true)
@@ -322,6 +355,62 @@ export default function NewAppPage() {
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />{discoveryError}
           </motion.div>
         )}
+
+        {/* ── Firecrawl Intelligence Crawl ─────────────────────────────── */}
+        <div className={`${glass} p-5 space-y-4`}>
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4 text-cyan-400" />
+            <h3 className="text-sm font-semibold text-white">Firecrawl App Intelligence</h3>
+            <span className="text-[10px] text-slate-500 ml-1">(optional — requires Firecrawl API key)</span>
+          </div>
+          <p className="text-xs text-slate-500">
+            Crawl the app website to generate an AI intelligence profile, detect brand tone,
+            products/services, and auto-recommend capabilities. The profile is saved to DB.
+          </p>
+          <button
+            type="button"
+            onClick={runFirecrawl}
+            disabled={crawling || !appUrl.trim()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-400 hover:bg-cyan-400/20 transition disabled:opacity-40"
+          >
+            {crawling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+            {crawling ? 'Crawling website…' : 'Crawl Website with Firecrawl'}
+          </button>
+          {!appUrl.trim() && (
+            <p className="text-[10px] text-slate-600">Enter App URL above to enable crawling.</p>
+          )}
+          {crawlWarning && (
+            <div className="flex items-start gap-2 p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs text-amber-400">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{crawlWarning}
+            </div>
+          )}
+          {crawlError && (
+            <div className="flex items-start gap-2 p-3 rounded-xl border border-red-500/20 bg-red-500/5 text-xs text-red-400">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{crawlError}
+            </div>
+          )}
+          {crawlProfile && !crawlError && (
+            <div className="space-y-3">
+              <p className="text-xs text-emerald-400 flex items-center gap-1">
+                <Check className="w-3 h-3" /> Intelligence profile generated
+                {Array.isArray(crawlProfile.recommendedCapabilities) && (
+                  <span className="ml-1 text-slate-500">— capabilities auto-populated in step 3</span>
+                )}
+              </p>
+              {crawlProfile.brandSummary && (
+                <p className="text-xs text-slate-400 leading-relaxed">{String(crawlProfile.brandSummary)}</p>
+              )}
+              {Array.isArray(crawlProfile.recommendedCapabilities) && (crawlProfile.recommendedCapabilities as string[]).length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {(crawlProfile.recommendedCapabilities as string[]).map((c: string) => (
+                    <span key={c} className="px-2 py-1 rounded-lg border border-cyan-400/20 bg-cyan-400/5 text-[10px] text-cyan-400">{c}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {discovery && (
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
             className={`${glass} p-6 space-y-5`}>

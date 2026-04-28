@@ -8,7 +8,7 @@ import {
   ArrowLeft, RefreshCw, AlertCircle, CheckCircle, Clock, WifiOff,
   LayoutDashboard, Brain, BarChart3, BookOpen, Target, FileText,
   Activity, Zap, Globe, Shield, Bot, Copy, Check, Loader2,
-  Send, MessageSquare,
+  Send, MessageSquare, Cpu, AlertTriangle,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -188,17 +188,18 @@ const HEALTH: Record<string, { color: string; icon: typeof CheckCircle; label: s
   offline:  { color: 'text-slate-500',   icon: WifiOff,     label: 'Offline' },
 }
 
-const TABS = ['Overview', 'AI Stack', 'Agents', 'Metrics', 'Learning', 'Strategy', 'Events', 'Safety'] as const
+const TABS = ['Overview', 'AI Stack', 'Agents', 'Metrics', 'Learning', 'Strategy', 'Events', 'Safety', 'Intelligence'] as const
 type Tab = (typeof TABS)[number]
 const TAB_ICONS: Record<Tab, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
-  Overview:  LayoutDashboard,
-  'AI Stack': Brain,
-  Agents:    Bot,
-  Metrics:   BarChart3,
-  Learning:  BookOpen,
-  Strategy:  Target,
-  Events:    FileText,
-  Safety:    Shield,
+  Overview:      LayoutDashboard,
+  'AI Stack':    Brain,
+  Agents:        Bot,
+  Metrics:       BarChart3,
+  Learning:      BookOpen,
+  Strategy:      Target,
+  Events:        FileText,
+  Safety:        Shield,
+  Intelligence:  Cpu,
 }
 
 const fadeUp = {
@@ -402,6 +403,7 @@ export default function AppDetailPage() {
         {tab === 'Strategy' && <StrategyTab appSlug={app.slug} appName={app.name} appCategory={app.category} />}
         {tab === 'Events' && <AppEventsTab appSlug={app.slug} />}
         {tab === 'Safety' && <SafetyTab appSlug={app.slug} />}
+        {tab === 'Intelligence' && <IntelligenceTab appSlug={app.slug} appName={app.name} websiteUrl={app.primaryUrl} />}
       </motion.div>
     </motion.div>
   )
@@ -1944,6 +1946,225 @@ function SafetyTab({ appSlug }: { appSlug: string }) {
           All prompts are scanned before generation. CSAM, violence, self-harm, and hate speech are always blocked.
         </p>
       </div>
+    </div>
+  )
+}
+
+/* ── Tab: Intelligence ───────────────────────────────────── */
+interface IntelligenceProfile {
+  businessType: string
+  crawlSummary: string
+  brandTone: string
+  targetUsers: string[]
+  productsServices: string[]
+  contentTopics: string[]
+  risks: string[]
+  recommendedCapabilities: string[]
+  recommendedModelPackage: Record<string, unknown>
+  lastCrawledAt: string | null
+  crawlArtifactId: string | null
+}
+
+function IntelligenceTab({ appSlug, appName, websiteUrl }: { appSlug: string; appName: string; websiteUrl: string }) {
+  const [profile, setProfile] = useState<IntelligenceProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [crawling, setCrawling] = useState(false)
+  const [crawlUrl, setCrawlUrl] = useState(websiteUrl || '')
+  const [crawlError, setCrawlError] = useState<string | null>(null)
+  const [crawlWarning, setCrawlWarning] = useState<string | null>(null)
+  const [crawlSuccess, setCrawlSuccess] = useState(false)
+
+  useEffect(() => {
+    fetch(`/api/admin/apps/intelligence?appSlug=${encodeURIComponent(appSlug)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.profile) setProfile(d.profile as IntelligenceProfile)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [appSlug])
+
+  async function crawl() {
+    if (!crawlUrl.trim()) { setCrawlError('Enter a website URL to crawl.'); return }
+    setCrawling(true); setCrawlError(null); setCrawlWarning(null); setCrawlSuccess(false)
+    try {
+      const res = await fetch('/api/admin/apps/intelligence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appId: appSlug, name: appName, websiteUrl: crawlUrl.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCrawlError(data.error ?? 'Crawl failed'); return }
+      if (data.firecrawlWarning) setCrawlWarning(data.firecrawlWarning as string)
+      if (data.profile) setProfile(data.profile as IntelligenceProfile)
+      setCrawlSuccess(true)
+    } catch (e) { setCrawlError(e instanceof Error ? e.message : 'Request failed') }
+    finally { setCrawling(false) }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 p-6 text-xs text-slate-500">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading intelligence profile…
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Crawl panel */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 space-y-4">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+          <Globe className="w-4 h-4 text-cyan-400" /> Firecrawl App Intelligence
+        </h3>
+        <p className="text-xs text-slate-500">
+          Crawl this app&apos;s website to build an AI intelligence profile. The brain will summarise the business,
+          detect capabilities needed, and recommend a model package.
+        </p>
+        <div className="flex gap-2">
+          <input
+            value={crawlUrl}
+            onChange={e => setCrawlUrl(e.target.value)}
+            placeholder="https://example.com"
+            className="flex-1 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+          />
+          <button
+            onClick={crawl}
+            disabled={crawling}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-400 hover:bg-cyan-400/20 transition disabled:opacity-40"
+          >
+            {crawling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+            {crawling ? 'Crawling…' : profile ? 'Re-crawl' : 'Crawl with Firecrawl'}
+          </button>
+        </div>
+
+        {crawlWarning && (
+          <div className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-400">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{crawlWarning}
+          </div>
+        )}
+        {crawlError && (
+          <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-400">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{crawlError}
+          </div>
+        )}
+        {crawlSuccess && !crawlError && (
+          <p className="text-xs text-emerald-400 flex items-center gap-1">
+            <CheckCircle className="w-3.5 h-3.5" /> Intelligence profile saved successfully.
+          </p>
+        )}
+      </div>
+
+      {/* Profile display */}
+      {profile ? (
+        <div className="space-y-4">
+          {profile.lastCrawledAt && (
+            <p className="text-[10px] text-slate-600">
+              Last crawled: {new Date(profile.lastCrawledAt).toLocaleString()}
+              {profile.crawlArtifactId && (
+                <span className="ml-2 text-purple-400">artifact: {profile.crawlArtifactId.slice(0, 8)}…</span>
+              )}
+            </p>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Business summary */}
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-semibold text-white">Business Summary</h4>
+              {profile.businessType && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Type</span>
+                  <span className="text-slate-300 capitalize">{profile.businessType}</span>
+                </div>
+              )}
+              {profile.brandTone && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Brand Tone</span>
+                  <span className="text-slate-300 capitalize">{profile.brandTone}</span>
+                </div>
+              )}
+              {profile.crawlSummary && (
+                <p className="text-xs text-slate-400 leading-relaxed">{profile.crawlSummary}</p>
+              )}
+            </div>
+
+            {/* Model package */}
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-semibold text-white">Recommended Model Package</h4>
+              {Object.entries(profile.recommendedModelPackage).map(([key, val]) => (
+                <div key={key} className="flex justify-between text-xs">
+                  <span className="text-slate-500 capitalize">{key}</span>
+                  <span className="text-cyan-400 font-mono">
+                    {Array.isArray(val) ? val.join(', ') : String(val || '—')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Capabilities */}
+          {profile.recommendedCapabilities.length > 0 && (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-semibold text-white">Recommended Capabilities</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {profile.recommendedCapabilities.map(cap => (
+                  <span key={cap} className="px-2 py-1 rounded-lg border border-cyan-400/20 bg-cyan-400/5 text-[10px] text-cyan-400">
+                    {cap}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Target users / products */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {profile.targetUsers.length > 0 && (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-2">
+                <h4 className="text-xs font-semibold text-white">Target Users</h4>
+                <ul className="space-y-1">
+                  {profile.targetUsers.map((u, i) => (
+                    <li key={i} className="text-xs text-slate-400 flex items-start gap-1.5">
+                      <span className="text-cyan-400 mt-0.5">•</span>{u}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {profile.productsServices.length > 0 && (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-2">
+                <h4 className="text-xs font-semibold text-white">Products / Services</h4>
+                <ul className="space-y-1">
+                  {profile.productsServices.map((p, i) => (
+                    <li key={i} className="text-xs text-slate-400 flex items-start gap-1.5">
+                      <span className="text-cyan-400 mt-0.5">•</span>{p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Risks */}
+          {profile.risks.length > 0 && (
+            <div className="bg-white/[0.03] border border-amber-500/10 rounded-xl p-4 space-y-2">
+              <h4 className="text-xs font-semibold text-white flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Identified Risks
+              </h4>
+              <ul className="space-y-1">
+                {profile.risks.map((r, i) => (
+                  <li key={i} className="text-xs text-amber-400/80 flex items-start gap-1.5">
+                    <span className="text-amber-400 mt-0.5">•</span>{r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 text-center">
+          <p className="text-sm text-slate-500">No intelligence profile yet. Crawl the app&apos;s website to generate one.</p>
+        </div>
+      )}
     </div>
   )
 }

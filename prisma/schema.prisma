@@ -1064,3 +1064,37 @@ model AivaMemory {
   @@index([memoryType])
   @@map("aiva_memories")
 }
+
+/// Generic key-value system settings store (e.g. Aiva avatar config, global flags).
+model SystemSetting {
+  key       String   @id
+  value     String   @default("") // JSON or plain string
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+/// Firecrawl + Brain intelligence profile for a connected app.
+/// Populated via POST /api/admin/apps/intelligence.
+model AppIntelligenceProfile {
+  id                      String    @id @default(cuid())
+  appSlug                 String    @unique @map("app_slug")
+  appName                 String    @default("") @map("app_name")
+  websiteUrl              String    @default("") @map("website_url")
+  businessType            String    @default("") @map("business_type")
+  crawlSummary            String    @default("") @map("crawl_summary")
+  brandTone               String    @default("") @map("brand_tone")
+  targetUsers             String    @default("[]") @map("target_users")          // JSON string[]
+  productsServices        String    @default("[]") @map("products_services")     // JSON string[]
+  supportKnowledge        String    @default("[]") @map("support_knowledge")     // JSON string[]
+  contentTopics           String    @default("[]") @map("content_topics")        // JSON string[]
+  risks                   String    @default("[]")                               // JSON string[]
+  recommendedCapabilities String    @default("[]") @map("recommended_capabilities") // JSON string[]
+  recommendedModelPackage String    @default("{}") @map("recommended_model_package") // JSON object
+  crawlArtifactId         String?   @map("crawl_artifact_id")
+  lastCrawledAt           DateTime? @map("last_crawled_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  @@map("app_intelligence_profiles")
+}
