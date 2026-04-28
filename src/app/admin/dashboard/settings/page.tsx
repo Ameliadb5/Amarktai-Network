@@ -383,6 +383,20 @@ const VOICE_MODELS = [
   { value: 'tts-1-hd',          label: 'OpenAI TTS-1 HD' },
 ]
 
+interface AivaContextData {
+  genxStatus: { available: boolean; error: string | null; modelCount: number }
+  missingKeys: string[]
+  artifactCount: number
+  fallbackUsage: number
+  firecrawlStatus: boolean
+  storagePersistent: boolean
+  emotionPersistence: 'redis' | 'in_memory'
+  aivaChatReady: boolean
+  aivaVoiceReady: boolean
+  lastCapabilityUsed: string | null
+  lastArtifact: { id: string; type: string; title: string; createdAt: string } | null
+}
+
 function AivaSection({ config, onSaved }: { config: AivaConfig; onSaved: () => void }) {
   const [open, setOpen] = useState(false)
   const [typedEnabled, setTypedEnabled] = useState(config.typedEnabled ?? true)
@@ -395,6 +409,17 @@ function AivaSection({ config, onSaved }: { config: AivaConfig; onSaved: () => v
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
+  const [aivaCtx, setAivaCtx] = useState<AivaContextData | null>(null)
+  const [ctxLoading, setCtxLoading] = useState(false)
+
+  useEffect(() => {
+    setCtxLoading(true)
+    fetch('/api/admin/aiva/context')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setAivaCtx(d) })
+      .catch(() => {})
+      .finally(() => setCtxLoading(false))
+  }, [])
 
   async function save() {
     setSaving(true)
@@ -453,6 +478,70 @@ function AivaSection({ config, onSaved }: { config: AivaConfig; onSaved: () => v
           <p className="text-xs text-slate-500">
             Aiva — AmarktAI Voice &amp; Intelligence Assistant. Configure typed chat mode and voice mode separately. Voice mode requires STT and TTS providers to be configured.
           </p>
+
+          {/* ── Aiva Status Panel ─────────────────────────────────────────── */}
+          <div className="rounded-xl border border-blue-500/15 bg-blue-500/5 p-4 space-y-2">
+            <p className="text-[10px] uppercase tracking-widest text-blue-400 font-semibold mb-3">Live Status</p>
+            {ctxLoading ? (
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading status…
+              </div>
+            ) : aivaCtx ? (
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <StatusRow
+                  label="Aiva Chat"
+                  value={aivaCtx.aivaChatReady ? 'Ready' : 'Unavailable'}
+                  ok={aivaCtx.aivaChatReady}
+                />
+                <StatusRow
+                  label="Aiva Voice"
+                  value={aivaCtx.aivaVoiceReady ? 'Ready' : 'Unavailable'}
+                  ok={aivaCtx.aivaVoiceReady}
+                />
+                <StatusRow
+                  label="STT"
+                  value={aivaCtx.aivaVoiceReady ? 'GenX (primary)' : 'Browser fallback'}
+                  ok={aivaCtx.aivaVoiceReady}
+                />
+                <StatusRow
+                  label="TTS"
+                  value={aivaCtx.aivaVoiceReady ? 'GenX (primary)' : 'Not available'}
+                  ok={aivaCtx.aivaVoiceReady}
+                />
+                <StatusRow
+                  label="Memory"
+                  value="DB-backed"
+                  ok={true}
+                />
+                <StatusRow
+                  label="Emotion"
+                  value="In-memory only"
+                  ok={false}
+                  warn
+                />
+                <StatusRow
+                  label="Last capability"
+                  value={aivaCtx.lastCapabilityUsed ?? '—'}
+                  ok={!!aivaCtx.lastCapabilityUsed}
+                />
+                <StatusRow
+                  label="Fallbacks (24h)"
+                  value={String(aivaCtx.fallbackUsage)}
+                  ok={aivaCtx.fallbackUsage === 0}
+                  warn={aivaCtx.fallbackUsage > 0}
+                />
+                {aivaCtx.missingKeys.length > 0 && (
+                  <div className="col-span-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2">
+                    <p className="text-[10px] text-amber-400 mb-1 font-medium">Missing provider keys:</p>
+                    <p className="text-[10px] text-amber-300">{aivaCtx.missingKeys.join(', ')}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">Status unavailable</p>
+            )}
+          </div>
 
           {open && (
             <div className="space-y-4">
@@ -1675,6 +1764,30 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1">
       <label className="text-[10px] uppercase tracking-wider text-slate-500">{label}</label>
       {children}
+    </div>
+  )
+}
+
+function StatusRow({
+  label,
+  value,
+  ok,
+  warn,
+}: {
+  label: string
+  value: string
+  ok: boolean
+  warn?: boolean
+}) {
+  const color = ok
+    ? 'text-emerald-400'
+    : warn
+    ? 'text-amber-400'
+    : 'text-red-400'
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[10px] text-slate-500">{label}</span>
+      <span className={`text-[10px] font-medium ${color}`}>{value}</span>
     </div>
   )
 }

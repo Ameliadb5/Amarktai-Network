@@ -1011,3 +1011,56 @@ model WorkspaceSession {
   @@index([traceId])
   @@map("workspace_sessions")
 }
+
+// ── Aiva System Assistant — Phase 2 ─────────────────────────────────────────
+
+/// Aiva conversation session (persisted chat history)
+model AivaConversation {
+  id        String   @id @default(cuid())
+  title     String   @default("New Conversation")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  messages AivaMessage[]
+
+  @@map("aiva_conversations")
+}
+
+/// Individual message in an Aiva conversation
+model AivaMessage {
+  id             String   @id @default(cuid())
+  conversationId String   @map("conversation_id")
+  role           String   // user | assistant | system
+  content        String
+  capability     String   @default("") // capability used for this message
+  provider       String   @default("") // provider that responded
+  model          String   @default("") // model used
+  outputType     String   @default("text") @map("output_type")
+  artifactId     String?  @map("artifact_id")
+  fallbackUsed   Boolean  @default(false) @map("fallback_used")
+  warning        String?
+  errorMessage   String?  @map("error_message")
+  metadata       String   @default("{}") // JSON
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation AivaConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("aiva_messages")
+}
+
+/// Aiva persistent memory entries (user preferences, learned facts, etc.)
+model AivaMemory {
+  id          String   @id @default(cuid())
+  memoryType  String   @default("preference") @map("memory_type") // preference | fact | summary | app | workspace | artifact | capability
+  key         String   @default("")
+  content     String
+  importance  Float    @default(0.5) // 0.0–1.0
+  tags        String   @default("[]") @map("tags") // JSON string[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([memoryType])
+  @@map("aiva_memories")
+}

@@ -17,6 +17,7 @@ import {
   Settings2,
   Activity,
 } from 'lucide-react'
+import AivaAssistant from '@/components/AivaAssistant'
 
 const NAV_GROUPS: Array<{
   label?: string
@@ -140,6 +141,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>
+
+      {/* Aiva floating assistant — fixed overlay, visible on all admin pages */}
+      <AivaAssistant />
     </div>
   )
 }
